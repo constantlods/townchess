@@ -65,8 +65,8 @@ const GradeShader = {
       col *= vig;
       // game state accents: muted red creeping in from the edges only
       float edge = smoothstep(0.12, 0.5, r2 * 1.8);
-      col = mix(col, col * vec3(1.25, 0.7, 0.66) + vec3(0.03, 0.0, 0.0), edge * uCheck * 0.55);
-      col = mix(col, col * vec3(1.15, 0.45, 0.42), edge * uMate * 0.7);
+      col = mix(col, col * vec3(1.1, 0.72, 0.68), edge * uCheck * 0.4);
+      col = mix(col, col * vec3(0.95, 0.55, 0.5), edge * uMate * 0.45);
       col *= 1.0 - uFade;
       // film grain (luma-weighted, 2-5%)
       float g = hash(vUv * uResolution + fract(uTime * 7.31) * 100.0) - 0.5;

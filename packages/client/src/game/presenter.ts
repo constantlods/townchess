@@ -232,6 +232,7 @@ export class Presenter {
     const result = won ? 'You Win' : lost ? 'You Lose' : 'Draw';
     const detail = s.status === 'timeout' ? (won ? 'Your opponent ran out of time.' : 'Your time ran out.')
       : s.status === 'resigned' ? (won ? 'Your opponent resigned.' : 'You resigned.') : '';
+    this.ui.setStatus('');
     this.ui.showGameOver(title, result, detail);
   }
 

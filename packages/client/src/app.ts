@@ -76,6 +76,8 @@ export class App {
     this.applyCameraOverride();
     this.world.setPosition(new ChessRules().pieces());
     this.arms = new PlayerArms(this.world, s.cosmetics);
+    this.arms.layout(innerWidth / innerHeight);
+    addEventListener('resize', () => { if (this.screen !== 'customize') this.arms.layout(innerWidth / innerHeight); });
     this.opp = new Opponent({ reducedHorror: s.reducedHorror });
     this.world.scene.add(this.opp);
     this.applyMotion();
@@ -313,15 +315,15 @@ export class App {
     setTexScale(prevScale);
     const url = await this.world.thumbnail(() => {
       const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(preset.fog, preset.fogDensity);
+      scene.fog = new THREE.FogExp2(preset.fog, preset.fogDensity * 0.45);
       scene.background = new THREE.Color(preset.fog);
       scene.environment = this.world.scene.environment;
       const board = this.world.board, opp = this.opp;
       const bParent = board.parent!, oParent = opp.parent!;
       scene.add(env.group, board, opp);
-      const cam = new THREE.PerspectiveCamera(50, 16 / 9, 0.02, 30);
-      cam.position.set(0.25, TABLE_TOP + 0.55, 0.95);
-      cam.lookAt(-0.05, TABLE_TOP + 0.08, -0.15);
+      const cam = new THREE.PerspectiveCamera(58, 16 / 9, 0.02, 30);
+      cam.position.set(0.55, TABLE_TOP + 0.75, 1.45);
+      cam.lookAt(-0.15, TABLE_TOP + 0.3, -0.9);
       return { scene, camera: cam, cleanup: () => { bParent.add(board); oParent.add(opp); } };
     }, 320, 180);
     this.thumbCache.set(key, url);

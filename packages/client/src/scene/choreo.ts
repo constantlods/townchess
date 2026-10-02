@@ -22,8 +22,8 @@ export class PlayerArms {
   readonly handR: HandModel;
   readonly armL: ArmIK;
   readonly armR: ArmIK;
-  readonly restL: ArmState;
-  readonly restR: ArmState;
+  restL: ArmState;
+  restR: ArmState;
   readonly shoulderBase = { L: new THREE.Vector3(-0.2, TABLE_TOP + 0.2, 0.66), R: new THREE.Vector3(0.2, TABLE_TOP + 0.2, 0.66) };
 
   constructor(public world: World, cosmetics: import('@hc/shared').Cosmetics) {
@@ -36,6 +36,18 @@ export class PlayerArms {
     this.restR = { wrist: new THREE.Vector3(0.33, T + 0.03, 0.27), quat: handQuat(new THREE.Vector3(-0.5, -0.2, -1), new THREE.Vector3(0.22, 1, 0)), pose: POSES.rest };
     this.armL = new ArmIK(this.handL, this.shoulderBase.L.clone(), new THREE.Vector3(-0.8, T - 0.3, 0.75), this.restL);
     this.armR = new ArmIK(this.handR, this.shoulderBase.R.clone(), new THREE.Vector3(0.8, T - 0.3, 0.75), this.restR);
+  }
+
+  /** Portrait screens: rest the hands closer together so they stay in the (narrow) frame. */
+  layout(aspect: number) {
+    const T = TABLE_TOP;
+    const portrait = aspect < 0.9;
+    const x = portrait ? 0.15 : 0.33, z = portrait ? 0.37 : 0.27;
+    const spread = portrait ? 0.15 : 0.5;
+    this.restL = { wrist: new THREE.Vector3(-x, T + 0.03, z), quat: handQuat(new THREE.Vector3(spread, -0.2, -1), new THREE.Vector3(-0.22, 1, 0)), pose: POSES.rest };
+    this.restR = { wrist: new THREE.Vector3(x, T + 0.03, z), quat: handQuat(new THREE.Vector3(-spread, -0.2, -1), new THREE.Vector3(0.22, 1, 0)), pose: POSES.rest };
+    if (!this.armL.busy) this.armL.set(this.restL);
+    if (!this.armR.busy) this.armR.set(this.restR);
   }
 
   setCosmetics(c: import('@hc/shared').Cosmetics) {

@@ -78,7 +78,9 @@ select:focus, input:focus { outline: 1px solid rgba(206, 170, 110, 0.6); }
 .promo svg { width: 34px; height: 34px; }
 
 /* ── Game over: small text over the final position ── */
-.gameover { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); text-align: center; pointer-events: none; }
+.gameover { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); text-align: center; pointer-events: none; padding: 26px 70px 22px; }
+.gameover::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(4, 3, 2, 0.72) 0%, rgba(4, 3, 2, 0.45) 45%, transparent 72%); opacity: 0; transition: opacity 1.2s; z-index: -1; }
+.gameover.show::before { opacity: 1; }
 .gameover .title { font-family: var(--display); font-size: 44px; letter-spacing: 0.1em; color: #a3261c; text-shadow: 0 0 18px rgba(120, 10, 6, 0.55), 0 2px 4px #000; opacity: 0; transform: translateY(6px); transition: opacity 1.4s, transform 1.4s; }
 .gameover .title.draw { color: #c8b48a; text-shadow: 0 2px 6px #000; }
 .gameover .result { font-size: 21px; margin-top: 4px; color: var(--ink); opacity: 0; transition: opacity 1.2s 0.9s; }
@@ -163,8 +165,8 @@ select:focus, input:focus { outline: 1px solid rgba(206, 170, 110, 0.6); }
   .controls .ctl:not(.menu-btn) { display: none; }
   .controls.open .ctl:not(.menu-btn) { display: flex; }
   .controls { flex-direction: column-reverse; }
-  .menu-btn { display: flex; width: 44px; padding: 0 12px; }
   .ctl { width: 150px; background: rgba(10, 9, 7, 0.82); border-color: var(--line); }
+  .ctl.menu-btn { display: flex; width: 44px; padding: 0 12px; }
   .gameover { bottom: 20%; width: 92vw; }
   .gameover .title { font-size: 32px; }
   .side { width: 100vw; padding: 18px 14px; }

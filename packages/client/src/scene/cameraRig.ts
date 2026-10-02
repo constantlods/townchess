@@ -56,7 +56,7 @@ export class CameraRig {
 
   focusOn(target: THREE.Vector3) {
     const dir = target.clone().sub(this.base.pos).normalize();
-    this.focus = { pos: this.base.pos.clone().addScaledVector(dir, 0.22), look: target.clone(), t: 0 };
+    this.focus = { pos: this.base.pos.clone().addScaledVector(dir, 0.12), look: target.clone(), t: 0 };
   }
   clearFocus() { this.focus = null; }
 
