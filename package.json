@@ -12,10 +12,12 @@
     "dev": "npm run dev -w @hc/client",
     "dev:server": "npm run dev -w @hc/server",
     "build": "npm run build -w @hc/client",
+    "start": "npm run build && npm run start -w @hc/server",
     "start:server": "npm run start -w @hc/server",
     "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client",
     "test": "vitest run",
-    "shots": "node tools/screenshots.mjs"
+    "shots": "node tools/screenshots.mjs",
+    "e2e:online": "node tools/e2e-online.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.0",

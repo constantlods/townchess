@@ -8,7 +8,7 @@ import { AiClient, AI_LEVELS, type AiLevel } from './aiClient';
  */
 export class LocalSession implements Session {
   readonly kind = 'local' as const;
-  private rules = new ChessRules();
+  private rules: ChessRules;
   private clock: ChessClock;
   private listeners = new Set<(e: SessionEvent) => void>();
   private ai = new AiClient();
@@ -17,7 +17,8 @@ export class LocalSession implements Session {
   /** Extra delay so the opponent appears to deliberate (ms). Scaled by settings. */
   pondering = 1;
 
-  constructor(public color: Color, tc: TimeControl, private level: AiLevel, me: PlayerPublic) {
+  constructor(public color: Color, tc: TimeControl, private level: AiLevel, me: PlayerPublic, startFen?: string) {
+    this.rules = new ChessRules(startFen);
     this.clock = new ChessClock(tc);
     const bot: PlayerPublic = { id: 'ai', username: 'UNKNOWN_13', rating: AI_LEVELS[level].rating, cosmetics: DEFAULT_COSMETICS };
     this.state = {
@@ -30,10 +31,10 @@ export class LocalSession implements Session {
   }
 
   start() {
-    this.clock.start('w', performance.now());
+    this.clock.start(this.rules.turn, performance.now());
     this.snapshot();
     this.emit({ type: 'newGame', state: this.state, color: this.color });
-    if (this.color !== 'w') this.aiTurn();
+    if (this.color !== this.rules.turn) this.aiTurn();
   }
 
   on(fn: (e: SessionEvent) => void) { this.listeners.add(fn); return () => this.listeners.delete(fn); }

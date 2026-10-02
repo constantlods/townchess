@@ -201,9 +201,9 @@ export class App {
     void this.startOnline(mode, tc, o.joinCode);
   }
 
-  private startLocal(color: Color, tc: string, level: AiLevel) {
+  private startLocal(color: Color, tc: string, level: AiLevel, fen?: string) {
     this.lastGame = { color, tc, level };
-    const session = new LocalSession(color, TIME_CONTROLS[tc] ?? TIME_CONTROLS['5+0'], level, this.me());
+    const session = new LocalSession(color, TIME_CONTROLS[tc] ?? TIME_CONTROLS['5+0'], level, this.me(), fen);
     session.pondering = this.settings.animationMode === 'competitive' ? 0.3 : 1;
     this.attach(session);
     session.start();
@@ -366,11 +366,17 @@ export class App {
 
   /** Hooks for the headless screenshot tool (tools/screenshots.mjs). */
   private installDebug() {
+    (window as unknown as Record<string, unknown>).__HC_INFO = () => {
+      const s = this.presenter.session;
+      return { screen: this.screen, kind: s?.kind ?? null, color: s?.color ?? null, id: s?.state.id ?? null, fen: s?.state.fen ?? null, moves: s?.state.history.map((m) => m.san) ?? [], status: s?.state.status ?? null, lobbyMsg: document.querySelector('.lobby .msg')?.textContent ?? '' };
+    };
     (window as unknown as Record<string, unknown>).__HC_DEBUG = async (cmd: string) => {
       const [c, a, b] = cmd.split(' ');
       const s = this.presenter.session;
       switch (c) {
         case 'play': this.play('ai', a ?? '5+0', { aiLevel: (b as AiLevel) ?? 'patient', color: 'w' }); break;
+        case 'fen': this.startLocal('w', '5+0', 'patient', cmd.slice(4)); break;
+        case 'online': this.play(a as PlayMode, b ?? '5+0', { aiLevel: 'patient', color: 'w', joinCode: cmd.split(' ')[3] }); break;
         case 'move': s?.submitMove(a, b); break;
         case 'screen': this.go(a as Screen); break;
         case 'settings': this.settingsPanel.show(a !== 'off'); break;
