@@ -162,11 +162,11 @@ export class Opponent extends THREE.Group {
 
     const fwd = new THREE.Vector3(0, 0, 1);
     // thinking pose: elbows on the table, hands clasped below the mask
-    this.thinkR = { wrist: new THREE.Vector3(-0.045, T + 0.25, -0.385), quat: handQuat(new THREE.Vector3(0.45, 0.85, 0.2), new THREE.Vector3(-0.8, 0.1, 0.55)) };
-    this.thinkL = { wrist: new THREE.Vector3(0.045, T + 0.25, -0.385), quat: handQuat(new THREE.Vector3(-0.45, 0.85, 0.2), new THREE.Vector3(0.8, 0.1, 0.55)) };
+    this.thinkR = { wrist: new THREE.Vector3(-0.045, T + 0.19, -0.37), quat: handQuat(new THREE.Vector3(0.45, 0.85, 0.2), new THREE.Vector3(-0.8, 0.1, 0.55)) };
+    this.thinkL = { wrist: new THREE.Vector3(0.045, T + 0.19, -0.37), quat: handQuat(new THREE.Vector3(-0.45, 0.85, 0.2), new THREE.Vector3(0.8, 0.1, 0.55)) };
     // resting pose: forearms on the table near the far edge of the board
-    this.restR = { wrist: new THREE.Vector3(-0.2, T + 0.035, -0.36), quat: handQuat(new THREE.Vector3(0.35, -0.25, 1), new THREE.Vector3(0.1, 1, 0.1)) };
-    this.restL = { wrist: new THREE.Vector3(0.2, T + 0.035, -0.36), quat: handQuat(new THREE.Vector3(-0.35, -0.25, 1), new THREE.Vector3(-0.1, 1, 0.1)) };
+    this.restR = { wrist: new THREE.Vector3(-0.24, T + 0.035, -0.47), quat: handQuat(new THREE.Vector3(0.35, -0.25, 1), new THREE.Vector3(0.1, 1, 0.1)) };
+    this.restL = { wrist: new THREE.Vector3(0.24, T + 0.035, -0.47), quat: handQuat(new THREE.Vector3(-0.35, -0.25, 1), new THREE.Vector3(-0.1, 1, 0.1)) };
     void fwd;
     this.armR = new ArmIK(this.handR, this.shoulderBase.R.clone(), new THREE.Vector3(-0.7, T - 0.4, -0.75), { ...this.thinkR, pose: POSES.clasp });
     this.armL = new ArmIK(this.handL, this.shoulderBase.L.clone(), new THREE.Vector3(0.7, T - 0.4, -0.75), { ...this.thinkL, pose: POSES.clasp });

@@ -178,7 +178,7 @@ export function buildEnvironment(p: EnvPreset, opts: { simplified: boolean; redu
   key.shadow.camera.far = 4;
   let bulb: THREE.Mesh | null = null;
   const keyPos = new THREE.Vector3();
-  const lampX = -0.74, lampZ = -0.26;
+  const lampX = -0.78, lampZ = -0.42;
   if (p.lampStyle === 'industrial' || p.lampStyle === 'exam' || p.lampStyle === 'banker') {
     const lamp = industrialLamp(p.lampStyle);
     lamp.group.position.set(lampX, TABLE_TOP, lampZ);
@@ -212,9 +212,14 @@ export function buildEnvironment(p: EnvPreset, opts: { simplified: boolean; redu
   key.position.copy(keyPos);
   key.target.position.set(-0.02, TABLE_TOP, 0.05);
   g.add(key, key.target);
+  // the lamp also catches the opponent's mask (weak, no shadow) — the reference lights the face from upper left
+  const face = new THREE.SpotLight(keyColor, p.keyIntensity * 0.22, 3, 0.22, 0.9, 1.5);
+  face.position.copy(keyPos);
+  face.target.position.set(0, TABLE_TOP + 0.42, -0.5);
+  g.add(face, face.target);
   // soft local glow so the lamp body/shade read
-  const glow = new THREE.PointLight(keyColor, p.keyIntensity * 0.05, 1.2, 2);
-  glow.position.copy(keyPos).add(new THREE.Vector3(0, 0.03, 0));
+  const glow = new THREE.PointLight(keyColor, p.keyIntensity * 0.012, 0.6, 2);
+  glow.position.copy(keyPos).add(new THREE.Vector3(0.04, -0.09, 0.02));
   g.add(glow);
 
   // ── Cold environment light(s) ───────────────────────────
@@ -269,7 +274,7 @@ export function buildEnvironment(p: EnvPreset, opts: { simplified: boolean; redu
       // barred window, back-left, with cold light coming through dirty glass
       const win = new THREE.Group();
       const frame = rustyMetal(52, '#2a2c26', 0.7, 0.6);
-      const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), new THREE.MeshStandardMaterial({ color: '#2a3430', emissive: coldC, emissiveIntensity: p.id === 'prison' ? 0.22 : 0.12, roughness: 0.6 }));
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), new THREE.MeshStandardMaterial({ color: '#2a3430', emissive: coldC, emissiveIntensity: p.id === 'prison' ? 0.1 : 0.045, roughness: 0.8 }));
       win.add(glass);
       for (let i = -3; i <= 3; i++) {
         const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 1.05, 8), frame);

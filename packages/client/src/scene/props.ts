@@ -55,15 +55,15 @@ export function industrialLamp(style: 'industrial' | 'exam' | 'banker'): { group
   const shadeGeo = new THREE.LatheGeometry(pts, 48);
   const paint = metalTexture(23, style === 'banker' ? '#1f3a26' : style === 'exam' ? '#9a9a90' : '#33382c', 0.5);
   const shadeOut = new THREE.MeshStandardMaterial({ map: paint.map, normalMap: paint.normalMap, roughnessMap: paint.roughnessMap, roughness: 1, metalness: 0.55, side: THREE.FrontSide });
-  const shadeIn = new THREE.MeshStandardMaterial({ color: '#e6d8b4', roughness: 0.45, metalness: 0.2, side: THREE.BackSide, emissive: '#ffcf8a', emissiveIntensity: 1.2 });
+  const shadeIn = new THREE.MeshStandardMaterial({ color: '#e6d8b4', roughness: 0.45, metalness: 0.2, side: THREE.BackSide, emissive: '#ffcf8a', emissiveIntensity: 0.18 });
   const shade = new THREE.Mesh(shadeGeo, shadeOut);
   const shadeInner = new THREE.Mesh(shadeGeo, shadeIn);
   const shadeGroup = new THREE.Group();
   shadeGroup.add(shade, shadeInner);
   shadeGroup.position.copy(head).add(new THREE.Vector3(0.03, -0.035, 0));
   // tilt the shade toward the board
-  shadeGroup.rotation.z = -0.38;
-  shadeGroup.rotation.x = 0.2;
+  shadeGroup.rotation.z = 0.5;   // opening tilted toward the board
+  shadeGroup.rotation.x = 0.05;  // the bulb peeks out under the rim, the interior stays mostly hidden
   shade.castShadow = true;
   g.add(shadeGroup);
   const bulbMesh = new THREE.Mesh(new THREE.SphereGeometry(0.026, 24, 16), new THREE.MeshStandardMaterial({ color: '#fff2d0', emissive: '#ffc070', emissiveIntensity: 14 }));

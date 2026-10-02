@@ -19,6 +19,9 @@ export class CameraRig {
   motionScale = 1; // 0 = reduced camera movement
   largerBoard = false;
   override: Partial<{ h: number; back: number; pitch: number; fov: number }> = {};
+  /** Alternate framings: looking at your own hands (customization) and a standing view (lobby). */
+  view: 'play' | 'hands' | 'lobby' = 'play';
+  private viewBlend = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 54, init: false };
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(40, aspect, 0.02, 30);
@@ -75,6 +78,25 @@ export class CameraRig {
       const tgt = this.attention.clone();
       look.lerp(tgt, 0.06 * m);
     }
+    // smooth transitions between framings
+    let vp = pos, vl = look, vf = this.base.fov;
+    if (this.view === 'hands') {
+      const portrait = this.camera.aspect < 0.9;
+      // offset to the right so the hands sit left of the customization panel
+      vp = new THREE.Vector3(portrait ? 0.02 : 0.11, TABLE_TOP + (portrait ? 0.5 : 0.34), portrait ? 0.7 : 0.66);
+      vl = new THREE.Vector3(portrait ? 0.02 : 0.11, TABLE_TOP, 0.33);
+      vf = portrait ? 66 : 48;
+    } else if (this.view === 'lobby') {
+      vp = new THREE.Vector3(0.95, 1.6, 1.75);
+      vl = new THREE.Vector3(-0.25, TABLE_TOP + 0.12, -0.25);
+      vf = this.camera.aspect < 0.9 ? 75 : 50;
+    }
+    const vb = this.viewBlend;
+    if (!vb.init) { vb.pos.copy(vp); vb.look.copy(vl); vb.fov = vf; vb.init = true; }
+    const k = Math.min(1, dt * 2.2);
+    vb.pos.lerp(vp, k); vb.look.lerp(vl, k); vb.fov += (vf - vb.fov) * k;
+    pos.copy(vb.pos); look.copy(vb.look);
+    if (Math.abs(this.camera.fov - vb.fov) > 0.01) { this.camera.fov = vb.fov; this.camera.updateProjectionMatrix(); }
     if (this.focus) {
       this.focus.t = Math.min(1, this.focus.t + dt / 6);
       const e = this.focus.t * this.focus.t * (3 - 2 * this.focus.t);

@@ -147,6 +147,17 @@ export class World {
     m.position.set(l.x + j.dx, l.y, l.z + j.dz);
   }
 
+  /** Replace the board (e.g. contrast setting changed) keeping pieces where they are. */
+  rebuildBoard() {
+    const old = this.board;
+    const nb = new Board({ highContrast: this.settings.highContrastPieces, blood: this.settings.reducedHorror ? 0 : 1 });
+    nb.position.copy(old.position); nb.rotation.copy(old.rotation); nb.flipped = old.flipped;
+    this.scene.add(nb);
+    for (const m of this.pieces.values()) nb.add(m);
+    this.scene.remove(old);
+    (this as { board: Board }).board = nb;
+  }
+
   rebuildPieceMaterials() {
     this.pieceMats = makePieceMaterials(this.settings.highContrastPieces);
     for (const m of [...this.pieces.values(), ...this.captured]) m.material = this.pieceMats[m.color][0];
@@ -168,8 +179,44 @@ export class World {
   fixedDt = 0;
   private frameCount = 0;
 
+  private thumbJobs: { make: () => { scene: THREE.Scene; camera: THREE.Camera; cleanup?: () => void }; w: number; h: number; resolve: (url: string) => void }[] = [];
+
+  /**
+   * Render a small thumbnail with the real renderer (tone mapping + colour management), at the start of
+   * a frame so the full-screen post pass overwrites it before anything is presented.
+   */
+  thumbnail(make: () => { scene: THREE.Scene; camera: THREE.Camera; cleanup?: () => void }, w = 320, h = 180): Promise<string> {
+    return new Promise((resolve) => this.thumbJobs.push({ make, w, h, resolve }));
+  }
+
+  private runThumbs() {
+    const job = this.thumbJobs.shift();
+    if (!job) return;
+    const r = this.renderer;
+    const pr = r.getPixelRatio();
+    const { scene, camera, cleanup } = job.make();
+    const prevTarget = r.getRenderTarget();
+    r.setRenderTarget(null);
+    r.setViewport(0, 0, job.w, job.h);
+    r.setScissor(0, 0, job.w, job.h);
+    r.setScissorTest(true);
+    r.render(scene, camera);
+    const c = document.createElement('canvas');
+    c.width = job.w; c.height = job.h;
+    const g = c.getContext('2d')!;
+    const src = r.domElement;
+    g.drawImage(src, 0, src.height - job.h * pr, job.w * pr, job.h * pr, 0, 0, job.w, job.h);
+    r.setScissorTest(false);
+    const size = r.getSize(new THREE.Vector2());
+    r.setViewport(0, 0, size.x, size.y);
+    r.setRenderTarget(prevTarget);
+    cleanup?.();
+    job.resolve(c.toDataURL('image/jpeg', 0.86));
+  }
+
   start(onFrame: (t: number, dt: number) => void) {
     const loop = () => {
+      this.runThumbs();
       const dt = this.fixedDt || Math.min(0.05, this.clock.getDelta());
       this.frameCount++;
       this.t += dt;

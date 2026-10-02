@@ -98,18 +98,19 @@ export function buildRig(side: Side): RigBuild {
     // metacarpal ridges + knuckle heads
     prims.push({ kind: 'cone', a: [0.012, 0.004, f.z * 0.45], b: [f.x - 0.006, f.y + 0.001, f.z], ra: 0.0062, rb: f.r[0] * 0.92, bone: 1, k: 0.008 });
     prims.push({ kind: 'ell', c: [f.x - 0.002, f.y + 0.0035, f.z], r: [0.0075, 0.0058, f.r[0] * 0.9], bone: 1, k: 0.005 });
+    prims.push({ kind: 'cone', a: [0.004, 0.0105, f.z * 0.35], b: [f.x - 0.012, f.y + 0.0085, f.z * 0.95], ra: 0.0024, rb: 0.0021, bone: 1, k: 0.0045 });
     // finger segments
     for (let j = 0; j < 3; j++) {
       const bi = fingerBone(fi, j);
       const len = f.len[j];
-      prims.push({ kind: 'cone', a: P(bi, 0), b: P(bi, len - (j === 2 ? f.r[3] * 0.9 : 0)), ra: f.r[j], rb: f.r[j + 1], bone: bi, k: j === 0 ? 0.006 : 0.0035 });
+      prims.push({ kind: 'cone', a: P(bi, 0), b: P(bi, len - (j === 2 ? f.r[3] * 0.9 : 0)), ra: f.r[j] * 0.97, rb: f.r[j + 1] * 0.97, bone: bi, k: j === 0 ? 0.0042 : 0.0028 });
       // dorsal joint bumps
       if (j > 0) prims.push({ kind: 'ell', c: P(bi, 0.0005, f.r[j] * 0.35), r: [0.0052, 0.0045, f.r[j] * 0.85], bone: bi, k: 0.003 });
       // palmar pads
       prims.push({ kind: 'ell', c: P(bi, len * 0.5, -f.r[j] * 0.28), r: [len * 0.42, f.r[j] * 0.8, f.r[j] * 0.92], bone: bi, k: 0.003 });
     }
     // web between fingers (on proximal segment base)
-    prims.push({ kind: 'ell', c: P(fingerBone(fi, 0), 0.008, -0.002), r: [0.012, 0.006, f.r[0] * 1.15], bone: fingerBone(fi, 0), k: 0.006 });
+    prims.push({ kind: 'ell', c: P(fingerBone(fi, 0), 0.004, -0.002), r: [0.009, 0.005, f.r[0] * 1.02], bone: fingerBone(fi, 0), k: 0.004 });
   });
   // thumb segments
   const tr = [0.0122, 0.0108, 0.0096, 0.0080];
@@ -159,7 +160,7 @@ export function buildHandGeometry(side: Side, cell = 0.0019): { geo: THREE.Buffe
 export type SkinVariant = 'bare' | 'dirty' | 'scarred' | 'tattooed';
 
 /** Anatomically placed skin texture: veins, tendons, knuckle creases, pores, grime, scars, ink. */
-export const handSkinTexture = def('handSkinTexture', (variant: SkinVariant, side: Side, tone: string = '#b88a6e', W: number = 2048, H: number = 560): RawPBR => {
+export const handSkinTexture = def('handSkinTexture', (variant: SkinVariant, side: Side, tone: string = '#a8785c', W: number = 2048, H: number = 560): RawPBR => {
   const tb = TB(W, H);
   const n = new Noise2D(7), n2 = new Noise2D(19), rnd = mulberry32(side === 'left' ? 3 : 5);
   const base = hex(tone);
@@ -170,7 +171,9 @@ export const handSkinTexture = def('handSkinTexture', (variant: SkinVariant, sid
     const mott = n.fbm(x / 70, y / 70, 4);
     const red = clamp01(n.fbm(x / 160 + 5, y / 160, 3) + 0.25);
     let c = base.map((v) => v * (0.9 + mott * 0.12)) as number[];
-    c = [lerp(c[0], 168, red * 0.16), lerp(c[1], 80, red * 0.16), lerp(c[2], 66, red * 0.16)];
+    c = [lerp(c[0], 172, red * 0.24), lerp(c[1], 74, red * 0.24), lerp(c[2], 60, red * 0.24)];
+    const yel = clamp01(n2.fbm(x / 220 + 3, y / 220, 3) + 0.1);
+    c = [lerp(c[0], 160, yel * 0.12), lerp(c[1], 132, yel * 0.12), lerp(c[2], 88, yel * 0.12)];
     // slightly darker, hairier forearm; redder knuckles
     const ax = UVB.minX + (x / W) * (UVB.maxX - UVB.minX);
     if (ax < -0.02) c = c.map((v) => v * 0.95);
@@ -193,9 +196,9 @@ export const handSkinTexture = def('handSkinTexture', (variant: SkinVariant, sid
   const fds = fingerDefs(side);
   const gaps = [0, 1, 2].map((g) => (fds[g].z + fds[g + 1].z) / 2);
   const vein = (pts: [number, number][], w: number) => tb.stroke(pts, w, (i, c) => {
-    const a = smoothstep(0, 1, c);
-    tb.height[i] += a * 0.55;
-    tb.blend(i, 92, 88, 104, a * 0.22);
+    const a = c * c * (3 - 2 * c);
+    tb.height[i] += a * 0.35;
+    tb.blend(i, 96, 84, 98, a * 0.16);
   });
   for (let v = 0; v < 3; v++) {
     const pts: [number, number][] = [];
@@ -203,7 +206,7 @@ export const handSkinTexture = def('handSkinTexture', (variant: SkinVariant, sid
     for (let s = 0; s <= 30; s++) {
       const x = -0.25 + (s / 30) * (0.07 + 0.25);
       const target = x > 0.0 ? gaps[v] : z;
-      z = lerp(z, target, x > 0 ? 0.12 : 0.02) + (n.simplex(s * 0.3, v * 7) * 0.0012);
+      z = lerp(z, target, x > 0 ? 0.12 : 0.02) + (n.simplex(s * 0.45, v * 7) * 0.0028);
       pts.push([px(x), pz(z)]);
     }
     vein(pts, 7 - v);

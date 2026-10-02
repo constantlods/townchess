@@ -99,13 +99,13 @@ export const tableTexture = def('tableTexture', (o: TableOpts, W: number = 2048,
       t.rough[i] = 0.68 + grime * 0.22 - clamp01(blotch) * 0.1;
     });
     // knife scratches, gouges
-    for (let s = 0; s < 220; s++) {
+    for (let s = 0; s < 160; s++) {
       const x0 = rnd() * W, y0 = rnd() * H, a = (rnd() - 0.5) * 0.5;
-      const len = 10 + rnd() * 70, wdt = 0.6 + rnd() * 0.9;
+      const len = 10 + rnd() * 60, wdt = 0.4 + rnd() * 0.6;
       const pts: [number, number][] = [[x0, y0], [x0 + Math.cos(a) * len * 0.5, y0 + Math.sin(a) * len * 0.5 + (rnd() - 0.5) * 6], [x0 + Math.cos(a) * len, y0 + Math.sin(a) * len]];
       const bright = rnd() < 0.55;
       t.stroke(pts, wdt, (i, c) => {
-        t.height[i] -= c * 0.5;
+        t.height[i] -= c * 0.25;
         if (bright) t.blend(i, light[0] * 1.1, light[1] * 1.05, light[2], c * 0.22);
         else t.blend(i, 14, 10, 7, c * 0.28);
         t.rough[i] = Math.min(1, t.rough[i] + c * 0.15);
@@ -180,7 +180,9 @@ export const boardTexture = def('boardTexture', (o: BoardOpts, inner: number, S:
         const edgeGrime = (1 - smoothstep(0, 0.12, ed)) * clamp01(n2.fbm(x / 30, y / 30, 3) + 0.5);
         c = mix3(c, [18, 13, 9], seam * 0.85 + edgeGrime * 0.22);
         const blotch = n2.fbm(x / 260 + 7, y / 260, 4);
-        c = mix3(c, [40, 30, 20], clamp01(blotch) * (isLight ? 0.35 : 0.15));
+        c = mix3(c, [40, 30, 20], clamp01(blotch + 0.15) * (isLight ? 0.45 : 0.15));
+        const dirt = clamp01(n2.fbm(x / 90 + 3, y / 90, 4) * 1.4);
+        c = mix3(c, [70, 54, 36], dirt * (isLight ? 0.35 : 0.1));
         hgt = -seam * 0.8 - g.late * 0.12;
         rough = 0.55 + edgeGrime * 0.2 + clamp01(blotch) * 0.1;
       } else {

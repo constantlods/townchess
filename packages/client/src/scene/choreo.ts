@@ -64,11 +64,11 @@ export interface ArmSet {
 }
 
 /** Hand orientation for picking a piece from above, approaching from the arm's own shoulder. */
-function graspState(arm: ArmIK, gripWorld: THREE.Vector3, pose: HandPose, pitch = 0.95): ArmState {
+function graspState(arm: ArmIK, gripWorld: THREE.Vector3, pose: HandPose, pitch = 0.42): ArmState {
   const horiz = gripWorld.clone().sub(arm.shoulder).setY(0).normalize();
   const fwd = horiz.clone().multiplyScalar(Math.cos(pitch)).add(new THREE.Vector3(0, -Math.sin(pitch), 0)).normalize();
   const upBase = new THREE.Vector3(0, 1, 0).sub(fwd.clone().multiplyScalar(fwd.y)).normalize();
-  const roll = arm.hand.side === 'right' ? 0.5 : -0.5; // thumb dips to the side for a pinch
+  const roll = arm.hand.side === 'right' ? 0.28 : -0.28; // thumb dips to the side for a pinch
   const up = upBase.applyAxisAngle(fwd, roll);
   const quat = handQuat(fwd, up);
   const wrist = gripWorld.clone().sub(gripLocal(arm.hand, pose).applyQuaternion(quat));

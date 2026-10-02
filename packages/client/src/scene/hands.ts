@@ -65,7 +65,7 @@ export const sleeveGeometry = defGeo('sleeve', (kind: Exclude<Cosmetics['sleeves
   const n3 = new Noise3D(side === 'left' ? 4 : 8);
   model.displace = (x, y, z) => {
     const ang = Math.atan2(y, z);
-    const folds = Math.sin(x * 140 + Math.sin(ang * 3) * 2) * 0.0016 + n3.noise(x * 40, ang * 2, 0) * 0.002;
+    const folds = Math.sin(x * 90 + Math.sin(ang * 2) * 1.5) * 0.0011 + n3.noise(x * 18, ang * 1.2, 0) * 0.0018;
     return folds * (kind === 'rolled' ? 0.5 : 1);
   };
   const geo = meshSDF(model, { cell: 0.0028, uv: 'xy', bounds: { min: [-0.36, -0.06, -0.07], max: [cuffX + 0.03, 0.06, 0.07] } });
@@ -134,16 +134,18 @@ export class HandModel extends THREE.Group {
     const skin = handSkinTexture(c.hands, this.side, this.tone);
     const skinMat = new THREE.MeshPhysicalMaterial({
       map: skin.map, normalMap: skin.normalMap, roughnessMap: skin.roughnessMap, roughness: 1,
-      normalScale: new THREE.Vector2(0.9, 0.9), vertexColors: true,
-      sheen: 0.55, sheenColor: new THREE.Color('#d0604a'), sheenRoughness: 0.45,
-      clearcoat: 0.06, clearcoatRoughness: 0.6, envMapIntensity: 0.5,
+      normalScale: new THREE.Vector2(1.1, 1.1), vertexColors: true,
+      sheen: 0.35, sheenColor: new THREE.Color('#c0503c'), sheenRoughness: 0.5,
+      clearcoat: 0.22, clearcoatRoughness: 0.42, envMapIntensity: 0.6,
+      specularIntensity: 0.6,
     });
     // cheap subsurface hint: lift the terminator with a warm wrap term
     skinMat.onBeforeCompile = (sh) => {
       sh.fragmentShader = sh.fragmentShader.replace(
         '#include <lights_fragment_end>',
         `#include <lights_fragment_end>
-         reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.10, 0.03, 0.02) * (1.0 - dot(normal, normalize(vViewPosition)));`,
+         reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.10, 0.03, 0.02) * (1.0 - dot(normal, normalize(vViewPosition)));
+         reflectedLight.directDiffuse *= vec3(1.0, 0.94, 0.9);`,
       );
     };
     let handMat: THREE.Material = skinMat, tipMat: THREE.Material = skinMat;
@@ -195,9 +197,10 @@ export class HandModel extends THREE.Group {
     } else if (c.accessories === 'strap' || (c.accessories === 'watch' && this.side === 'right')) {
       if (c.accessories === 'strap') {
         const lt = leatherTexture(73, '#3a2414', 0.7);
-        const strap = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.031, 0.028, 36, 1, true), new THREE.MeshPhysicalMaterial({ map: lt.map, normalMap: lt.normalMap, roughness: 0.7, side: THREE.DoubleSide, clearcoat: 0.2 }));
-        strap.rotation.z = Math.PI / 2; strap.scale.set(1.0, 1, 0.66 + 0.34);
-        strap.scale.set(0.72, 1, 1.02);
+        const prof = [new THREE.Vector2(0.0285, -0.014), new THREE.Vector2(0.0315, -0.0135), new THREE.Vector2(0.0322, 0), new THREE.Vector2(0.0315, 0.0135), new THREE.Vector2(0.0285, 0.014), new THREE.Vector2(0.0285, -0.014)];
+        const strap = new THREE.Mesh(new THREE.LatheGeometry(prof, 40), new THREE.MeshPhysicalMaterial({ map: lt.map, normalMap: lt.normalMap, roughness: 0.65, clearcoat: 0.25, clearcoatRoughness: 0.5 }));
+        strap.rotation.z = Math.PI / 2;
+        strap.scale.set(0.7, 1, 1.0); // local x → thickness after the z-rotation
         strap.position.set(-0.03, 0.0, 0);
         const buckle = new THREE.Mesh(new THREE.TorusGeometry(0.006, 0.0012, 6, 4), new THREE.MeshStandardMaterial({ color: '#7a6a4a', metalness: 1, roughness: 0.5, map: metalTexture(74, '#7a6a4a', 0.5).map }));
         buckle.position.set(-0.03, 0.022, t * 0.0); buckle.rotation.x = Math.PI / 2;
