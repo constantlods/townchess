@@ -1,0 +1,25 @@
+{
+  "name": "horror-chess",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @hc/client",
+    "dev:server": "npm run dev -w @hc/server",
+    "build": "npm run build -w @hc/client",
+    "start:server": "npm run start -w @hc/server",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client",
+    "test": "vitest run",
+    "shots": "node tools/screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
