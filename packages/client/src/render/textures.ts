@@ -182,7 +182,9 @@ export const boardTexture = def('boardTexture', (o: BoardOpts, inner: number, S:
         const blotch = n2.fbm(x / 260 + 7, y / 260, 4);
         c = mix3(c, [40, 30, 20], clamp01(blotch + 0.15) * (isLight ? 0.45 : 0.15));
         const dirt = clamp01(n2.fbm(x / 90 + 3, y / 90, 4) * 1.4);
-        c = mix3(c, [70, 54, 36], dirt * (isLight ? 0.35 : 0.1));
+        c = mix3(c, [70, 54, 36], dirt * (isLight ? 0.5 : 0.12));
+        const smear = clamp01(n.fbm(x / 340 + 11, y / 340, 4) * 1.6 - 0.15);
+        c = mix3(c, [52, 38, 26], smear * (isLight ? 0.38 : 0.15));
         hgt = -seam * 0.8 - g.late * 0.12;
         rough = 0.55 + edgeGrime * 0.2 + clamp01(blotch) * 0.1;
       } else {
@@ -218,7 +220,7 @@ export const boardTexture = def('boardTexture', (o: BoardOpts, inner: number, S:
     // dents
     for (let s = 0; s < 70; s++) t.disc(rnd() * S, rnd() * S, 2 + rnd() * 6, (i, c) => { t.height[i] -= c * c * 0.6; t.blend(i, 20, 14, 10, c * 0.2); });
     // small dark old stains (kept faint for readability)
-    const st = Math.round(7 * o.blood);
+    const st = Math.round(12 * o.blood);
     for (let s = 0; s < st; s++) {
       const cx = rnd() * S, cy = rnd() * S;
       for (let k = 0; k < 12; k++) {
@@ -238,7 +240,7 @@ export const pieceTexture = def('pieceTexture', (light: boolean, seed: number, W
     const t = TB(W, H);
     const n = new Noise2D(seed), n2 = new Noise2D(seed + 5);
     const rnd = mulberry32(seed);
-    const base = light ? hex('#b9a782') : hex('#1a130f');
+    const base = light ? hex('#c6b48e') : hex('#1a130f');
     t.each((x, y, i) => {
       const g = grain(n, y / 90, Math.sin((x / W) * Math.PI * 2) * 0.6 + 4, light ? 9 : 7);
       let c = mix3(base, light ? [150, 128, 92] : [10, 7, 5], g.late * (light ? 0.35 : 0.5));

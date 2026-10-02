@@ -98,7 +98,7 @@ export function buildRig(side: Side): RigBuild {
     // metacarpal ridges + knuckle heads
     prims.push({ kind: 'cone', a: [0.012, 0.004, f.z * 0.45], b: [f.x - 0.006, f.y + 0.001, f.z], ra: 0.0062, rb: f.r[0] * 0.92, bone: 1, k: 0.008 });
     prims.push({ kind: 'ell', c: [f.x - 0.002, f.y + 0.0035, f.z], r: [0.0075, 0.0058, f.r[0] * 0.9], bone: 1, k: 0.005 });
-    prims.push({ kind: 'cone', a: [0.004, 0.0105, f.z * 0.35], b: [f.x - 0.012, f.y + 0.0085, f.z * 0.95], ra: 0.0024, rb: 0.0021, bone: 1, k: 0.0045 });
+    prims.push({ kind: 'cone', a: [0.006, 0.0098, f.z * 0.4], b: [f.x - 0.014, f.y + 0.0078, f.z * 0.95], ra: 0.0019, rb: 0.0016, bone: 1, k: 0.007 });
     // finger segments
     for (let j = 0; j < 3; j++) {
       const bi = fingerBone(fi, j);
@@ -197,8 +197,8 @@ export const handSkinTexture = def('handSkinTexture', (variant: SkinVariant, sid
   const gaps = [0, 1, 2].map((g) => (fds[g].z + fds[g + 1].z) / 2);
   const vein = (pts: [number, number][], w: number) => tb.stroke(pts, w, (i, c) => {
     const a = c * c * (3 - 2 * c);
-    tb.height[i] += a * 0.35;
-    tb.blend(i, 96, 84, 98, a * 0.16);
+    tb.height[i] += a * 0.2;
+    tb.blend(i, 100, 86, 96, a * 0.1);
   });
   for (let v = 0; v < 3; v++) {
     const pts: [number, number][] = [];
@@ -209,7 +209,7 @@ export const handSkinTexture = def('handSkinTexture', (variant: SkinVariant, sid
       z = lerp(z, target, x > 0 ? 0.12 : 0.02) + (n.simplex(s * 0.45, v * 7) * 0.0028);
       pts.push([px(x), pz(z)]);
     }
-    vein(pts, 7 - v);
+    vein(pts, 9 - v * 1.5);
     // a branch
     const b0 = 10 + Math.floor(rnd() * 10);
     const br: [number, number][] = pts.slice(b0, b0 + 1).map((p) => [p[0], p[1]] as [number, number]);

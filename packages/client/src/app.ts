@@ -282,8 +282,8 @@ export class App {
       const t = tableTexture(this.envPreset('institutional').table);
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughness: 0.8 }));
       ground.position.y = -0.024; ground.receiveShadow = true;
-      const key = new THREE.SpotLight('#ffb46b', 0.9, 2, 0.8, 0.7, 1.5);
-      key.position.set(-0.15, 0.35, 0.1); key.target.position.set(0.05, 0, 0); key.castShadow = true;
+      const key = new THREE.SpotLight('#ffbc80', 0.32, 2, 0.8, 0.7, 1.5);
+      key.position.set(-0.2, 0.45, 0.18); key.target.position.set(0.05, 0, 0); key.castShadow = true;
       scene.add(ground, key, key.target, new THREE.HemisphereLight('#a8b8a8', '#20160e', 0.12));
       scene.environment = this.world.scene.environment;
       const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 5);

@@ -7,7 +7,9 @@ import type { RawPBR } from './canvasTex';
  * Asset pipeline: a dry-run "collect" pass discovers which procedural assets a builder needs,
  * then they are generated in parallel Web Workers and cached in IndexedDB for later visits.
  */
-const VERSION = 7;
+declare const __BUILD_ID__: string;
+/** Cache namespace: per production build. In dev the cache is disabled so generator edits show up immediately. */
+const VERSION: string | null = import.meta.env.DEV ? null : __BUILD_ID__;
 const DB = 'horror-chess-assets';
 
 let dbP: Promise<IDBDatabase | null> | null = null;
@@ -17,7 +19,15 @@ function db(): Promise<IDBDatabase | null> {
       try {
         const r = indexedDB.open(DB, 1);
         r.onupgradeneeded = () => r.result.createObjectStore('raw');
-        r.onsuccess = () => res(r.result);
+        r.onsuccess = () => {
+          res(r.result);
+          // drop entries from older builds
+          try {
+            const st = r.result.transaction('raw', 'readwrite').objectStore('raw');
+            const cur = st.openKeyCursor();
+            cur.onsuccess = () => { const c = cur.result; if (!c) return; if (!String(c.key).startsWith(VERSION + '|')) st.delete(c.key); c.continue(); };
+          } catch { /* ignore */ }
+        };
         r.onerror = () => res(null);
       } catch { res(null); }
     });
@@ -25,6 +35,7 @@ function db(): Promise<IDBDatabase | null> {
   return dbP;
 }
 async function idbGet(key: string): Promise<unknown> {
+  if (VERSION === null) return undefined;
   const d = await db();
   if (!d) return undefined;
   return new Promise((res) => {
@@ -36,6 +47,7 @@ async function idbGet(key: string): Promise<unknown> {
   });
 }
 async function idbPut(key: string, v: unknown) {
+  if (VERSION === null) return;
   const d = await db();
   if (!d) return;
   try { d.transaction('raw', 'readwrite').objectStore('raw').put(v, `${VERSION}|${key}`); } catch { /* quota etc. */ }

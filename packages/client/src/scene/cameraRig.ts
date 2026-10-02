@@ -35,7 +35,12 @@ export class CameraRig {
     // Landscape: eyes ~0.4 m above the table top, ~0.42 m behind the board edge, looking ~21° down (matches reference).
     let h = 0.40, back = 0.42, pitch = 19.5, fov = 54;
     if (tablet) { h = 0.62; back = 0.55; pitch = 33; fov = 52; }
-    if (portrait) { h = 0.72; back = 0.42; pitch = 42; fov = 68; }
+    if (portrait) {
+      h = 0.72; back = 0.42; pitch = 42;
+      // fit the board to ~88% of the screen width, while keeping hands and opponent in frame
+      const halfH = Math.atan(0.235 / 0.95) / 0.88;
+      fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(halfH) / aspect)), 56, 72);
+    }
     if (this.largerBoard) { back -= 0.08; h -= 0.03; }
     h = this.override.h ?? h; back = this.override.back ?? back; pitch = this.override.pitch ?? pitch; fov = this.override.fov ?? fov;
     const nearEdge = 0.235;

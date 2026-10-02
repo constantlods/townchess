@@ -267,7 +267,7 @@ export function buildEnvironment(p: EnvPreset, opts: { simplified: boolean; redu
     }
     if (p.sign) {
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.55), new THREE.MeshStandardMaterial({ map: signTexture(p.sign[0], p.sign[1]), transparent: true, roughness: 0.95, depthWrite: false }));
-      sign.position.set(0.95, 1.85, backZ + 0.01);
+      sign.position.set(0.72, 1.48, backZ + 0.01);
       g.add(sign);
     }
     if (p.id === 'institutional' || p.id === 'examination' || p.id === 'prison') {

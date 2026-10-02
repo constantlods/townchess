@@ -114,9 +114,9 @@ export class Opponent extends THREE.Group {
 
   constructor(opts: { reducedHorror: boolean }) {
     super();
-    const shirt = fabricTexture(101, '#5c5a44', opts.reducedHorror ? 0.4 : 1.0);
+    const shirt = fabricTexture(101, '#7a7052', opts.reducedHorror ? 0.4 : 1.0);
     for (const t of [shirt.map, shirt.normalMap]) t.repeat.set(2, 2);
-    const cloth = new THREE.MeshStandardMaterial({ map: shirt.map, normalMap: shirt.normalMap, roughness: 0.96, vertexColors: true, normalScale: new THREE.Vector2(0.6, 0.6), color: '#a8a088' });
+    const cloth = new THREE.MeshStandardMaterial({ map: shirt.map, normalMap: shirt.normalMap, roughness: 0.96, vertexColors: true, normalScale: new THREE.Vector2(0.6, 0.6), color: '#c0b498' });
     this.torso = new THREE.Mesh(torsoGeometry(), cloth);
     this.torso.castShadow = true; this.torso.receiveShadow = true;
     this.body.add(this.torso);
