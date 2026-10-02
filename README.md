@@ -5,6 +5,10 @@ single industrial lamp, your own hands resting on the wood, across from a masked
 sound is generated procedurally in code — there are no third-party art or audio assets, and nothing is taken from
 any existing game.
 
+Build report: [docs/REPORT.md](docs/REPORT.md) · Session summary: [docs/SESSION_SUMMARY.md](docs/SESSION_SUMMARY.md)
+
+![Gameplay](docs/screenshots/gameplay-1920x1080.jpg)
+
 ## Run it
 
 Requires Node 20+.
