@@ -55,3 +55,36 @@ Midway through, the user added three things:
 - See [REPORT.md](REPORT.md) for verification, decisions, remaining work and limitations.
 - The main open item is realism: the procedural hands and opponent are convincing in composition and lighting, but
   not photographic.
+
+---
+
+# Session Summary — 2026-10-02 (photorealistic rendering phase, part 1)
+
+The user supplied the "photorealistic horror chess" specification. It targets the AMD RX 6650 XT in the Proxmox
+server, with UE5 as the primary candidate engine and a benchmark required before any migration.
+
+## What was done
+
+1. **Phase 0: repository audit.**
+   - Read the docs and package scripts, and confirmed a clean baseline.
+   - Typecheck is clean, and 17/17 tests pass.
+2. **Phase 1: hardware audit.**
+   - The GPU is on the host under `amdgpu`, and no VM passes it through.
+   - Installed Mesa's RADV Vulkan and VA-API drivers and the diagnostic tools.
+   - Verified Vulkan 1.4 with hardware ray tracing.
+   - Verified working VA-API H.264 and HEVC hardware encoding, with measured throughput.
+3. **Baseline benchmark.**
+   - Added `tools/gpubench.mjs`.
+   - The existing renderer was measured on the real GPU for the first time, at 1080p, 1440p, 4K and 1170×2532 portrait.
+   - Earlier sessions only used SwiftShader.
+   - `tools/screenshots.mjs` now uses the GPU by default.
+4. **Phase 2: engine evaluation.**
+   - UE5 stays the primary candidate.
+   - It is blocked by an Epic account/EULA, which only the owner can provide, and by host RAM: 15 GiB total, 13 GiB
+     allocated to guests.
+   - Documented in RENDERING.md and PERFORMANCE.md.
+
+## Not done (and why)
+
+- **UE5 benchmark scene and later phases.** These need the blockers above resolved. No game code was changed, so
+  nothing that works today was put at risk.

@@ -5,7 +5,14 @@ single industrial lamp, your own hands resting on the wood, across from a masked
 sound is generated procedurally in code — there are no third-party art or audio assets, and nothing is taken from
 any existing game.
 
-Build report: [docs/REPORT.md](docs/REPORT.md) · Session summary: [docs/SESSION_SUMMARY.md](docs/SESSION_SUMMARY.md)
+Build report: [docs/REPORT.md](docs/REPORT.md) · Session summary: [docs/SESSION_SUMMARY.md](docs/SESSION_SUMMARY.md) ·
+Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Rendering / engine evaluation: [docs/RENDERING.md](docs/RENDERING.md) ·
+Performance on the RX 6650 XT: [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
+
+> **Photorealistic rendering phase.** The procedural Three.js renderer is version 0. It has been benchmarked on the
+> production GPU, an AMD RX 6650 XT: 59 fps at 1440p HIGH. Unreal Engine 5 has been chosen as the target renderer,
+> but a benchmark scene has to prove it on this hardware first. See RENDERING.md for that decision and for what is
+> blocking it.
 
 ![Gameplay](docs/screenshots/gameplay-1920x1080.jpg)
 
@@ -32,6 +39,7 @@ Checks:
 ```bash
 npm run typecheck
 npm test               # rules, clock, protocol, server authority (17 tests)
+node tools/gpubench.mjs 2560x1440   # FPS / frame time / 1% lows on the real GPU (client on :5199)
 npm run e2e:online     # two headless browsers play through the real server (server + client must be running)
 ```
 

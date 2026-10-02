@@ -142,3 +142,15 @@ npm run start          # production: builds the client and serves it plus /ws on
 | ![Lobby](screenshots/lobby-1920x1080.jpg) | ![Checkmate](screenshots/checkmate-1280x720.jpg) |
 | ![Hand customization](screenshots/hand-customization-1600x900.jpg) | ![Environments](screenshots/environments-1440x900.jpg) |
 | ![Tablet](screenshots/tablet-768x1024.jpg) | ![Phone](screenshots/mobile-390x844.jpg) |
+
+## Photorealistic rendering phase — status
+
+| Phase | Status |
+| --- | --- |
+| 0 Repository audit | Done |
+| 1 Hardware audit | Done ([PERFORMANCE.md](PERFORMANCE.md)) |
+| 2 Engine evaluation | Done: UE5 primary, Godot 4 fallback ([RENDERING.md](RENDERING.md)) |
+| 3 UE5 benchmark scene | **Blocked**: Epic account/EULA, and host RAM |
+| 4 Proxmox GPU configuration | GPU verified on the host (`amdgpu`, RADV, VA-API). The choice between host and passthrough VM is pending |
+| 5 Pixel Streaming | Hardware H.264 encode verified with ffmpeg/VA-API. UE Pixel Streaming itself not tested |
+| 6–19 | Not started |
