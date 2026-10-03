@@ -5,7 +5,8 @@ adversarial review by a critique agent. It replaces the earlier phase list from 
 lists its scope, how we'll know it's done, and what is deliberately not in it.
 
 **Status:** Milestone 1 is complete (§5). Milestone 2 is **in progress**: the full gameplay loop is proven on Linux
-(§5b). The Windows packaged build is the remaining item. Windows host decided by the owner: a Windows PC with an RTX
+(§5b), and the packaged Windows build passes its smoke, Job Object and antivirus checks. Remaining: the owner's
+interactive play test of the packaged build (HUD, mouse), then the art spike (2b). Windows host decided by the owner: a Windows PC with an RTX
 4070 Ti SUPER and 32 GB RAM.
 
 ## 1. Audit: what actually exists
@@ -249,7 +250,12 @@ Per-ply checks (every scenario):
 | Packaged core bundle on stock Node (no tsx, no repo) | Pass | `npm run bundle:core` |
 | Windows: C++ build (VS 2022 17.14, MSVC 14.44.35229) | Pass (90 s) | `ue5/tools/win/build.ps1` |
 | Windows: level build on D3D12 SM6 (RTX 4070 Ti SUPER selected, not the integrated GPU) | Pass (`BUILD OK`, 81 actors) | `setup_content.ps1` |
-| **Packaged Win64 build, Job Object, antivirus behaviour, HUD and mouse** | **In progress** | `package.ps1` |
+| Packaged Win64 Development build (cooked, bundled `node.exe` + core in `Content/TownChessCore`) | Pass (`BUILD SUCCESSFUL`) | `package.ps1` |
+| Packaged smoke: the bundled core starts on an ephemeral port with a per-launch secret, 12 plies against the engine through the board's click path, every position checked (in sync, no silent repair, no misplaced piece) | Pass (12/12, 0 failures, D3D12), nothing left running afterwards | `test_package.ps1` (`-tcsmoke=12`) |
+| Job Object: the game is killed with `TerminateProcess` (no shutdown code runs) while its core runs | Pass: Windows terminated the core with the game | `test_package.ps1` |
+| Core crash in a packaged build: the core was killed while the game ran | Pass, observed once: the game logged `exited unexpectedly`, relaunched the core within 0.2 s and reconnected. Seen in an accidentally overlapping run, not yet a scripted test | `pkg-smoke.log` |
+| Antivirus: Defender real-time protection on, build run unmodified | Pass: no detections involving the build or `node.exe` (read-only query) | `test_package.ps1` |
+| **Owner's interactive launch through the root `TownChess.exe` stub: HUD and real mouse input** | **Pending** (the stub hung with no child in the non-interactive SSH session; the tests launch `TownChess/Binaries/Win64/TownChess.exe` directly) | owner |
 
 Bugs found and fixed while testing:
 - **Promotion queued behind a recapture:** the swap was looked up by square and changed the wrong piece's mesh (found

@@ -25,6 +25,7 @@ machine's address and account are deliberately not recorded here: the repository
 | 5 | Visual Studio Community 2022 17.14 via winget, with the components UE 5.8 lists in `Engine/Config/Windows/Windows_SDK.json`: game dev with C++, desktop C++, .NET desktop, Windows 11 SDK 10.0.22621, Clang, UE IDE/debugger integration, MSVC 14.44 x64 and ATL. Installed silently with `--norestart` | Agent (approved) | UE C++ compilation and Windows packaging | Visual Studio Installer → Uninstall, or `winget uninstall Microsoft.VisualStudio.2022.Community` |
 | 6 | Update attempt (`setup.exe update --quiet --norestart`). It exited 87 (an argument-quoting error) and changed nothing. Not needed: winget had already installed the latest 17.14.41 (September 2026) | Agent | The MSVC folder is named `14.44.35207`, which UE 5.8 bans. The actual `cl.exe` is 19.44.35229 (product 14.44.35229), which includes the 14.44.35211 fix; servicing updates kept the old folder name | — |
 | 7 | Unreal Engine 5.8.3 through the Epic Games Launcher | Owner | Prebuilt engine; needs the owner's Epic sign-in | Remove it in the Launcher |
+| 8 | Packaged builds written to `C:\TownChess\builds`, Poly Haven assets to `C:\TownChess\assets` (inside the workspace). Defender was only queried (`Get-MpComputerStatus`, `Get-MpThreatDetection`), never changed | Agent | Packaging and the antivirus check | Delete those folders |
 
 Nothing else on the system was changed. The PC is never rebooted, and no system settings, other users or security
 software were touched.
