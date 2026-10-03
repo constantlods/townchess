@@ -48,6 +48,26 @@ New in v2:
 | Game start | `state.firstMoveDeadline` | Wall-clock deadline for the first move (the abort window) |
 | Players | `PlayerPublic.rating: number \| null`, `ai: {level}` | Engine seats show **no rating**: the levels are not calibrated |
 
+## Local core (offline play in the UE5 client)
+
+The native client never contains chess rules. For offline games it launches a private instance of the same core,
+`packages/server/src/sidecar.ts`, and talks protocol v2 to it.
+
+| Requirement | How |
+| --- | --- |
+| Local only | Binds `127.0.0.1` |
+| No fixed port | Port 0. The core prints one line, `TOWNCHESS_CORE_READY {"port":N,"pid":P,"protocolVersion":2}`, on stdout; all other logging goes to stderr |
+| Per-launch secret | `UTCLocalCore` generates 64 random hex characters and passes them in the child's **environment** (`TOWNCHESS_CORE_SECRET`), not on its command line. Every WebSocket must present the secret as `x-townchess-secret` (or `?secret=`); the core rejects anything else before the upgrade completes |
+| No orphans | The core exits as soon as its stdin closes. The client holds the write end of that pipe, so any client death (crash, kill, normal quit) closes it. On Windows the core is also placed in a Job Object with `KILL_ON_JOB_CLOSE` |
+| Crash recovery | Unfinished games are journaled to `<Saved>/TownChess/core/journal/<id>.json` after every change, by atomic rename. A restarted core replays each record through `GameCore` validation and restores the clocks. The client reconnects with its saved token and rejoins |
+| Supervision | The client restarts a core that exits unexpectedly. If it crash-loops (5 quick failures), the client gives up and logs an error |
+| Correlated logs | Everything the core prints is forwarded into the client log as `LogTownChessCore` |
+| Paths | `[/Script/TownChess.TCLocalCore]` `NodePath` / `NodeArgs` / `ScriptPath` in `DefaultGame.ini`. They can be overridden with `-tccorenode=`, `-tccorescript=` and `-tccoreargs=`, or with `TOWNCHESS_NODE` / `TOWNCHESS_CORE_SCRIPT`. Development builds run the TypeScript through the repo's tsx loader; `@PROJECTDIRURL@` expands to the project directory as a `file://` URL. UE's ini parser strips braces, and Node needs file URLs for absolute `--import` paths on Windows |
+
+Tests:
+- `packages/server/test/sidecar.test.ts` covers the secret, a crash plus journal resume, and stdin-close exit.
+- `ue5/tools/reconnect_test.sh` covers the same through the real UE client.
+
 ## Time
 
 - **Clocks.** Game clocks run on `performance.now()` (monotonic). `clockSampledAt` and `firstMoveDeadline` are

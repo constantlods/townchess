@@ -22,7 +22,8 @@
     "e2e:online": "node tools/e2e-online.mjs",
     "build:openings": "node tools/build-openings.mjs",
     "build:schema": "tsx tools/build-schema.ts",
-    "e2e:offline": "node tools/e2e-offline.mjs"
+    "e2e:offline": "node tools/e2e-offline.mjs",
+    "bundle:core": "node tools/bundle-core.mjs && node tools/verify-core-bundle.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.0",

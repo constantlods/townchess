@@ -26,8 +26,10 @@ void UTCCoreClient::Deinitialize()
 
 FString UTCCoreClient::TokenPath() const
 {
-	// one identity per server URL (the local core and an online server are different identities)
-	return FPaths::ProjectSavedDir() / TEXT("TownChess") / FString::Printf(TEXT("token-%s.txt"), *FMD5::HashAnsiString(*Url).Left(12));
+	// One identity per server. The local core gets a new ephemeral port on every launch, so it is keyed by role, not
+	// URL: otherwise a restarted game would come back as a stranger and never rejoin its unfinished game.
+	const FString Key = Secret.IsEmpty() ? Url : FString(TEXT("local-core"));
+	return FPaths::ProjectSavedDir() / TEXT("TownChess") / FString::Printf(TEXT("token-%s.txt"), *FMD5::HashAnsiString(*Key).Left(12));
 }
 
 void UTCCoreClient::Connect(const FString& InUrl, const FString& InSecret, const FString& InUsername)
