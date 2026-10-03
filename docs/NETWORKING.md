@@ -46,6 +46,7 @@ New in v2:
 | Openings and events | `state.opening`, `state.inBook`, `state.lastEvents` | Openings and deterministic events for commentary and the analysis cart |
 | Draw claims | `state.drawPolicy`, `state.claimableDraw` | Whether a claim is possible right now |
 | Game start | `state.firstMoveDeadline` | Wall-clock deadline for the first move (the abort window) |
+| Clocks | `state.clockRunning` | Whose clock is running, or null. Clients extrapolate only this clock |
 | Players | `PlayerPublic.rating: number \| null`, `ai: {level}` | Engine seats show **no rating**: the levels are not calibrated |
 
 ## Local core (offline play in the UE5 client)
@@ -57,12 +58,13 @@ The native client never contains chess rules. For offline games it launches a pr
 | --- | --- |
 | Local only | Binds `127.0.0.1` |
 | No fixed port | Port 0. The core prints one line, `TOWNCHESS_CORE_READY {"port":N,"pid":P,"protocolVersion":2}`, on stdout; all other logging goes to stderr |
-| Per-launch secret | `UTCLocalCore` generates 64 random hex characters and passes them in the child's **environment** (`TOWNCHESS_CORE_SECRET`), not on its command line. Every WebSocket must present the secret as `x-townchess-secret` (or `?secret=`); the core rejects anything else before the upgrade completes |
+| Per-launch secret | `UTCLocalCore` generates 64 random hex characters and writes them as the **first line on the child's stdin**, so they never appear in an environment block or on a command line. Every WebSocket must present the secret as `x-townchess-secret` (or `?secret=`); the core rejects anything else before the upgrade completes. Tools and tests may use `TOWNCHESS_CORE_SECRET` instead; the core removes it from its own environment |
 | No orphans | The core exits as soon as its stdin closes. The client holds the write end of that pipe, so any client death (crash, kill, normal quit) closes it. On Windows the core is also placed in a Job Object with `KILL_ON_JOB_CLOSE` |
-| Crash recovery | Unfinished games are journaled to `<Saved>/TownChess/core/journal/<id>.json` after every change, by atomic rename. A restarted core replays each record through `GameCore` validation and restores the clocks. The client reconnects with its saved token and rejoins |
-| Supervision | The client restarts a core that exits unexpectedly. If it crash-loops (5 quick failures), the client gives up and logs an error |
+| Crash recovery | Unfinished games are journaled to `<Saved>/TownChess/core/journal/<id>.json` after every change, every 5 s during play, and on clean shutdown (`--data <dir>` sets the location). Each write is a temp file, fsync, then rename, with the rename retried on Windows `EPERM`/`EBUSY`. A restarted core replays each record through `GameCore` validation. Unrestorable records are moved to `journal/corrupt/` |
+| Time while closed | **Offline games pause while the game is closed.** A clean quit keeps all thinking time used so far; a crash refunds at most the last ~5 s. A game saved before both first moves comes back still waiting for them: no clock runs and a fresh first-move window starts |
+| Supervision | The client restarts a core that exits unexpectedly. After 5 failures within 5 s of launch it gives up and logs an error; the failure count resets once a core has stayed up for 60 s. A failed launch is retried every 2 s |
 | Correlated logs | Everything the core prints is forwarded into the client log as `LogTownChessCore` |
-| Paths | `[/Script/TownChess.TCLocalCore]` `NodePath` / `NodeArgs` / `ScriptPath` in `DefaultGame.ini`. They can be overridden with `-tccorenode=`, `-tccorescript=` and `-tccoreargs=`, or with `TOWNCHESS_NODE` / `TOWNCHESS_CORE_SCRIPT`. Development builds run the TypeScript through the repo's tsx loader; `@PROJECTDIRURL@` expands to the project directory as a `file://` URL. UE's ini parser strips braces, and Node needs file URLs for absolute `--import` paths on Windows |
+| Paths | Highest precedence first: `-tccorenode=` / `-tccorescript=` / `-tccoreargs=` on the command line, then `TOWNCHESS_NODE` / `TOWNCHESS_CORE_SCRIPT`, then (packaged builds) the bundled runtime and core in `Content/TownChessCore`, then `NodePath` / `NodeArgs` / `ScriptPath` in `DefaultGame.ini`. Development builds run the TypeScript through the repo's tsx loader. `@PROJECTDIRURL@` expands to the project directory as a percent-encoded `file://` URL, because UE's ini parser strips braces and Node needs file URLs for absolute `--import` paths on Windows |
 
 Tests:
 - `packages/server/test/sidecar.test.ts` covers the secret, a crash plus journal resume, and stdin-close exit.

@@ -94,6 +94,7 @@ private:
 	void AnimateMove(const FTCMoveRecord& Move);
 	FTCPieceVisual SpawnPiece(const FString& Code, const FVector& Local);
 	void SetPieceMesh(FTCPieceVisual& P, const FString& Code);
+	void ApplyPieceMesh(USceneComponent* Root, UStaticMeshComponent* Mesh, const FString& Code);
 	static void DestroyPiece(FTCPieceVisual& P);
 	FVector LocalOf(const FString& Square) const;
 	FVector GraveyardSlot(const FString& CapturedColor);
@@ -115,7 +116,11 @@ private:
 		TWeakObjectPtr<USceneComponent> Target;
 		FVector From, To;
 		float T = 0.f, Duration = 0.5f, Lift = 6.f;
-		FString PromoteSquare, PromoteCode;
+		/** Promotion swap: bound to the promoted piece itself at queue time, never looked up by square later (a move
+		 *  queued behind it, e.g. an immediate recapture, may already own that square). */
+		TWeakObjectPtr<USceneComponent> PromoteRoot;
+		TWeakObjectPtr<UStaticMeshComponent> PromoteMesh;
+		FString PromoteCode;
 	};
 	TArray<FAnim> Anims;
 	FTCGameState Shown;

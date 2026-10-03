@@ -107,15 +107,21 @@ FString ATCBoard::SquareAtWorld(const FVector& World) const
 void ATCBoard::SetPieceMesh(FTCPieceVisual& P, const FString& Code)
 {
 	P.Code = Code;
+	ApplyPieceMesh(P.Root, P.Mesh, Code);
+}
+
+void ATCBoard::ApplyPieceMesh(USceneComponent* PieceRoot, UStaticMeshComponent* MeshComp, const FString& Code)
+{
+	if (!PieceRoot || !MeshComp) return;
 	UStaticMesh* Mesh = PieceMeshes.FindRef(Code);
-	P.Mesh->SetStaticMesh(Mesh);
+	MeshComp->SetStaticMesh(Mesh);
 	if (Mesh)
 	{
 		// meshes are baked at their original square: re-centre on the piece's own vertical axis
 		const FVector C = Mesh->GetBoundingBox().GetCenter();
-		P.Mesh->SetRelativeLocation(FVector(-C.X, -C.Y, 0.f));
+		MeshComp->SetRelativeLocation(FVector(-C.X, -C.Y, 0.f));
 	}
-	P.Root->SetRelativeRotation(FRotator(0, Code.StartsWith(TEXT("w")) ? WhitePieceYaw : BlackPieceYaw, 0));
+	PieceRoot->SetRelativeRotation(FRotator(0, Code.StartsWith(TEXT("w")) ? WhitePieceYaw : BlackPieceYaw, 0));
 }
 
 FTCPieceVisual ATCBoard::SpawnPiece(const FString& Code, const FVector& Local)
@@ -201,12 +207,16 @@ void ATCBoard::AnimateMove(const FTCMoveRecord& Move)
 			Anims.Add(A);
 			Pieces.Add(Fx.To, P);
 		}
-		else // Promote: swap the piece after it has landed
+		else // Promote: the logical piece changes now; its mesh swaps once it has landed
 		{
+			FTCPieceVisual* P = Pieces.Find(Fx.From);
+			if (!P) continue;
+			P->Code = Fx.Color + Fx.Piece;
 			FAnim A;
 			A.Duration = 0.f;
-			A.PromoteSquare = Fx.From;
-			A.PromoteCode = Fx.Color + Fx.Piece;
+			A.PromoteRoot = P->Root;
+			A.PromoteMesh = P->Mesh;
+			A.PromoteCode = P->Code;
 			Anims.Add(A);
 		}
 	}
@@ -219,7 +229,7 @@ void ATCBoard::Tick(float Dt)
 	FAnim& A = Anims[0];
 	if (!A.PromoteCode.IsEmpty())
 	{
-		if (FTCPieceVisual* P = Pieces.Find(A.PromoteSquare)) SetPieceMesh(*P, A.PromoteCode);
+		ApplyPieceMesh(A.PromoteRoot.Get(), A.PromoteMesh.Get(), A.PromoteCode);
 		Anims.RemoveAt(0);
 	}
 	else

@@ -263,7 +263,9 @@ def _tick(_dt):
                     server_ms = st.white_clock_ms if mine == "w" else st.black_clock_ms
                     # the core sampled our clock when it accepted the move, a little after our display sample
                     diff = pre - server_ms
-                    check("displayed clock agrees with the core's clock", -50 <= diff <= 400, f"display {pre:.0f} vs core {server_ms:.0f} (diff {diff:.0f} ms)")
+                    # Inherent error = one-way transit of the last state + frame quantisation + transit of the move;
+                    # observed 9-500 ms on a loaded VM. 750 ms still catches real bugs (wrong side, 2x speed, no tick).
+                    check("displayed clock agrees with the core's clock", -50 <= diff <= 750, f"display {pre:.0f} vs core {server_ms:.0f} (diff {diff:.0f} ms)")
             S["last_len"] = len(st.history)
             S["anims_at_len"] = board.get_animated_moves()
             note_features(st)

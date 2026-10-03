@@ -217,24 +217,45 @@ Built: `ue5/TownChess`, a C++ protocol v2 client. All chess decisions come from 
 - the level built by script from the benchmark scene.
 
 Evidence: real games played in the UE client by the in-game driver (`ue5/TownChess/Scripts/autotest.py`), which uses
-the same board and HUD entry points as the mouse and checks the board against the authority after every change.
+the same board and HUD entry points as the mouse.
 
-| Definition-of-done item | Result | Run |
+> **Correction (2026-10-03, after the third critique review).** The first version of this table overstated its
+> evidence:
+> - the per-ply "in sync" check ran after the board silently repaired itself, so it could not fail;
+> - the clock row compared the client against itself;
+> - outcomes were logged, not asserted;
+> - the reconnect row did not compare with the pre-kill position.
+>
+> All of these were made falsifiable and every scenario re-run. The stricter checks **immediately found a real
+> animation bug**: a promotion queued behind an immediate recapture swapped the wrong piece's mesh. It is now fixed.
+> The table below shows the re-run.
+
+Per-ply checks (every scenario):
+- the board matches the authoritative FEN with **zero silent repairs**;
+- no piece is visually off its square;
+- exactly one animation per authoritative move.
+
+| Definition-of-done item | Result (strict re-run) | Run |
 | --- | --- | --- |
 | Launch, local core start, handshake, authoritative state | Pass | Every run |
-| Rejection test: illegal move refused, **not animated**, board and history unchanged | Pass | CPU and clock runs |
-| Full game against the server-hosted engine | Pass: 66 plies to checkmate, board in sync after every ply (69/69) | `cpu` |
-| UE ↔ server ↔ browser: en passant, capture with underpromotion (cxb8=N), castling both sides, checks, resignation | Pass (15/15) | `e2e-ue-browser special` |
-| UE ↔ server ↔ browser: checkmate | Pass (9/9) | `mate` |
-| UE ↔ server ↔ browser: stalemate (Loyd's 10-mover) | Pass (13/13) | `stalemate` |
-| Draw offer received and accepted through the HUD | Pass (6/6) | `draw` |
-| Clocks count down; flag fall → timeout | Pass: 5,019 ms elapsed / 5,019 ms shown (10/10) | `clock` |
-| Kill the UE client (SIGKILL) → no orphan core → relaunch, rejoin, board/turn/clocks rebuilt → game finished | Pass (19/19) | `reconnect_test.sh` |
+| Rejection test: illegal move refused, **not animated**, board and history unchanged | Pass | `cpu`, `clock` |
+| Full game against the server-hosted engine | Pass (28/28, 22 per-ply checks) | `cpu` |
+| UE ↔ server ↔ browser: en passant, capture with underpromotion, castling both sides, checks, resignation (asserted: `resignation`, White wins, browser shows `resigned`) | Pass (27/27), after the promotion fix | `e2e-ue-browser special` |
+| UE ↔ server ↔ browser: checkmate (asserted) | Pass (11/11) | `mate` |
+| UE ↔ server ↔ browser: stalemate (asserted) | Pass (23/23) | `stalemate` |
+| Draw offer accepted through the HUD (asserted: `agreement` from the core) | Pass (8/8) | `draw` |
+| Displayed clock matches the core's clock at move acceptance; flag fall ends the game (asserted: `timeout`, Black wins) | Pass: display within 9 ms of the core; timeout asserted (14/14) | `clock` |
+| Kill the UE client (SIGKILL) → no orphan core (fails the script if not) → relaunch; restored ply and FEN **equal the position at the kill**; clocks agree with the core afterwards | Pass (16/16) | `reconnect_test.sh` |
 | Packaged core bundle on stock Node (no tsx, no repo) | Pass | `npm run bundle:core` |
-| **Packaged Win64 build, DX12, Job Object, antivirus behaviour** | **Not done yet.** Windows PC set up (SSH, VS 2022 17.14, Node 24, workspace; see WINDOWS_SETUP.md). Waiting for the UE 5.8.3 install to finish | — |
-| **Real mouse picking and on-screen HUD** | **Not verified headless.** Under Xvfb the Vulkan swapchain never presents. To be verified on Windows | — |
+| Windows: C++ build (VS 2022 17.14, MSVC 14.44.35229) | Pass (90 s) | `ue5/tools/win/build.ps1` |
+| Windows: level build on D3D12 SM6 (RTX 4070 Ti SUPER selected, not the integrated GPU) | Pass (`BUILD OK`, 81 actors) | `setup_content.ps1` |
+| **Packaged Win64 build, Job Object, antivirus behaviour, HUD and mouse** | **In progress** | `package.ps1` |
 
 Bugs found and fixed while testing:
+- **Promotion queued behind a recapture:** the swap was looked up by square and changed the wrong piece's mesh (found
+  by the strict per-ply check).
+- **Lost identity after a crash:** a player created within 5 s of a hard kill of the core was lost (found when the
+  sidecar test launched the core like the client does).
 - **Garbage-collection crash:** marker assets were cached in static raw pointers.
 - **Leaked piece meshes:** a board rebuild promoted child components instead of destroying them.
 - **Lost local identity:** the local core's identity was keyed by an ephemeral port, so a restarted game came back as a
