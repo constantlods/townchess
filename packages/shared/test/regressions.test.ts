@@ -127,7 +127,7 @@ describe('BUG-006 a restored history carries fabricated clockAfterMs values', ()
     expect(play().history.map((h) => h.clockAfterMs)).toEqual([56_000, 54_000, 49_000, 34_000]);
   });
 
-  it.fails('BUG-006a: after restore every clockAfterMs is the original value or undefined, never invented', () => {
+  it('BUG-006a: after restore every clockAfterMs is the original value or undefined, never invented', () => {
     const g = play();
     const clocks = { w: g.clock!.peek('w', 41_000), b: g.clock!.peek('b', 41_000) };
     const r = GameCore.restore({ timeControl: tc, firstMoveMs: null, moves: g.movesUci(), clocks }, 100_000);

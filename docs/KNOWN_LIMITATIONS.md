@@ -35,8 +35,8 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [BUG-002](#bug-002) | Promotion piece accepted on a non-promotion move | Low | **Fixed 2026-10-03** (regression test now a normal passing test) |
 | [BUG-003](#bug-003) | Start FEN already past 75 moves is not ended | Low | **Fixed 2026-10-03** (regression test now a normal passing test) |
 | [BUG-004](#bug-004) | House engine noise picks among fail-low bounds | Medium (Novice/Patient hang mate in one) | **Fixed 2026-10-03** (regression test now a normal passing test) |
-| [BUG-005](#bug-005) | `eventSeq` goes backwards across a journal restore | Medium (clients drop real events after a restart) | Open |
-| [BUG-006](#bug-006) | Restored history carries fabricated `clockAfterMs` | Low (wrong clock annotations) | Open |
+| [BUG-005](#bug-005) | `eventSeq` goes backwards across a journal restore | Medium (clients drop real events after a restart) | Fixed |
+| [BUG-006](#bug-006) | Restored history carries fabricated `clockAfterMs` | Low (wrong clock annotations) | Fixed |
 | [LIM-008](#lim-008) | Lenient FEN castling field (X-FEN/Shredder letters ignored) | Low | Open, documented |
 | [LIM-009](#lim-009) | What a journal restore does not bring back | Low/informational | Open, documented |
 
@@ -293,8 +293,8 @@ This is in the engine (Layer B), not in the rules.
   `record()` → JSON → `fromRecord()`: seq is **1**. Then 1...e5 gets seq **2**, which is below 3.
 - **Pinned by:** `BUG-005a` and `BUG-005b` (`it.fails`) in `packages/server/test/journal.test.ts`. A control checks
   that the original sequence is 3.
-- **Fix (for the lead):** persist `eventSeq` in `RoomRecord` and pass it to `GameCore.restore` (taking the max of it
-  and the replayed value). An alternative is a per-boot epoch that clients compare first.
+- **Fixed:** `RoomRecord.eventSeq` (optional, absent in older journals) is saved and `GameCore.restore` takes the max of
+  it and the replayed value. BUG-005a/b are now normal tests.
 
 ## BUG-006
 
@@ -306,8 +306,8 @@ This is in the engine (Layer B), not in the rules.
 - **Reproduction:** a 60+1 game, `firstMoveMs: null`, 1.e4 at 5 s, 1...e5 at 12 s, 2.Nf3 at 20 s, 2...Nc6 at 41 s.
   The live history clocks are `[56000, 54000, 49000, 34000]`. After restore, ply 1 is **61000**.
 - **Pinned by:** `BUG-006a` (`it.fails`, plus a control) in `packages/shared/test/regressions.test.ts`.
-- **Fix (for the lead):** store the per-move clocks in the journal and restore them. The alternative is to leave
-  `clockAfterMs` undefined on replayed moves. Either passes the test.
+- **Fixed:** `restore` clears `clockAfterMs` on replayed moves (the journal has no per-move clocks; storing them is a
+  possible later improvement). BUG-006a is now a normal test.
 
 ## LIM-008
 

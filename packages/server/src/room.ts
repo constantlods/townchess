@@ -34,6 +34,8 @@ export interface RoomRecord {
   clocks: Record<Color, number> | null;
   status: string;
   createdAt: number;
+  /** Last eventSeq clients were sent; restore never goes below it (BUG-005). Absent in older journals. */
+  eventSeq?: number;
 }
 
 export const newGameId = () => 'GAME-' + randomBytes(3).toString('hex').toUpperCase();
@@ -160,7 +162,7 @@ export class GameRoom {
       v: 1, id: this.id, white: this.white, black: this.black, tc: this.tc, untimed: this.untimed, rated: this.rated,
       isPrivate: this.isPrivate, drawPolicy: this.core.drawPolicy, moves: this.core.movesUci(),
       clocks: this.core.clock ? { w: this.core.clock.peek('w', now), b: this.core.clock.peek('b', now) } : null,
-      status: this.status, createdAt: this.createdAt,
+      status: this.status, createdAt: this.createdAt, eventSeq: this.core.eventSeq,
     };
   }
 
@@ -169,7 +171,7 @@ export class GameRoom {
     const room = new GameRoom(rec.id, rec.tc, rec.rated, rec.white, rec.black, players, ev, { isPrivate: rec.isPrivate, timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy });
     room.createdAt = rec.createdAt;
     if (rec.status === 'active' && rec.white && rec.black) {
-      room.core = GameCore.restore({ timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, moves: rec.moves, clocks: rec.clocks }, room.now());
+      room.core = GameCore.restore({ timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, moves: rec.moves, clocks: rec.clocks, eventSeq: rec.eventSeq }, room.now());
       room.armTimers();
     }
     return room;

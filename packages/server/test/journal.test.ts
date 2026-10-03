@@ -127,12 +127,12 @@ describe('BUG-005 eventSeq goes backwards across a journal restore', () => {
     expect(setup().seen).toBe(3);
   });
 
-  it.fails('BUG-005a: the restored room never reports a lower eventSeq than the clients already saw', () => {
+  it('BUG-005a: the restored room never reports a lower eventSeq than the clients already saw', () => {
     const { room, store, seen } = setup();
     expect(reload(room, store).dto().eventSeq).toBeGreaterThanOrEqual(seen);
   });
 
-  it.fails('BUG-005b: the first move after the restore gets an eventSeq the clients have not seen yet', () => {
+  it('BUG-005b: the first move after the restore gets an eventSeq the clients have not seen yet', () => {
     const { room, store, b, seen } = setup();
     const r = reload(room, store);
     expect(r.move(b, 'e7', 'e5', undefined, 1)).toBeNull();

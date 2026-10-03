@@ -104,7 +104,7 @@ export class GameCore {
    * replayed through the normal validation path, so a corrupt record fails loudly instead of producing an illegal
    * game. Clocks resume from the saved remaining times with the side to move running from `now`.
    */
-  static restore(opts: GameCoreOptions & { moves: string[]; clocks: Record<Color, number> | null }, now: number): GameCore {
+  static restore(opts: GameCoreOptions & { moves: string[]; clocks: Record<Color, number> | null; eventSeq?: number }, now: number): GameCore {
     const g = new GameCore(opts);
     // replay on a synthetic timeline starting at 0 (no clock can flag during replay), then re-anchor at `now`
     g.start(0);
@@ -112,6 +112,10 @@ export class GameCore {
       const r = g.move(g.turn, { from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] as MoveInput['promotion'] }, i);
       if (!r.ok) throw new Error(`restore: move ${i + 1} (${m}) rejected: ${r.reason}`);
     });
+    // non-move events (offers, declines...) are not replayed: never report a sequence clients have already seen
+    g.eventSeq = Math.max(g.eventSeq, opts.eventSeq ?? 0);
+    // the replay timeline is synthetic, so its per-move clocks are not the real ones; the journal does not store them
+    for (const h of g.history) delete h.clockAfterMs;
     if (g.status !== 'active') return g;
     if (g.firstMoveDeadline !== null) {
       // fewer than two moves were played: clocks still wait for the first moves, with a fresh window from now
