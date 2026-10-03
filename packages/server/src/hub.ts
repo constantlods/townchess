@@ -64,7 +64,11 @@ export class Hub implements RoomEvents {
         return true;
       },
     });
-    if (this.journalDir) this.restoreJournal();
+    if (this.journalDir) {
+      this.restoreJournal();
+      this.journalTimer = setInterval(() => this.persistAll(), 5000);
+      this.journalTimer.unref();
+    }
     this.wss.on('connection', (ws, req) => this.onConnection(ws, req));
     this.matchTimer = setInterval(() => this.matchmake(), 1000);
     this.pingTimer = setInterval(() => {
@@ -78,24 +82,43 @@ export class Hub implements RoomEvents {
 
   private trustProxy: boolean;
   private journalDir: string | null;
+  private journalTimer: NodeJS.Timeout | null = null;
 
   // ── journal (local core crash recovery) ──
   private journalFile(id: string) { return nodePath.join(this.journalDir!, `${id}.json`); }
 
-  /** RoomEvents: keep an up-to-date record of every unfinished game; finished games leave the journal. */
+  /**
+   * RoomEvents: keep an up-to-date record of every unfinished game; finished games leave the journal.
+   * Written to a temp file, fsynced, then renamed over the old record. On Windows the rename can briefly fail while
+   * antivirus or the indexer holds the target open (EPERM/EBUSY), so it is retried.
+   */
   persist(room: GameRoom) {
     if (!this.journalDir) return;
+    const file = this.journalFile(room.id);
     try {
-      if (isFinished(room.status)) { fs.rmSync(this.journalFile(room.id), { force: true }); return; }
+      if (isFinished(room.status)) { fs.rmSync(file, { force: true }); return; }
       fs.mkdirSync(this.journalDir, { recursive: true });
-      const tmp = this.journalFile(room.id) + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify(room.record()));
-      fs.renameSync(tmp, this.journalFile(room.id));
+      const tmp = file + '.tmp';
+      const fd = fs.openSync(tmp, 'w');
+      try { fs.writeSync(fd, JSON.stringify({ ...room.record(), savedAt: Date.now() })); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+      for (let attempt = 0; ; attempt++) {
+        try { fs.renameSync(tmp, file); break; } catch (e) {
+          const code = (e as NodeJS.ErrnoException).code;
+          if (attempt >= 4 || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) throw e;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1)); // short synchronous backoff
+        }
+      }
     } catch (e) { console.error('[hub] journal write failed', e); }
+  }
+
+  /** Persist every unfinished game (shutdown, and periodically so a crash refunds at most a few seconds). */
+  persistAll() {
+    for (const r of this.rooms.values()) if (r.status === 'active') this.persist(r);
   }
 
   private restoreJournal() {
     if (!this.journalDir || !fs.existsSync(this.journalDir)) return;
+    for (const f of fs.readdirSync(this.journalDir).filter((x) => x.endsWith('.tmp'))) fs.rmSync(nodePath.join(this.journalDir, f), { force: true });
     for (const f of fs.readdirSync(this.journalDir).filter((x) => x.endsWith('.json'))) {
       try {
         const rec = JSON.parse(fs.readFileSync(nodePath.join(this.journalDir, f), 'utf8')) as RoomRecord;
@@ -105,11 +128,19 @@ export class Hub implements RoomEvents {
         for (const id of [room.white, room.black]) if (id && !isAiSeat(id)) this.activeGame.set(id, room.id);
         console.log(`[hub] restored ${room.id} at ply ${room.core.ply}`);
         room.resumeAfterRestore();
-      } catch (e) { console.error(`[hub] could not restore ${f}`, e); }
+      } catch (e) {
+        // never retry a broken record on every launch: move it aside for inspection
+        console.error(`[hub] could not restore ${f}; moved to journal/corrupt`, e);
+        const bad = nodePath.join(this.journalDir, 'corrupt');
+        fs.mkdirSync(bad, { recursive: true });
+        try { fs.renameSync(nodePath.join(this.journalDir, f), nodePath.join(bad, `${Date.now()}-${f}`)); } catch { /* best effort */ }
+      }
     }
   }
 
   close() {
+    if (this.journalTimer) clearInterval(this.journalTimer);
+    this.persistAll(); // a clean shutdown keeps every unfinished game, clocks included
     this.ai.close();
     clearInterval(this.matchTimer);
     clearInterval(this.pingTimer);

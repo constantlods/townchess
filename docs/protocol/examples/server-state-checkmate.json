@@ -175,6 +175,7 @@
     "whiteClockMs": 297000,
     "blackClockMs": 298000,
     "clockSampledAt": 1791028800000,
+    "clockRunning": null,
     "status": "checkmate",
     "winner": "w",
     "rated": false,

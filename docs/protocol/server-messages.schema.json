@@ -591,6 +591,20 @@
             "clockSampledAt": {
               "type": "number"
             },
+            "clockRunning": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "w",
+                    "b"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "status": {
               "type": "string",
               "enum": [
@@ -922,6 +936,7 @@
             "whiteClockMs",
             "blackClockMs",
             "clockSampledAt",
+            "clockRunning",
             "status",
             "winner",
             "rated",
@@ -1369,6 +1384,20 @@
             "clockSampledAt": {
               "type": "number"
             },
+            "clockRunning": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "w",
+                    "b"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "status": {
               "type": "string",
               "enum": [
@@ -1700,6 +1729,7 @@
             "whiteClockMs",
             "blackClockMs",
             "clockSampledAt",
+            "clockRunning",
             "status",
             "winner",
             "rated",
@@ -2184,6 +2214,20 @@
             "clockSampledAt": {
               "type": "number"
             },
+            "clockRunning": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "w",
+                    "b"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "status": {
               "type": "string",
               "enum": [
@@ -2515,6 +2559,7 @@
             "whiteClockMs",
             "blackClockMs",
             "clockSampledAt",
+            "clockRunning",
             "status",
             "winner",
             "rated",

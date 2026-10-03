@@ -29,7 +29,7 @@ function stateAfter(moves: string[], startFen?: string): GameStateDTO {
   const epoch = Date.UTC(2026, 9, 3, 12, 0, 0);
   return {
     id: 'GAME-0A1B2C', white: human, black: engine, fen: s.fen, moveHistory: s.history, turn: s.turn,
-    whiteClockMs: s.clocks!.w, blackClockMs: s.clocks!.b, clockSampledAt: epoch, status: s.status, winner: s.winner,
+    whiteClockMs: s.clocks!.w, blackClockMs: s.clocks!.b, clockSampledAt: epoch, clockRunning: s.status === 'active' ? s.running : null, status: s.status, winner: s.winner,
     rated: false, timeControl: { initialMs: 300_000, incrementMs: 0 }, drawOfferBy: s.drawOfferBy, rematchOfferBy: null,
     createdAt: epoch - 60_000, updatedAt: epoch, disconnected: [], termination: s.termination, drawPolicy: 'automatic',
     claimableDraw: s.claimableDraw, legalMoves: s.legalMoves,

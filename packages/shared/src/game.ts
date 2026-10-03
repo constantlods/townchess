@@ -105,13 +105,18 @@ export class GameCore {
    * game. Clocks resume from the saved remaining times with the side to move running from `now`.
    */
   static restore(opts: GameCoreOptions & { moves: string[]; clocks: Record<Color, number> | null }, now: number): GameCore {
-    const g = new GameCore({ ...opts, firstMoveMs: null });
-    g.status = 'active';
+    const g = new GameCore(opts);
+    // replay on a synthetic timeline starting at 0 (no clock can flag during replay), then re-anchor at `now`
+    g.start(0);
     opts.moves.forEach((m, i) => {
       const r = g.move(g.turn, { from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] as MoveInput['promotion'] }, i);
       if (!r.ok) throw new Error(`restore: move ${i + 1} (${m}) rejected: ${r.reason}`);
     });
-    if (g.clock && opts.clocks && g.status === 'active') {
+    if (g.status !== 'active') return g;
+    if (g.firstMoveDeadline !== null) {
+      // fewer than two moves were played: clocks still wait for the first moves, with a fresh window from now
+      g.firstMoveDeadline = now + (g.firstMoveMs ?? 0);
+    } else if (g.clock && opts.clocks) {
       g.clock.remaining = { ...opts.clocks };
       g.clock.start(g.turn, now);
     }

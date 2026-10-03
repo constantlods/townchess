@@ -106,6 +106,7 @@ export const GameStateSchema = z.object({
   whiteClockMs: z.number(),
   blackClockMs: z.number(),
   clockSampledAt: z.number(),
+  clockRunning: color.nullable(),
   status: z.enum(['waiting', 'active', 'checkmate', 'stalemate', 'draw_agreed', 'draw_repetition', 'draw_fivefold', 'draw_insufficient', 'draw_fifty', 'draw_seventyfive', 'resigned', 'timeout', 'abandoned', 'aborted']),
   winner: color.nullable(),
   rated: z.boolean(),

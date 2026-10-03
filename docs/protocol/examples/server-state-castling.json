@@ -175,6 +175,7 @@
     "whiteClockMs": 297000,
     "blackClockMs": 297500,
     "clockSampledAt": 1791028800000,
+    "clockRunning": "b",
     "status": "active",
     "winner": null,
     "rated": false,

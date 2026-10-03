@@ -112,6 +112,8 @@ export interface GameStateDTO {
   blackClockMs: number;
   /** Server timestamp (ms) at which the clocks above were sampled. */
   clockSampledAt: number;
+  /** Whose clock is running right now (null before both first moves, when untimed, or when the game is over). */
+  clockRunning: Color | null;
   status: GameStatus;
   winner: Color | null;
   rated: boolean;

@@ -69,6 +69,7 @@
     "whiteClockMs": 300000,
     "blackClockMs": 300000,
     "clockSampledAt": 1791028800000,
+    "clockRunning": null,
     "status": "draw_insufficient",
     "winner": null,
     "rated": false,

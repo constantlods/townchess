@@ -129,6 +129,7 @@ export class GameRoom {
       whiteClockMs: snap.clocks?.w ?? initial,
       blackClockMs: snap.clocks?.b ?? initial,
       clockSampledAt: wall,
+      clockRunning: this.status === 'active' ? snap.running : null,
       status: snap.status,
       winner: snap.winner,
       rated: this.rated,

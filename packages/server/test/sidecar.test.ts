@@ -20,9 +20,14 @@ const SECRET = 'test-secret-0123456789abcdef';
 const procs: ChildProcess[] = [];
 afterEach(() => { for (const p of procs) p.kill('SIGKILL'); procs.length = 0; });
 
-function launch(dataDir: string): Promise<{ proc: ChildProcess; port: number }> {
+/** `viaStdin`: deliver the secret as the first stdin line and the data dir as --data (how the UE client launches). */
+function launch(dataDir: string, viaStdin = false): Promise<{ proc: ChildProcess; port: number }> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(process.execPath, ['--import', tsxLoader, entry], { env: { ...process.env, TOWNCHESS_CORE_SECRET: SECRET, TOWNCHESS_CORE_DATA: dataDir, HC_AI_MIN_THINK_MS: '0' }, stdio: ['pipe', 'pipe', 'pipe'] });
+    const env = { ...process.env, HC_AI_MIN_THINK_MS: '0' } as Record<string, string>;
+    if (!viaStdin) { env.TOWNCHESS_CORE_SECRET = SECRET; env.TOWNCHESS_CORE_DATA = dataDir; }
+    const args = ['--import', tsxLoader, entry, ...(viaStdin ? ['--data', dataDir] : [])];
+    const proc = spawn(process.execPath, args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    if (viaStdin) proc.stdin!.write(SECRET + '\n');
     procs.push(proc);
     let buf = '';
     const t = setTimeout(() => reject(new Error('sidecar did not report ready')), 20_000);
@@ -88,6 +93,61 @@ describe('local core (sidecar)', () => {
     const mv = rj.state.legalMoves[0];
     c2.send({ type: 'MOVE', gameId: j.state.id, seq: 2, from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4], ply: 2 });
     await c2.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 4);
+    c2.ws.close();
+  }, 60_000);
+
+  it('takes the secret from stdin; a clean quit keeps used thinking time (no refund)', async () => {
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-core-'));
+    const first = await launch(data, true);
+    const c = connect(first.port, SECRET);
+    await c.opened;
+    c.send({ type: 'HELLO', username: 'CLOCKS' });
+    const w = await c.next('WELCOME');
+    c.send({ type: 'CREATE_AI_GAME', level: 'novice', color: 'w', timeControl: '5+0' });
+    const j = await c.next('GAME_JOINED');
+    expect(j.state.clockRunning).toBeNull(); // before both first moves
+    c.send({ type: 'MOVE', gameId: j.state.id, seq: 1, from: 'e2', to: 'e4', ply: 0 });
+    const s2 = await c.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 2);
+    expect(s2.state.clockRunning).toBe('w');
+    await new Promise((r) => setTimeout(r, 1500)); // White thinks for 1.5 s
+    const exited = new Promise((r) => first.proc.once('exit', r));
+    first.proc.stdin!.end(); // clean quit
+    await exited;
+    const second = await launch(data, true);
+    const c2 = connect(second.port, SECRET);
+    await c2.opened;
+    c2.send({ type: 'HELLO', token: w.token });
+    await c2.next('WELCOME');
+    c2.send({ type: 'JOIN_GAME', gameId: j.state.id });
+    const rj = await c2.next('GAME_JOINED');
+    expect(rj.state.whiteClockMs).toBeLessThan(300_000 - 1200); // the 1.5 s was spent, not refunded
+    expect(rj.state.clockRunning).toBe('w');
+    c2.ws.close();
+  }, 60_000);
+
+  it('a game saved before both first moves restores without a running clock', async () => {
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-core-'));
+    const first = await launch(data, true);
+    const c = connect(first.port, SECRET);
+    await c.opened;
+    c.send({ type: 'HELLO', username: 'EARLY' });
+    const w = await c.next('WELCOME');
+    c.send({ type: 'CREATE_AI_GAME', level: 'novice', color: 'b', timeControl: '5+0' });
+    const j = await c.next('GAME_JOINED');
+    await c.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 1); // engine (White) moved; Black to move
+    first.proc.kill('SIGKILL');
+    await new Promise((r) => first.proc.once('exit', r));
+    const second = await launch(data, true);
+    const c2 = connect(second.port, SECRET);
+    await c2.opened;
+    c2.send({ type: 'HELLO', token: w.token });
+    await c2.next('WELCOME');
+    c2.send({ type: 'JOIN_GAME', gameId: j.state.id });
+    const rj = await c2.next('GAME_JOINED');
+    expect(rj.state.moveHistory.length).toBe(1);
+    expect(rj.state.clockRunning).toBeNull();
+    expect(rj.state.firstMoveDeadline).not.toBeNull();
+    expect(rj.state.blackClockMs).toBe(300_000);
     c2.ws.close();
   }, 60_000);
 
