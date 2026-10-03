@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import WebSocket from 'ws';
 import type { ServerMessage } from '@hc/shared';
 
@@ -13,14 +13,16 @@ import type { ServerMessage } from '@hc/shared';
  */
 const here = path.dirname(fileURLToPath(import.meta.url));
 const entry = path.resolve(here, '../src/sidecar.ts');
-const tsx = path.resolve(here, '../../../node_modules/.bin/tsx');
+// Launch exactly like the UE client does (UTCLocalCore): `node --import <tsx loader as file:// URL> sidecar.ts`.
+// (node_modules/.bin/tsx is a .cmd shim on Windows and cannot be spawned directly.)
+const tsxLoader = pathToFileURL(path.resolve(here, '../../../node_modules/tsx/dist/esm/index.mjs')).href;
 const SECRET = 'test-secret-0123456789abcdef';
 const procs: ChildProcess[] = [];
 afterEach(() => { for (const p of procs) p.kill('SIGKILL'); procs.length = 0; });
 
 function launch(dataDir: string): Promise<{ proc: ChildProcess; port: number }> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(tsx, [entry], { env: { ...process.env, TOWNCHESS_CORE_SECRET: SECRET, TOWNCHESS_CORE_DATA: dataDir, HC_AI_MIN_THINK_MS: '0' }, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawn(process.execPath, ['--import', tsxLoader, entry], { env: { ...process.env, TOWNCHESS_CORE_SECRET: SECRET, TOWNCHESS_CORE_DATA: dataDir, HC_AI_MIN_THINK_MS: '0' }, stdio: ['pipe', 'pipe', 'pipe'] });
     procs.push(proc);
     let buf = '';
     const t = setTimeout(() => reject(new Error('sidecar did not report ready')), 20_000);
