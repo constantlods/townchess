@@ -64,6 +64,12 @@ void ATCBoard::BeginPlay()
 	}
 }
 
+void ATCBoard::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (UTCCoreClient* C = Core()) { C->OnState.RemoveAll(this); C->OnMoveRejected.RemoveAll(this); }
+	Super::EndPlay(Reason);
+}
+
 float ATCBoard::SurfaceZ() const
 {
 	float Base = 0.f;
@@ -175,7 +181,7 @@ void ATCBoard::AnimateMove(const FTCMoveRecord& Move)
 			if (!Pieces.RemoveAndCopyValue(Fx.From, P) || !P.Root) continue;
 			FAnim A;
 			A.Target = P.Root;
-			A.From = P.Root->GetRelativeLocation();
+			A.From = LocalOf(Fx.From); // not the current location: an earlier queued move may still be carrying it there
 			A.To = GraveyardSlot(Fx.Color);
 			A.Duration = MoveSeconds * 0.8f;
 			A.Lift = LiftHeight;
@@ -228,7 +234,7 @@ void ATCBoard::Tick(float Dt)
 		// the shown board must equal the authority; if it ever does not, the authority wins
 		if (!IsInSync())
 		{
-			++Resyncs;
+			++Resyncs; // automation asserts this stays 0: a silent repair must never hide an animation bug
 			UE_LOG(LogTownChess, Warning, TEXT("board diverged from the authoritative FEN after a move: rebuilding"));
 			if (const UTCCoreClient* C = Core()) Rebuild(C->GetState());
 		}
@@ -259,6 +265,7 @@ void ATCBoard::OnCoreState(const FTCGameState& State, const FString& Reason)
 	{
 		Shown = State; // offers, clocks, results: no board change
 	}
+	if (!State.IsActive()) { Selected.Empty(); PromotionFrom.Empty(); PromotionTo.Empty(); } // no pickers on a finished game
 	PendingRequest = false;
 	RefreshMarkers();
 }
@@ -305,6 +312,7 @@ bool ATCBoard::ChoosePromotion(const FString& Piece)
 {
 	UTCCoreClient* C = Core();
 	if (!C || PromotionFrom.IsEmpty()) return false;
+	if (!C->IsMyTurn()) { PromotionFrom.Empty(); PromotionTo.Empty(); ClearSelection(); return false; }
 	if (Piece.IsEmpty()) { PromotionFrom.Empty(); PromotionTo.Empty(); ClearSelection(); return false; }
 	C->SubmitMove(PromotionFrom, PromotionTo, Piece.Left(1).ToLower());
 	PromotionFrom.Empty();
@@ -340,6 +348,17 @@ bool ATCBoard::IsInSync() const
 		if (!P || P->Code != KV.Value) return false;
 	}
 	return true;
+}
+
+int32 ATCBoard::GetPhysicalMismatches() const
+{
+	// where the pieces really are, not just the bookkeeping: every piece root must sit on its square's centre
+	int32 Bad = 0;
+	for (const auto& KV : Pieces)
+	{
+		if (!KV.Value.Root || !FVector::PointsAreNear(KV.Value.Root->GetRelativeLocation(), LocalOf(KV.Key), 0.01f)) ++Bad;
+	}
+	return Bad;
 }
 
 TArray<FString> ATCBoard::GetMarkedSquares() const

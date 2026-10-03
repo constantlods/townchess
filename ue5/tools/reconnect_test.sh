@@ -8,8 +8,13 @@ set -uo pipefail
 OUT=${1:-$HOME/tc-results/reconnect}; N=${2:-12}
 rm -rf "$OUT" "$HOME/townchess/ue5/TownChess/Saved/TownChess/core/journal"
 ~/tctools/run_client.sh cpu "$OUT/part1" -tcauto=cpu:novice:w:5+0 -TCKillAtPly=$N -TCTimeout=600 >/dev/null
-python3 -c "import json;d=json.load(open('$OUT/part1/result.json'));print('killed at ply',d.get('killed_at_ply'),d.get('killed_fen'))"
+read -r PLY FEN < <(python3 -c "import json;d=json.load(open('$OUT/part1/result.json'));print(d.get('killed_at_ply',-1), d.get('killed_fen','').replace(' ','_'))")
+echo "killed at ply $PLY $FEN"
 sleep 2
-if pgrep -f "[s]idecar.ts" >/dev/null; then echo "FAIL orphan local core still running"; pgrep -af "[s]idecar.ts"; else echo "PASS no orphan local core after client kill"; fi
+FAIL=0
+if pgrep -f "[s]idecar.ts" >/dev/null; then echo "FAIL orphan local core still running"; pgrep -af "[s]idecar.ts"; FAIL=1; else echo "PASS no orphan local core after client kill"; fi
 ls "$HOME/townchess/ue5/TownChess/Saved/TownChess/core/journal/"
-~/tctools/run_client.sh reconnect "$OUT/part2" -TCTimeout=1200
+OUTPUT=$(~/tctools/run_client.sh reconnect "$OUT/part2" -TCTimeout=1200 -TCExpectPly=$PLY "-TCExpectFen=$FEN")
+echo "$OUTPUT"
+echo "$OUTPUT" | grep -q "RESULT PASS" || FAIL=1
+exit $FAIL

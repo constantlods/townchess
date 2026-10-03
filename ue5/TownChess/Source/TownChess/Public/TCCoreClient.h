@@ -85,7 +85,7 @@ private:
 	void ApplyState(const FTCGameState& S, const FString& Reason);
 
 	TSharedPtr<IWebSocket> Socket;
-	FString Url, Secret, Username, Token, PlayerId, MyColor;
+	FString Url, Secret, Username, Token, PlayerId, MyColor, PendingRejoin, ServerActiveGame;
 	FTCGameState State;
 	double StateReceivedAt = 0;
 	int32 NextSeq = 1;

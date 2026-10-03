@@ -10,10 +10,10 @@ const VM = process.env.TC_VM;   // e.g. user@render-vm
 const WEB = process.env.TC_WEB; // e.g. http://render-vm:8787
 if (!VM || !WEB) { console.error('set TC_VM (ssh target of the render machine) and TC_WEB (its web client URL)'); process.exit(2); }
 const SCEN = {
-  special: { white: 'e2e4 e4e5 e5d6 d6c7 c7b8n g1f3 f1e2 e1g1 g1h2 h2g1 d2d4 f3h2', black: 'g8f6 d7d5 e7e6 d8d7 a8b8 f8d6 e8g8 d6h2 f6g4 d7d6 d6h2', end: 'resign' },
-  mate: { white: 'e2e4 f1c4 d1h5 h5f7', black: 'e7e5 b8c6 g8f6', end: null },
-  stalemate: { white: 'e2e3 d1h5 h5a5 h2h4 a5c7 c7d7 d7b7 b7b8 b8c8 c8e6', black: 'a7a5 a8a6 h7h5 a6h6 f7f6 e8f7 d8d3 d3h7 f7g6', end: null },
-  draw: { white: 'e2e4 g1f3', black: 'e7e5 b8c6', end: 'offer-draw' },
+  special: { white: 'e2e4 e4e5 e5d6 d6c7 c7b8n g1f3 f1e2 e1g1 g1h2 h2g1 d2d4 f3h2', black: 'g8f6 d7d5 e7e6 d8d7 a8b8 f8d6 e8g8 d6h2 f6g4 d7d6 d6h2', end: 'resign', status: 'resigned', termination: 'resignation', winner: 'w' },
+  mate: { white: 'e2e4 f1c4 d1h5 h5f7', black: 'e7e5 b8c6 g8f6', end: null, status: 'checkmate', termination: 'checkmate', winner: 'w' },
+  stalemate: { white: 'e2e3 d1h5 h5a5 h2h4 a5c7 c7d7 d7b7 b7b8 b8c8 c8e6', black: 'a7a5 a8a6 h7h5 a6h6 f7f6 e8f7 d8d3 d3h7 f7g6', end: null, status: 'stalemate', termination: 'stalemate', winner: 'none' },
+  draw: { white: 'e2e4 g1f3', black: 'e7e5 b8c6', end: 'offer-draw', status: 'draw_agreed', termination: 'agreement', winner: 'none' },
 };
 const name = process.argv[2] ?? 'special';
 const sc = SCEN[name];
@@ -21,7 +21,7 @@ const out = `~/tc-results/web-${name}`;
 const ssh = (cmd) => execFileSync('ssh', ['-o', 'ConnectTimeout=5', VM, cmd], { encoding: 'utf8' });
 
 ssh(`rm -rf ${out}`);
-const extra = name === 'draw' ? '-TCAcceptDraw=1' : '';
+const extra = `${name === 'draw' ? '-TCAcceptDraw=1' : ''} -TCExpectTermination=${sc.termination} -TCExpectWinner=${sc.winner}`;
 const ue = spawn('ssh', [VM, `timeout 1500 ~/tctools/run_client.sh script ${out} -tcserver=ws://127.0.0.1:8787/ws -tcauto=private:10+0 -TCMoves=${sc.white.replaceAll(' ', ',')} ${extra}`], { stdio: ['ignore', 'pipe', 'inherit'] });
 let ueOut = '';
 ue.stdout.on('data', (d) => { ueOut += d; });
@@ -61,6 +61,8 @@ console.log('browser sees', info.status, info.moves.join(' '));
 await browser.close();
 await new Promise((r) => ue.on('close', r));
 console.log(ueOut.trim());
-const ok = /RESULT PASS/.test(ueOut);
+const browserOk = info.status === sc.status;
+console.log(browserOk ? `browser status ${info.status} as expected` : `browser status ${info.status}, expected ${sc.status}`);
+const ok = /RESULT PASS/.test(ueOut) && browserOk;
 console.log(ok ? `E2E UE<->BROWSER ${name} OK` : `E2E UE<->BROWSER ${name} FAILED`);
 process.exit(ok ? 0 : 1);

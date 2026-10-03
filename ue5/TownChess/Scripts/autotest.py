@@ -21,7 +21,12 @@ import unreal
 
 
 def arg(name, default=""):
-    for tok in unreal.SystemLibrary.get_command_line().split():
+    import shlex
+    try:
+        toks = shlex.split(unreal.SystemLibrary.get_command_line(), posix=False)
+    except ValueError:
+        toks = unreal.SystemLibrary.get_command_line().split()
+    for tok in (t.strip('"') for t in toks):
         if tok.lower().startswith(f"-{name.lower()}="):
             return tok.split("=", 1)[1]
     return default
@@ -34,6 +39,10 @@ MAX_PLIES = int(arg("TCMaxPlies", "300"))
 ACCEPT_DRAW = arg("TCAcceptDraw", "") == "1"
 KILL_AT_PLY = int(arg("TCKillAtPly", "0"))  # simulate a hard crash (SIGKILL) once the game reaches this ply
 IDLE_AFTER_PLY = int(arg("TCIdleAfterPly", "0"))  # stop moving from this ply on (clock / flag-fall test)
+EXPECT_TERMINATION = arg("TCExpectTermination", "")  # e.g. checkmate, timeout, agreement, stalemate, resignation
+EXPECT_WINNER = arg("TCExpectWinner", "")  # w, b, or "none"
+EXPECT_PLY = int(arg("TCExpectPly", "-1"))  # reconnect: the ply the game had when the client was killed
+EXPECT_FEN = arg("TCExpectFen", "").replace("_", " ")  # reconnect: the position at the kill (spaces as underscores)
 os.makedirs(OUT, exist_ok=True)
 
 R = {"test": TEST, "checks": [], "pass": None, "moves": [], "features": {}, "screens": []}
@@ -228,7 +237,8 @@ def _tick(_dt):
         return
 
     if S["phase"] == "verify_reconnect":
-        check("reconnected game resumed with history", len(st.history) > 0, f"ply {len(st.history)}")
+        check("reconnected game resumed at the ply it had when killed", EXPECT_PLY < 0 or len(st.history) == EXPECT_PLY, f"ply {len(st.history)} expected {EXPECT_PLY}")
+        check("restored position equals the position at the kill", not EXPECT_FEN or st.fen == EXPECT_FEN, st.fen)
         check("board rebuilt from authoritative state after reconnect", board.is_in_sync())
         check("turn restored", st.turn in ("w", "b"), st.turn)
         timed = st.initial_ms > 0  # FTCGameState::IsTimed is C++-only
@@ -242,8 +252,20 @@ def _tick(_dt):
         if len(st.history) != S["last_len"]:
             # a new authoritative position has been shown: it must match exactly
             if S["last_len"] >= 0:
-                check(f"ply {len(st.history)} board in sync", board.is_in_sync(), st.history[-1].san if st.history else "")
+                new_moves = len(st.history) - S["last_len"]
+                anims = board.get_animated_moves() - S.get("anims_at_len", 0)
+                ok = board.is_in_sync() and board.get_resyncs() == 0 and board.get_physical_mismatches() == 0 and anims == new_moves
+                check(f"ply {len(st.history)} board in sync without repair", ok,
+                      f"{st.history[-1].san if st.history else ''} resyncs={board.get_resyncs()} misplaced={board.get_physical_mismatches()} animated={anims}/{new_moves}")
+                pre = S.pop("pre_clock", None)
+                if pre is not None and new_moves >= 1 and st.initial_ms > 0:
+                    mine = core.get_my_color()
+                    server_ms = st.white_clock_ms if mine == "w" else st.black_clock_ms
+                    # the core sampled our clock when it accepted the move, a little after our display sample
+                    diff = pre - server_ms
+                    check("displayed clock agrees with the core's clock", -50 <= diff <= 400, f"display {pre:.0f} vs core {server_ms:.0f} (diff {diff:.0f} ms)")
             S["last_len"] = len(st.history)
+            S["anims_at_len"] = board.get_animated_moves()
             note_features(st)
             if len(st.history) in (10, 30):
                 screenshot(f"ply{len(st.history)}")
@@ -256,7 +278,13 @@ def _tick(_dt):
                 import signal
                 os.kill(os.getpid(), signal.SIGKILL)
         if st.status not in ("active", "waiting"):
-            check("game reached a result", True, f"{st.status} / {st.termination} winner={st.winner or '-'}")
+            detail = f"{st.status} / {st.termination} winner={st.winner or '-'}"
+            if EXPECT_TERMINATION:
+                check(f"game ended by {EXPECT_TERMINATION}", st.termination == EXPECT_TERMINATION, detail)
+            else:
+                log(f"result (no expectation given): {detail}")
+            if EXPECT_WINNER:
+                check(f"winner is {EXPECT_WINNER}", (st.winner or "none") == EXPECT_WINNER, detail)
             R["moves"] = [m.san for m in st.history]
             screenshot("end")
             S["phase"] = "done"
@@ -269,8 +297,10 @@ def _tick(_dt):
         if ACCEPT_DRAW and st.draw_offer_by and st.draw_offer_by != core.get_my_color():
             # through the same HUD button a player clicks
             hud = unreal.GameplayStatics.get_player_controller(w, 0).get_hud()
-            hud.press_button("accept")
-            check("draw offer received and accepted through the HUD", True, f"offered by {st.draw_offer_by}")
+            if not S.get("draw_pressed"):
+                hud.press_button("accept")
+                S["draw_pressed"] = True
+                log(f"draw offer from {st.draw_offer_by}: pressed the HUD accept button")
             S["wait_until"] = now + 1.0
             return
         if not core.is_my_turn():
@@ -295,6 +325,8 @@ def _tick(_dt):
             mv = choose(core, board)
         if not mv:
             return
+        if st.clock_running == core.get_my_color():
+            S["pre_clock"] = core.get_display_clock_ms(core.get_my_color())
         r1 = board.click_square(mv[:2])
         r2 = board.click_square(mv[2:4])
         if r2 == unreal.TCClickResult.NEEDS_PROMOTION:

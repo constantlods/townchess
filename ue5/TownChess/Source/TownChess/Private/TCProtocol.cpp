@@ -74,6 +74,7 @@ bool TCProtocol::ParseState(const TSharedPtr<FJsonObject>& O, FTCGameState& S)
 	S.BlackClockMs = Num(O, TEXT("blackClockMs"));
 	const TSharedPtr<FJsonObject>* Tc;
 	if (O->TryGetObjectField(TEXT("timeControl"), Tc)) S.InitialMs = Num(*Tc, TEXT("initialMs"));
+	S.ClockRunning = Str(O, TEXT("clockRunning"));
 	S.Status = Str(O, TEXT("status"));
 	S.Winner = Str(O, TEXT("winner"));
 	S.Termination = Str(O, TEXT("termination"));

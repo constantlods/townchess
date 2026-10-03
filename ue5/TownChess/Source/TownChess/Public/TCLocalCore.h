@@ -13,15 +13,16 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTCOnCoreReady, const FString&, Url)
  * offline play. Contract with the core: packages/server/src/sidecar.ts and docs/NETWORKING.md "Local core".
  *
  * - Ephemeral port: the core binds 127.0.0.1:0 and reports `TOWNCHESS_CORE_READY {"port":N,...}` on stdout.
- * - Per-launch secret: random, passed in the child's environment (never on its command line), required on every
- *   connection.
+ * - Per-launch secret: random, written as the first line of the child's stdin (never in an environment block or on a
+ *   command line), required on every connection.
  * - No orphans: the core exits when its stdin pipe closes, which happens whenever this process dies; on Windows the
  *   core is additionally placed in a Job Object with KILL_ON_JOB_CLOSE.
  * - Crash recovery: if the core dies while we are running, it is restarted with the same data directory; it restores
  *   unfinished games from its journal and UTCCoreClient reconnects and rejoins.
  * - Logs: everything the core prints is forwarded to LogTownChessCore, interleaved with the client log.
  *
- * Paths (in order): -tccorenode= / -tccorescript= on the command line, TOWNCHESS_NODE / TOWNCHESS_CORE_SCRIPT env,
+ * Paths (highest precedence first): -tccorenode= / -tccorescript= on the command line, TOWNCHESS_NODE /
+ * TOWNCHESS_CORE_SCRIPT env, the bundled core in packaged builds (Content/TownChessCore), then
  * [/Script/TownChess.TCLocalCore] NodePath / ScriptPath in DefaultGame.ini.
  */
 UCLASS(Config = Game)
@@ -69,6 +70,8 @@ private:
 	FString Pending;
 	int32 Port = 0;
 	int32 Restarts = 0;
+	int32 QuickFailures = 0;
+	double RetryAt = 0;
 	bool bWanted = false;
 	double LaunchedAt = 0;
 	FTSTicker::FDelegateHandle TickHandle;

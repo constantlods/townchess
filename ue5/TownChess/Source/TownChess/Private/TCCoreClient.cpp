@@ -34,6 +34,8 @@ FString UTCCoreClient::TokenPath() const
 
 void UTCCoreClient::Connect(const FString& InUrl, const FString& InSecret, const FString& InUsername)
 {
+	// idempotent: a second call for the same core (level reload, repeated ready event) keeps the healthy socket
+	if (InUrl == Url && InSecret == Secret && bWantConnected && Connection != ETCConnection::Disconnected) return;
 	Disconnect();
 	Url = InUrl;
 	Secret = InSecret;
@@ -141,17 +143,16 @@ void UTCCoreClient::HandleMessage(const FString& Text)
 		Token = M->GetStringField(TEXT("token"));
 		FFileHelper::SaveStringToFile(Token, *TokenPath());
 		PlayerId = M->GetObjectField(TEXT("player"))->GetStringField(TEXT("id"));
-		SetConnection(ETCConnection::Welcomed);
 		FString Active;
-		const FString Rejoin = HasGame() ? State.Id : (M->TryGetStringField(TEXT("activeGameId"), Active) ? Active : FString());
-		if (!Rejoin.IsEmpty())
+		ServerActiveGame = M->TryGetStringField(TEXT("activeGameId"), Active) ? Active : FString();
+		PendingRejoin = HasGame() && !State.IsFinished() ? State.Id : ServerActiveGame;
+		if (!PendingRejoin.IsEmpty())
 		{
-			// reconnect: ask for the authoritative state and rebuild from it
-			const TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
-			J->SetStringField(TEXT("type"), TEXT("JOIN_GAME"));
-			J->SetStringField(TEXT("gameId"), Rejoin);
-			Send(J);
+			// reconnect: ask for the authoritative state and rebuild from it (sent before announcing "welcomed", so
+			// nothing reacting to that event can create a competing game first)
+			JoinGame(PendingRejoin);
 		}
+		SetConnection(ETCConnection::Welcomed);
 		return;
 	}
 	if (Type == TEXT("GAME_JOINED"))
@@ -159,6 +160,7 @@ void UTCCoreClient::HandleMessage(const FString& Text)
 		FTCGameState S;
 		if (TCProtocol::ParseState(M->GetObjectField(TEXT("state")), S))
 		{
+			PendingRejoin.Empty();
 			MyColor = M->GetStringField(TEXT("color"));
 			ApplyState(S, TEXT("joined"));
 		}
@@ -182,6 +184,15 @@ void UTCCoreClient::HandleMessage(const FString& Text)
 	}
 	if (Type == TEXT("ERROR"))
 	{
+		if (!PendingRejoin.IsEmpty() && M->GetStringField(TEXT("code")) == TEXT("not_found"))
+		{
+			// the game we remembered is gone (e.g. the core restarted after it finished): use the server's view instead
+			const FString Gone = PendingRejoin;
+			PendingRejoin.Empty();
+			if (!ServerActiveGame.IsEmpty() && ServerActiveGame != Gone) { PendingRejoin = ServerActiveGame; JoinGame(ServerActiveGame); }
+			else { State = FTCGameState(); MyColor.Empty(); OnState.Broadcast(State, TEXT("left")); }
+			return;
+		}
 		LastError = M->GetStringField(TEXT("message"));
 		UE_LOG(LogTownChess, Warning, TEXT("core error %s: %s"), *M->GetStringField(TEXT("code")), *LastError);
 		OnError.Broadcast(LastError);
@@ -200,7 +211,7 @@ void UTCCoreClient::ApplyState(const FTCGameState& S, const FString& Reason)
 double UTCCoreClient::GetDisplayClockMs(const FString& Color) const
 {
 	const double Base = Color == TEXT("w") ? State.WhiteClockMs : State.BlackClockMs;
-	if (!State.IsActive() || State.Turn != Color || State.History.Num() < 2) return Base; // clocks start after both first moves
+	if (!State.IsActive() || State.ClockRunning != Color) return Base; // only the clock the core says is running moves
 	return FMath::Max(0.0, Base - (FPlatformTime::Seconds() - StateReceivedAt) * 1000.0);
 }
 

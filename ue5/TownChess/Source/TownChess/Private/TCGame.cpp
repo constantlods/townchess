@@ -76,6 +76,17 @@ void ATCGameMode::BeginPlay()
 	}
 }
 
+void ATCGameMode::EndPlay(const EEndPlayReason::Type Reason)
+{
+	// subsystems outlive the level: never leave delegates pointing at a dead game mode
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UTCCoreClient* C = GI->GetSubsystem<UTCCoreClient>()) { C->OnConnectionChanged.RemoveAll(this); C->OnState.RemoveAll(this); }
+		if (UTCLocalCore* L = GI->GetSubsystem<UTCLocalCore>()) L->OnReady.RemoveAll(this);
+	}
+	Super::EndPlay(Reason);
+}
+
 void ATCGameMode::OnCoreReady(const FString& Url)
 {
 	UGameInstance* GI = GetGameInstance();
@@ -151,6 +162,12 @@ void ATCPlayerController::BeginPlay()
 	SetInputMode(FInputModeGameAndUI().SetHideCursorDuringCapture(false));
 	if (UTCCoreClient* C = Core()) C->OnState.AddDynamic(this, &ATCPlayerController::OnState);
 	OnState(FTCGameState(), TEXT("init"));
+}
+
+void ATCPlayerController::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (UTCCoreClient* C = Core()) C->OnState.RemoveAll(this);
+	Super::EndPlay(Reason);
 }
 
 void ATCPlayerController::SetupInputComponent()

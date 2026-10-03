@@ -77,6 +77,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "TownChess") int32 GetAnimatedMoves() const { return AnimatedMoves; }
 	UFUNCTION(BlueprintPure, Category = "TownChess") int32 GetResyncs() const { return Resyncs; }
 	UFUNCTION(BlueprintPure, Category = "TownChess") TArray<FString> GetMarkedSquares() const;
+	/** Pieces whose visual position is not their square's centre (must be 0 whenever nothing is animating). */
+	UFUNCTION(BlueprintPure, Category = "TownChess") int32 GetPhysicalMismatches() const;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	virtual void Tick(float Dt) override;
 

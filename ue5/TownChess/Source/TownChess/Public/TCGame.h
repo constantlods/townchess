@@ -26,6 +26,7 @@ class TOWNCHESS_API ATCGameMode : public AGameModeBase
 public:
 	ATCGameMode();
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	UFUNCTION(BlueprintPure, Category = "TownChess") bool IsOnline() const { return !ServerUrl.IsEmpty(); }
 	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetServerLabel() const;
 
@@ -48,6 +49,7 @@ public:
 	ATCPlayerController();
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	ATCBoard* Board() const;
 	UTCCoreClient* Core() const;
 	/** Text entry for the "join table" code on the menu. */

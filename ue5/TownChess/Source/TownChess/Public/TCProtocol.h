@@ -77,6 +77,8 @@ struct TOWNCHESS_API FTCGameState
 	UPROPERTY(BlueprintReadOnly) double WhiteClockMs = 0;
 	UPROPERTY(BlueprintReadOnly) double BlackClockMs = 0;
 	UPROPERTY(BlueprintReadOnly) double InitialMs = 0;
+	/** Whose clock is running ("w"/"b"), empty when none is (before both first moves, untimed, game over). */
+	UPROPERTY(BlueprintReadOnly) FString ClockRunning;
 	UPROPERTY(BlueprintReadOnly) FString Status;
 	UPROPERTY(BlueprintReadOnly) FString Winner;
 	UPROPERTY(BlueprintReadOnly) FString Termination;
