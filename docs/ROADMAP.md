@@ -231,7 +231,7 @@ the same board and HUD entry points as the mouse and checks the board against th
 | Clocks count down; flag fall → timeout | Pass: 5,019 ms elapsed / 5,019 ms shown (10/10) | `clock` |
 | Kill the UE client (SIGKILL) → no orphan core → relaunch, rejoin, board/turn/clocks rebuilt → game finished | Pass (19/19) | `reconnect_test.sh` |
 | Packaged core bundle on stock Node (no tsx, no repo) | Pass | `npm run bundle:core` |
-| **Packaged Win64 build, DX12, Job Object, antivirus behaviour** | **Not done**: blocked on SSH access to the Windows PC (port 22 filtered) | — |
+| **Packaged Win64 build, DX12, Job Object, antivirus behaviour** | **Not done yet.** Windows PC set up (SSH, VS 2022 17.14, Node 24, workspace; see WINDOWS_SETUP.md). Waiting for the UE 5.8.3 install to finish | — |
 | **Real mouse picking and on-screen HUD** | **Not verified headless.** Under Xvfb the Vulkan swapchain never presents. To be verified on Windows | — |
 
 Bugs found and fixed while testing:
