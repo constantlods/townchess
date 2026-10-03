@@ -31,10 +31,10 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-005](#lim-005) | chess.js en passant repetition hash | High if used, so it is never used | Worked around |
 | [LIM-006](#lim-006) | Claims about a position after the opponent's reply | Informational | Not planned |
 | [LIM-007](#lim-007) | Cost of verbose move generation | Performance | Open |
-| [BUG-001](#bug-001) | Castling rights from a start FEN not checked against the rooks | Medium (illegal castling) | **Open, new 2026-10-03** |
-| [BUG-002](#bug-002) | Promotion piece accepted on a non-promotion move | Low | **Open, new 2026-10-03** |
-| [BUG-003](#bug-003) | Start FEN already past 75 moves is not ended | Low | **Open, new 2026-10-03** |
-| [BUG-004](#bug-004) | House engine noise picks among fail-low bounds | Medium (Novice/Patient hang mate in one) | **Open, new 2026-10-03** |
+| [BUG-001](#bug-001) | Castling rights from a start FEN not checked against the rooks | Medium (illegal castling) | **Fixed 2026-10-03** (regression test now a normal passing test) |
+| [BUG-002](#bug-002) | Promotion piece accepted on a non-promotion move | Low | **Fixed 2026-10-03** (regression test now a normal passing test) |
+| [BUG-003](#bug-003) | Start FEN already past 75 moves is not ended | Low | **Fixed 2026-10-03** (regression test now a normal passing test) |
+| [BUG-004](#bug-004) | House engine noise picks among fail-low bounds | Medium (Novice/Patient hang mate in one) | **Fixed 2026-10-03** (regression test now a normal passing test) |
 
 ---
 
