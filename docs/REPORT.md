@@ -154,3 +154,18 @@ npm run start          # production: builds the client and serves it plus /ws on
 | 4 Proxmox GPU configuration | **Done.** VM 131 with the RX 6650 XT passed through. Mesa 26.2.3 is required for UE hardware ray tracing |
 | 5 Pixel Streaming | **Blocked by an engine limitation.** UE 5.8's only Linux hardware encoder is NVENC, and AMF is Windows-only. Options A–D are in RENDERING.md and need the owner's decision |
 | 6–19 | Not started |
+
+## Master directive: audit, roadmap and Milestone 1 (2026-10-03)
+
+- **Audit and roadmap.** [ROADMAP.md](ROADMAP.md), revised after an adversarial review by a critique agent.
+- **Milestone 1, core foundation: complete.** The item-by-item table is in ROADMAP.md §5.
+- **Tests and builds.**
+  - 290 automated tests, run three times in a row with no failures.
+  - Typecheck of all four packages is clean.
+  - The client build passes.
+  - Both end-to-end scripts (online and offline) pass.
+- **Agents used:**
+  - critique (roadmap review; findings adopted or answered in ROADMAP.md);
+  - rules (123 FIDE fixture cases plus a chess.js deviation report);
+  - character design ("The Annotator": [CHARACTERS.md](CHARACTERS.md) and `content/characters/`);
+  - GitHub (keeps draft PR #1 current at each checkpoint).

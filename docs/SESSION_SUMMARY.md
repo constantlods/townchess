@@ -125,3 +125,33 @@ server, with UE5 as the primary candidate engine and a benchmark required before
   on the VM.
 - **Host firewall.** The Proxmox cluster firewall re-enables `bridge-nf-call-iptables`, which breaks networking for
   firewalled VMs on vmbr0. This is a host networking change, left for the owner.
+
+---
+
+# Session Summary — 2026-10-03 (master directive: audit, roadmap, Milestone 1)
+
+The owner supplied a master development directive. They asked for a full audit, a self-chosen roadmap and
+implementation of the first milestone. Midway, they asked for helper agents (rules, character design, and especially a
+critique agent) and for a GitHub agent to keep the repo updated.
+
+## What was done
+
+1. **Audit.**
+   - Strengths: the rules wrapper, the server authority and the `Session` seam.
+   - Duplication: game flow written twice, in `GameRoom` and `LocalSession`.
+   - Correctness gaps:
+     - FIDE 6.9 timeouts were wrong;
+     - fivefold and 75-move were missing;
+     - promotion silently became a queen;
+     - repetition relied on chess.js's flawed en passant hash.
+   - Missing: everything about a UE5 client.
+2. **Roadmap**, revised after the critique agent's review. See ROADMAP.md.
+3. **Milestone 1 implemented:** see ROADMAP.md §5.
+4. **UE C++ spike** in the render VM: it builds. Risk 3 is retired.
+5. **Draft PR #1** (`feature/photorealistic-renderer` → `main`) is maintained by the GitHub agent.
+
+## Decisions for the owner
+
+- **Windows build host** (the gate before Milestone 2).
+- **Character "The Annotator":** approve the name and mask concept; decide on voice casting and the animation source.
+  See the open questions in CHARACTERS.md.

@@ -1,0 +1,2538 @@
+{
+  "schemaVersion": 1,
+  "id": "annotator",
+  "displayName": "THE ANNOTATOR",
+  "version": "0.1.0",
+  "status": "draft",
+  "concept": "A records clerk who outlived the institution he served. He sits under the same lamp, plays correct and patient chess, and writes down every move in a cloth-bound ledger. He wears a two-leaf riveted steel face plate he made himself; its only opening is a checker-drilled grid over one eye.",
+  "tags": [
+    "institutional",
+    "silent",
+    "record-keeping",
+    "masked",
+    "vertical-slice"
+  ],
+  "presentation": {
+    "body": {
+      "source": "metahuman",
+      "preset": "mh.body.annotator",
+      "skeleton": "skel.metahuman",
+      "loadFace": false,
+      "loadGroom": false,
+      "lodBias": 0,
+      "hiddenRegions": [
+        "head_face",
+        "hands_except_r_index_distal",
+        "legs_below_knee"
+      ]
+    },
+    "materialSlots": {
+      "skin_hand": {
+        "material": "mi.annotator.fingertip",
+        "params": {
+          "ShadingModel": "subsurface_cheap",
+          "Tint": [
+            0.86,
+            0.78,
+            0.72
+          ]
+        }
+      },
+      "cloth_coif": {
+        "material": "mi.annotator.coif",
+        "params": {
+          "Tint": [
+            0.47,
+            0.43,
+            0.37
+          ],
+          "Grime": 0.4
+        }
+      },
+      "cloth_outer": {
+        "material": "mi.annotator.coat",
+        "params": {
+          "Tint": [
+            0.24,
+            0.29,
+            0.26
+          ],
+          "FuzzRoughness": 0.85,
+          "StainAmount": 0.35
+        }
+      },
+      "cloth_sleeve": {
+        "material": "mi.annotator.oversleeve",
+        "params": {
+          "Tint": [
+            0.73,
+            0.65,
+            0.51
+          ],
+          "GraphiteSmudge": 0.5
+        }
+      },
+      "cloth_glove": {
+        "material": "mi.annotator.glove",
+        "params": {
+          "Tint": [
+            0.62,
+            0.59,
+            0.53
+          ],
+          "GraphiteFingertips": 0.7
+        }
+      },
+      "mask_metal": {
+        "material": "mi.annotator.mask",
+        "params": {
+          "RoughnessFloor": 0.12,
+          "RustAmount": 0.55,
+          "VerdigrisAmount": 0.6,
+          "PolishAmount": 0.7,
+          "TallyCount": 0,
+          "DustAmount": 0.3
+        }
+      }
+    },
+    "clothing": [
+      {
+        "id": "coif",
+        "mesh": "sk.annotator.coif",
+        "slot": "cloth_coif",
+        "simulate": false
+      },
+      {
+        "id": "coat",
+        "mesh": "sk.annotator.coat",
+        "slot": "cloth_outer",
+        "simulate": false,
+        "notes": "Collarless, off-centre placket buttoning on his left; corrective morphs on shoulders and elbows only."
+      },
+      {
+        "id": "oversleeve_l",
+        "mesh": "sk.annotator.oversleeve_l",
+        "slot": "cloth_sleeve",
+        "simulate": false
+      },
+      {
+        "id": "oversleeve_r",
+        "mesh": "sk.annotator.oversleeve_r",
+        "slot": "cloth_sleeve",
+        "simulate": false
+      },
+      {
+        "id": "glove_l",
+        "mesh": "sk.annotator.glove_l",
+        "slot": "cloth_glove",
+        "simulate": false
+      },
+      {
+        "id": "glove_r",
+        "mesh": "sk.annotator.glove_r_cut_index",
+        "slot": "cloth_glove",
+        "simulate": false,
+        "notes": "Index finger cut at the last joint, hemmed in black thread."
+      }
+    ],
+    "mask": {
+      "mesh": "sm.annotator.mask",
+      "socket": "head",
+      "offset": {
+        "loc": [
+          0.0,
+          9.5,
+          2.0
+        ],
+        "rot": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "slot": "mask_metal",
+      "params": {
+        "notes": "Rigid two-leaf steel plate, 24 x 17.5 x 7.5 cm; spec in docs/CHARACTERS.md 2.3. Offset is a placeholder until fitted."
+      }
+    },
+    "props": [
+      {
+        "id": "ledger",
+        "mesh": "sm.annotator.ledger_open",
+        "socket": "table",
+        "notes": "Swap to sm.annotator.ledger_closed; no page simulation."
+      },
+      {
+        "id": "pencil",
+        "mesh": "sm.annotator.pencil",
+        "socket": "hand_l_grip"
+      },
+      {
+        "id": "captured_row",
+        "mesh": "game.pieces",
+        "socket": "table",
+        "notes": "Captured pieces laid on their sides to his right, 3.5 cm apart."
+      }
+    ],
+    "browserFallback": {
+      "primary": "#3e4a43",
+      "secondary": "#b9a582",
+      "maskStyle": "two_leaf_plate"
+    }
+  },
+  "animation": {
+    "clips": {
+      "idle_breath": {
+        "asset": null,
+        "kind": "procedural",
+        "loop": true
+      },
+      "think": {
+        "asset": "anim.annotator.think_loop",
+        "kind": "hybrid",
+        "lengthS": 5.0,
+        "loop": true
+      },
+      "look_at": {
+        "asset": null,
+        "kind": "procedural"
+      },
+      "finger_trace": {
+        "asset": null,
+        "kind": "procedural"
+      },
+      "reach_grip_place": {
+        "asset": null,
+        "kind": "procedural",
+        "variants": [
+          "pose.annotator.pinch",
+          "pose.annotator.pinch_braced",
+          "pose.annotator.flat"
+        ]
+      },
+      "capture_set_aside": {
+        "asset": null,
+        "kind": "procedural"
+      },
+      "pose_pinch": {
+        "asset": "pose.annotator.pinch",
+        "kind": "pose"
+      },
+      "pose_pinch_braced": {
+        "asset": "pose.annotator.pinch_braced",
+        "kind": "pose"
+      },
+      "pose_flat": {
+        "asset": "pose.annotator.flat",
+        "kind": "pose"
+      },
+      "notate": {
+        "asset": "anim.annotator.notate",
+        "kind": "authored",
+        "lengthS": 1.4,
+        "variants": [
+          "anim.annotator.notate_a",
+          "anim.annotator.notate_b"
+        ]
+      },
+      "notate_underline": {
+        "asset": "anim.annotator.notate_underline",
+        "kind": "authored",
+        "lengthS": 0.8,
+        "additive": true
+      },
+      "mask_set": {
+        "asset": "anim.annotator.mask_set",
+        "kind": "authored",
+        "lengthS": 1.2,
+        "additive": true
+      },
+      "react_check": {
+        "asset": "anim.annotator.react_check",
+        "kind": "authored",
+        "lengthS": 1.0,
+        "additive": true
+      },
+      "react_player_blunder": {
+        "asset": "anim.annotator.react_player_blunder",
+        "kind": "authored",
+        "lengthS": 3.0
+      },
+      "react_own_blunder": {
+        "asset": "anim.annotator.react_own_blunder",
+        "kind": "authored",
+        "lengthS": 4.0
+      },
+      "mate_win": {
+        "asset": "anim.annotator.mate_win",
+        "kind": "authored",
+        "lengthS": 7.0,
+        "variants": [
+          "anim.annotator.mate_win_high"
+        ]
+      },
+      "mate_loss": {
+        "asset": "anim.annotator.mate_loss",
+        "kind": "hybrid",
+        "lengthS": 6.0
+      },
+      "resign_self": {
+        "asset": "anim.annotator.resign_self",
+        "kind": "hybrid",
+        "lengthS": 5.0
+      },
+      "offer_draw": {
+        "asset": "anim.annotator.offer_draw",
+        "kind": "authored",
+        "lengthS": 3.0
+      },
+      "intro_sit": {
+        "asset": "anim.annotator.intro_sit",
+        "kind": "authored",
+        "lengthS": 9.0
+      },
+      "intro_lamp_on": {
+        "asset": "anim.annotator.intro_lamp_on",
+        "kind": "authored",
+        "lengthS": 5.0
+      }
+    },
+    "procedural": {
+      "breathing": {
+        "ratePerMin": [
+          9,
+          14
+        ],
+        "headPitchDeg": 0.8,
+        "slowerWhenWinning": true
+      },
+      "lookAt": {
+        "yawClampDeg": 35,
+        "pitchClampDeg": 20,
+        "damping": 0.85,
+        "hoverFollowDelayS": 0.4,
+        "targets": [
+          "board_square",
+          "player_hands",
+          "player_face",
+          "ledger"
+        ]
+      },
+      "fingerTrace": {
+        "hand": "right",
+        "finger": "index",
+        "liftCm": 1.0,
+        "pathCm": [
+          2,
+          6
+        ],
+        "speedCmPerS": 1.5
+      },
+      "ik": {
+        "carry": "straight",
+        "liftCm": 4.0,
+        "overshoot": 0.0,
+        "carrySpeedCmPerS": 18,
+        "settle": "critically_damped"
+      },
+      "lean": {
+        "maxForwardCm": 4.0,
+        "rampS": 20
+      }
+    }
+  },
+  "behaviour": {
+    "idle": {
+      "rest": "pose_flat",
+      "fidgets": [
+        {
+          "clip": "mask_set",
+          "minIntervalS": 180,
+          "maxIntervalS": 420
+        }
+      ]
+    },
+    "moveStyle": {
+      "grip": "pinch_top",
+      "braceForTallPieces": true,
+      "liftCm": 4,
+      "carry": "straight",
+      "rotateKnightsToFace": "player",
+      "sealTap": true,
+      "capturePlacement": "row_on_side_right",
+      "notateEveryPly": true,
+      "skipNotationBelowClockS": 30
+    },
+    "reactions": [
+      {
+        "event": "check",
+        "mover": "opponent",
+        "clip": null,
+        "holdS": 1.5,
+        "notes": "Index finger stays on the checking piece."
+      },
+      {
+        "event": "check",
+        "mover": "player",
+        "clip": "react_check",
+        "gaze": "own_king"
+      },
+      {
+        "event": "double_check",
+        "mover": "player",
+        "clip": "react_check",
+        "gaze": "own_king"
+      },
+      {
+        "event": "discovered_check",
+        "mover": "player",
+        "clip": "react_check",
+        "gaze": "own_king"
+      },
+      {
+        "event": "opening_identified",
+        "clip": "notate_underline"
+      },
+      {
+        "event": "gambit_offered",
+        "clip": "notate_underline"
+      },
+      {
+        "event": "material_swing",
+        "mover": "player",
+        "conditions": {
+          "swing": {
+            "max": -3
+          }
+        },
+        "clip": null,
+        "gaze": "player_hands",
+        "holdS": 2.0
+      },
+      {
+        "event": "material_swing",
+        "mover": "player",
+        "conditions": {
+          "swing": {
+            "max": -5
+          }
+        },
+        "clip": "react_own_blunder"
+      },
+      {
+        "event": "material_swing",
+        "mover": "opponent",
+        "conditions": {
+          "swing": {
+            "min": 5
+          }
+        },
+        "clip": "react_player_blunder",
+        "gaze": "player_hands",
+        "notes": "Stand-in for engine 'blunder' until Milestone 5."
+      },
+      {
+        "event": "blunder",
+        "mover": "player",
+        "clip": "react_player_blunder",
+        "gaze": "player_hands",
+        "holdS": 5.0
+      },
+      {
+        "event": "blunder",
+        "mover": "opponent",
+        "clip": "react_own_blunder"
+      },
+      {
+        "event": "checkmate",
+        "mover": "opponent",
+        "clip": "mate_win",
+        "gaze": "player_face"
+      },
+      {
+        "event": "checkmate",
+        "mover": "player",
+        "clip": "mate_loss"
+      },
+      {
+        "event": "resign",
+        "mover": "opponent",
+        "clip": "resign_self"
+      },
+      {
+        "event": "resign",
+        "mover": "player",
+        "clip": "notate"
+      },
+      {
+        "event": "draw_offered",
+        "mover": "opponent",
+        "clip": "offer_draw"
+      },
+      {
+        "event": "timeout",
+        "mover": "opponent",
+        "clip": null,
+        "holdS": 2.0,
+        "notes": "Freeze mid-motion."
+      },
+      {
+        "event": "timeout",
+        "mover": "player",
+        "clip": null,
+        "gaze": "player_face",
+        "holdS": 2.0
+      },
+      {
+        "event": "game_start",
+        "clip": "intro_sit"
+      }
+    ],
+    "gaze": {
+      "directGazeBudget": 3,
+      "default": "board_centre"
+    }
+  },
+  "voice": {
+    "audioKeyPrefix": "vo.annotator.",
+    "casting": "Male, playing age 50-70, light baritone. Quiet, precise, clerical. No gravel, growl or theatrical menace; no regional caricature; not a sound-alike of any known horror performer.",
+    "delivery": "Close-mic, low level, never projected. Pause before the last word, not after. Questions delivered flat. '...' means a held breath of 0.6-1.2 s.",
+    "processing": {
+      "preset": "plate_resonance",
+      "highPassHz": 90,
+      "convolutionIr": "ir.annotator.steel_plate_2cm",
+      "wet": 0.3,
+      "eq": [
+        {
+          "type": "peak",
+          "hz": 2500,
+          "db": -2.0,
+          "q": 1.0
+        },
+        {
+          "type": "peak",
+          "hz": 5000,
+          "db": 1.5,
+          "q": 4.0
+        }
+      ],
+      "roomSend": "env_matched",
+      "spatialSocket": "head",
+      "forbidden": [
+        "pitch_shift",
+        "ring_mod",
+        "distortion",
+        "bitcrush"
+      ]
+    },
+    "nonVerbal": {
+      "breath": [
+        "sfx.annotator.breath_01",
+        "sfx.annotator.breath_02",
+        "sfx.annotator.breath_03"
+      ],
+      "write": [
+        "sfx.annotator.pencil_write_01",
+        "sfx.annotator.pencil_write_02"
+      ],
+      "erase": [
+        "sfx.annotator.erase_01"
+      ],
+      "pencilDown": [
+        "sfx.annotator.pencil_down_01"
+      ],
+      "seal": [
+        "sfx.annotator.seal_tap_01"
+      ],
+      "ledgerClose": [
+        "sfx.annotator.ledger_close_01",
+        "sfx.annotator.ledger_close_02"
+      ],
+      "maskSet": [
+        "sfx.annotator.mask_scrape_01"
+      ]
+    },
+    "subtitleStyle": {
+      "speakerLabel": "THE ANNOTATOR",
+      "colour": "#d8cfc0"
+    }
+  },
+  "chess": {
+    "defaultLevel": "measured",
+    "levels": {
+      "steady": {
+        "label": "Steady",
+        "builtin": {
+          "maxDepth": 3,
+          "timeMs": 1000,
+          "noiseCp": 40
+        },
+        "stockfish": {
+          "skillLevel": 3,
+          "moveTimeMs": 300
+        }
+      },
+      "measured": {
+        "label": "Measured",
+        "builtin": {
+          "maxDepth": 4,
+          "timeMs": 1800,
+          "noiseCp": 20
+        },
+        "stockfish": {
+          "skillLevel": 8,
+          "moveTimeMs": 500
+        }
+      },
+      "exacting": {
+        "label": "Exacting",
+        "builtin": {
+          "maxDepth": 5,
+          "timeMs": 2500,
+          "noiseCp": 0
+        },
+        "stockfish": {
+          "skillLevel": 14,
+          "moveTimeMs": 800
+        }
+      }
+    },
+    "style": {
+      "candidateWindowCp": 30,
+      "tradeBias": 0.6,
+      "quietMoveBias": 0.4,
+      "pawnStructureBias": 0.5,
+      "kingSafetyBias": 0.5,
+      "preferKingsideCastle": true,
+      "greedForFreeMaterial": 1.0
+    },
+    "openings": {
+      "asWhite": [
+        {
+          "family": "Queen's Gambit Declined",
+          "weight": 0.7,
+          "line": "1. d4 d5 2. c4"
+        },
+        {
+          "family": "Queen's Pawn Game",
+          "weight": 0.3,
+          "line": "1. d4 d5 2. Bf4",
+          "notes": "London-style setup"
+        }
+      ],
+      "asBlackVsE4": [
+        {
+          "family": "Caro-Kann Defense",
+          "weight": 0.7
+        },
+        {
+          "family": "French Defense",
+          "weight": 0.3
+        }
+      ],
+      "asBlackVsD4": [
+        {
+          "family": "Queen's Gambit Declined",
+          "weight": 0.6
+        },
+        {
+          "family": "Slav Defense",
+          "weight": 0.4
+        }
+      ],
+      "asBlackVsOther": [],
+      "bookDepthPlies": 10,
+      "acceptGambitProbability": 0.35
+    },
+    "time": {
+      "model": "even",
+      "fractionOfRemaining": 0.033,
+      "minThinkS": 2.5,
+      "maxThinkS": 25,
+      "blunderHoldS": [
+        3,
+        8
+      ],
+      "lowTimeThresholdS": 30
+    },
+    "resign": {
+      "policy": "material",
+      "materialDeficit": 9,
+      "evalCp": -900,
+      "forPlies": 8
+    },
+    "draw": {
+      "offers": true,
+      "offerMinMove": 40,
+      "acceptMinMove": 30,
+      "acceptIfBalanceAtMost": 0
+    },
+    "tells": {
+      "tellAccuracy": 0.5
+    }
+  },
+  "intensity": {
+    "default": "medium",
+    "low": {
+      "commentaryTiers": [
+        "low"
+      ],
+      "directGazeBudget": 0,
+      "blunderHoldS": [
+        1,
+        1.5
+      ],
+      "lampEvents": false,
+      "maskParams": {
+        "TallyCount": 0
+      },
+      "captureRowStyle": "upright",
+      "intro": "intro_lamp_on",
+      "breathingAudio": "off",
+      "notes": "Lean into light only on checkmate. Gaze limited to board and the player's hands."
+    },
+    "medium": {
+      "commentaryTiers": [
+        "low",
+        "medium"
+      ],
+      "directGazeBudget": 3,
+      "blunderHoldS": [
+        3,
+        6
+      ],
+      "lampEvents": true,
+      "captureRowStyle": "on_side",
+      "intro": "intro_sit",
+      "breathingAudio": "soft",
+      "notes": "One brief lamp dip on a player blunder."
+    },
+    "high": {
+      "commentaryTiers": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "directGazeBudget": 6,
+      "blunderHoldS": [
+        5,
+        8
+      ],
+      "lampEvents": true,
+      "captureRowStyle": "on_side_by_value",
+      "intro": "intro_sit",
+      "breathingAudio": "audible",
+      "notes": "Lamp dips on blunders and checks, never above 3 Hz, never full black. Tally increments on screen after a loss. Ledger slide on mate."
+    }
+  },
+  "commentary": {
+    "language": "en",
+    "globalCooldownS": 10,
+    "globalCooldownPlies": 3,
+    "maxLinesPerPly": 1,
+    "maxLinesPerGame": 18,
+    "eventPrecedence": [
+      "checkmate",
+      "stalemate",
+      "resign",
+      "timeout",
+      "draw_agreed",
+      "draw_repetition",
+      "draw_fifty",
+      "draw_insufficient",
+      "blunder",
+      "brilliant",
+      "missed_win",
+      "double_check",
+      "discovered_check",
+      "gambit_offered",
+      "promotion",
+      "en_passant",
+      "check",
+      "mistake",
+      "material_swing",
+      "capture",
+      "castle_queenside",
+      "castle_kingside",
+      "opening_identified",
+      "inaccuracy",
+      "game_start"
+    ],
+    "eventAliases": {
+      "draw_fivefold": "draw_repetition",
+      "draw_seventyfive": "draw_fifty"
+    },
+    "placeholders": {
+      "opening": "opening.name",
+      "openingFamily": "opening.family"
+    },
+    "lines": [
+      {
+        "id": "annotator.game_start.001",
+        "event": "game_start",
+        "text": "You may begin.",
+        "subtitle": "You may begin.",
+        "priority": 60,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.game_start.001",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1500,
+          "interruptible": false,
+          "maxLateMs": 4000
+        },
+        "notes": "Spoken after the ledger is opened. Flat, as if reading an instruction."
+      },
+      {
+        "id": "annotator.game_start.002",
+        "event": "game_start",
+        "text": "Hands on the table, where I can see them. ... Begin.",
+        "subtitle": "Hands on the table, where I can see them. ... Begin.",
+        "priority": 55,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.game_start.002",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1500,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.capture.001",
+        "event": "capture",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Noted.",
+        "subtitle": "Noted. [writes]",
+        "priority": 20,
+        "probability": 0.25,
+        "cooldown": {
+          "seconds": 90,
+          "plies": 10
+        },
+        "maxUsesPerGame": 3,
+        "intensity": "low",
+        "audio": "vo.annotator.capture.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        },
+        "notes": "The workhorse line. Almost under the breath."
+      },
+      {
+        "id": "annotator.capture.002",
+        "event": "capture",
+        "conditions": {
+          "mover": "player",
+          "moveNumber": {
+            "max": 10
+          }
+        },
+        "text": "Early to start taking things.",
+        "subtitle": "Early to start taking things.",
+        "priority": 35,
+        "probability": 0.4,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.capture.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.capture.003",
+        "event": "capture",
+        "conditions": {
+          "mover": "player",
+          "captured": [
+            "q"
+          ]
+        },
+        "text": "Her too. You're starting to enjoy this.",
+        "subtitle": "Her too. You're starting to enjoy this.",
+        "priority": 70,
+        "probability": 0.8,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.capture.003",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.capture.004",
+        "event": "capture",
+        "conditions": {
+          "mover": "opponent",
+          "captured": [
+            "q"
+          ]
+        },
+        "text": "Your queen. She goes with the others.",
+        "subtitle": "Your queen. She goes with the others.",
+        "priority": 70,
+        "probability": 0.85,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.capture.004",
+        "animation": "capture_set_aside",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 400,
+          "interruptible": true,
+          "maxLateMs": 4000
+        },
+        "notes": "Delivered while laying her on her side in the row."
+      },
+      {
+        "id": "annotator.capture.005",
+        "event": "capture",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "Set aside.",
+        "subtitle": "Set aside.",
+        "priority": 25,
+        "probability": 0.25,
+        "cooldown": {
+          "seconds": 120,
+          "plies": 12
+        },
+        "maxUsesPerGame": 2,
+        "intensity": "low",
+        "audio": "vo.annotator.capture.005",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.capture.006",
+        "event": "capture",
+        "conditions": {
+          "mover": "opponent",
+          "eventCount": {
+            "min": 6
+          }
+        },
+        "text": "The row is getting long.",
+        "subtitle": "The row is getting long.",
+        "priority": 45,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.capture.006",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.capture.007",
+        "event": "capture",
+        "conditions": {
+          "mover": "opponent",
+          "captured": [
+            "n"
+          ]
+        },
+        "text": "Knights always face you. Even lying down.",
+        "subtitle": "Knights always face you. Even lying down.",
+        "priority": 40,
+        "probability": 0.35,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.capture.007",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.capture.008",
+        "event": "capture",
+        "conditions": {
+          "mover": "player",
+          "materialBalance": {
+            "max": -3
+          }
+        },
+        "text": "Take what you like. It is all written down.",
+        "subtitle": "Take what you like. It is all written down.",
+        "priority": 40,
+        "probability": 0.35,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.capture.008",
+        "animation": "notate",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.check.001",
+        "event": "check",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "Check.",
+        "subtitle": "Check.",
+        "priority": 30,
+        "probability": 0.35,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 8
+        },
+        "maxUsesPerGame": 3,
+        "intensity": "low",
+        "audio": "vo.annotator.check.001",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 300,
+          "interruptible": true,
+          "maxLateMs": 4000
+        },
+        "notes": "Said while the index finger still rests on the checking piece."
+      },
+      {
+        "id": "annotator.check.002",
+        "event": "check",
+        "conditions": {
+          "mover": "opponent",
+          "eventCount": {
+            "min": 3
+          }
+        },
+        "text": "Check. Again. You are running out of corners.",
+        "subtitle": "Check. Again. You are running out of corners.",
+        "priority": 45,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.check.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 300,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.check.003",
+        "event": "check",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "I see it.",
+        "subtitle": "I see it.",
+        "priority": 25,
+        "probability": 0.3,
+        "cooldown": {
+          "seconds": 90,
+          "plies": 8
+        },
+        "maxUsesPerGame": 2,
+        "intensity": "low",
+        "audio": "vo.annotator.check.003",
+        "animation": "react_check",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.check.004",
+        "event": "check",
+        "conditions": {
+          "mover": "player",
+          "eventCount": {
+            "min": 4
+          }
+        },
+        "text": "You keep knocking. I keep answering.",
+        "subtitle": "You keep knocking. I keep answering.",
+        "priority": 45,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.check.004",
+        "animation": "react_check",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.double_check.001",
+        "event": "double_check",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "Two at once. Only the king can answer that.",
+        "subtitle": "Two at once. Only the king can answer that.",
+        "priority": 75,
+        "probability": 0.85,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.double_check.001",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 500,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.double_check.002",
+        "event": "double_check",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Both. ... Yes.",
+        "subtitle": "Both. ... Yes.",
+        "priority": 70,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.double_check.002",
+        "animation": "react_check",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.discovered_check.001",
+        "event": "discovered_check",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "It was behind my own piece. You looked straight past it.",
+        "subtitle": "It was behind my own piece. You looked straight past it.",
+        "priority": 70,
+        "probability": 0.8,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.discovered_check.001",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 600,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.discovered_check.002",
+        "event": "discovered_check",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "You hid it behind your own piece. Good. Keep hiding things.",
+        "subtitle": "You hid it behind your own piece. Good. Keep hiding things.",
+        "priority": 65,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.discovered_check.002",
+        "animation": "react_check",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 200,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.checkmate.001",
+        "event": "checkmate",
+        "conditions": {
+          "mover": "opponent",
+          "result": "opponent_wins"
+        },
+        "text": "Mate. That concludes the entry.",
+        "subtitle": "Mate. That concludes the entry.",
+        "priority": 95,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.checkmate.001",
+        "animation": "mate_win",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.checkmate.002",
+        "event": "checkmate",
+        "conditions": {
+          "mover": "opponent",
+          "result": "opponent_wins"
+        },
+        "text": "Mate. Keep your hands flat on the table until I have finished writing.",
+        "subtitle": "Mate. Keep your hands flat on the table until I have finished writing.",
+        "priority": 100,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "high",
+        "audio": "vo.annotator.checkmate.002",
+        "animation": "mate_win",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.checkmate.003",
+        "event": "checkmate",
+        "conditions": {
+          "mover": "opponent",
+          "result": "opponent_wins",
+          "moveNumber": {
+            "max": 20
+          }
+        },
+        "text": "Mate. Under twenty moves. I won't need a second page.",
+        "subtitle": "Mate. Under twenty moves. I won't need a second page.",
+        "priority": 98,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.checkmate.003",
+        "animation": "mate_win",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.checkmate.004",
+        "event": "checkmate",
+        "conditions": {
+          "mover": "player",
+          "result": "player_wins"
+        },
+        "text": "Mate. It goes in the ledger the same as the others.",
+        "subtitle": "Mate. It goes in the ledger the same as the others.",
+        "priority": 95,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.checkmate.004",
+        "animation": "mate_loss",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.checkmate.005",
+        "event": "checkmate",
+        "conditions": {
+          "mover": "player",
+          "result": "player_wins"
+        },
+        "text": "Mate. Remember the exact moves. I already do.",
+        "subtitle": "Mate. Remember the exact moves. I already do.",
+        "priority": 100,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "high",
+        "audio": "vo.annotator.checkmate.005",
+        "animation": "mate_loss",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.stalemate.001",
+        "event": "stalemate",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "No moves, and no way out. That isn't a win. For either of us.",
+        "subtitle": "No moves, and no way out. That isn't a win. For either of us.",
+        "priority": 95,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.stalemate.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1500,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.stalemate.002",
+        "event": "stalemate",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "You left me nothing and called it mercy.",
+        "subtitle": "You left me nothing and called it mercy.",
+        "priority": 95,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.stalemate.002",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1500,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.stalemate.003",
+        "event": "stalemate",
+        "text": "Stalemate.",
+        "subtitle": "Stalemate. [writes]",
+        "priority": 90,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.stalemate.003",
+        "animation": "notate",
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1500,
+          "interruptible": false,
+          "maxLateMs": 4000
+        },
+        "notes": "Fallback for LOW when the player stalemated him."
+      },
+      {
+        "id": "annotator.castle_kingside.001",
+        "event": "castle_kingside",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Into the corner. Everyone goes into the corner.",
+        "subtitle": "Into the corner. Everyone goes into the corner.",
+        "priority": 30,
+        "probability": 0.35,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.castle_kingside.001",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.castle_kingside.002",
+        "event": "castle_kingside",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "Behind a wall. For now.",
+        "subtitle": "Behind a wall. For now.",
+        "priority": 25,
+        "probability": 0.3,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.castle_kingside.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.castle_queenside.001",
+        "event": "castle_queenside",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "The long side. Further to run, later.",
+        "subtitle": "The long side. Further to run, later.",
+        "priority": 35,
+        "probability": 0.45,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.castle_queenside.001",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.castle_queenside.002",
+        "event": "castle_queenside",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "Long castle. I'll be sitting closer to you now.",
+        "subtitle": "Long castle. I'll be sitting closer to you now.",
+        "priority": 35,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.castle_queenside.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.en_passant.001",
+        "event": "en_passant",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "En passant. Most forget that rule by the end.",
+        "subtitle": "En passant. Most forget that rule by the end.",
+        "priority": 55,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.en_passant.001",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.en_passant.002",
+        "event": "en_passant",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "In passing. The rule is older than this room.",
+        "subtitle": "In passing. The rule is older than this room.",
+        "priority": 55,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.en_passant.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.promotion.001",
+        "event": "promotion",
+        "conditions": {
+          "mover": "player",
+          "promotion": [
+            "q"
+          ]
+        },
+        "text": "A pawn that walked the whole way. I wrote down every step.",
+        "subtitle": "A pawn that walked the whole way. I wrote down every step.",
+        "priority": 60,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.promotion.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.promotion.002",
+        "event": "promotion",
+        "conditions": {
+          "mover": "player",
+          "promotion": [
+            "n",
+            "b",
+            "r"
+          ]
+        },
+        "text": "Not a queen. You think I don't notice choices.",
+        "subtitle": "Not a queen. You think I don't notice choices.",
+        "priority": 75,
+        "probability": 0.9,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.promotion.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.promotion.003",
+        "event": "promotion",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "Promoted. Some of us are, eventually.",
+        "subtitle": "Promoted. Some of us are, eventually.",
+        "priority": 60,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.promotion.003",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.opening_identified.001",
+        "event": "opening_identified",
+        "conditions": {
+          "mover": "player",
+          "ply": {
+            "max": 6
+          }
+        },
+        "text": "The {opening}. You've been taught.",
+        "subtitle": "The {opening}. You've been taught.",
+        "priority": 40,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.opening_identified.001.{openingFamily}",
+        "animation": "notate_underline",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        },
+        "notes": "Record per family worth covering, plus a .generic take using 'this opening'."
+      },
+      {
+        "id": "annotator.opening_identified.002",
+        "event": "opening_identified",
+        "conditions": {
+          "ply": {
+            "min": 7,
+            "max": 20
+          }
+        },
+        "text": "{opening}. I have notes on that.",
+        "subtitle": "{opening}. I have notes on that.",
+        "priority": 35,
+        "probability": 0.4,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.opening_identified.002.{openingFamily}",
+        "animation": "notate_underline",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.opening_identified.003",
+        "event": "opening_identified",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "We are in the {openingFamily}. I know where it ends.",
+        "subtitle": "We are in the {openingFamily}. I know where it ends.",
+        "priority": 40,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.opening_identified.003.{openingFamily}",
+        "animation": "notate_underline",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.opening_identified.004",
+        "event": "opening_identified",
+        "conditions": {
+          "eventCount": {
+            "min": 3
+          }
+        },
+        "text": "{opening}. Still inside the book. Both of us.",
+        "subtitle": "{opening}. Still inside the book. Both of us.",
+        "priority": 30,
+        "probability": 0.35,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.opening_identified.004.{openingFamily}",
+        "animation": "notate_underline",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.gambit_offered.001",
+        "event": "gambit_offered",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "The {opening}. You give me a pawn and expect to be thanked.",
+        "subtitle": "The {opening}. You give me a pawn and expect to be thanked.",
+        "priority": 70,
+        "probability": 0.85,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.gambit_offered.001.{openingFamily}",
+        "animation": "notate_underline",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.gambit_offered.002",
+        "event": "gambit_offered",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "The {opening}. Take it. Most people take it.",
+        "subtitle": "The {opening}. Take it. Most people take it.",
+        "priority": 70,
+        "probability": 0.85,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.gambit_offered.002.{openingFamily}",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.gambit_offered.003",
+        "event": "gambit_offered",
+        "conditions": {
+          "ply": {
+            "min": 9
+          }
+        },
+        "text": "A gift, this late. The {opening}. I keep a record of gifts.",
+        "subtitle": "A gift, this late. The {opening}. I keep a record of gifts.",
+        "priority": 75,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.gambit_offered.003.{openingFamily}",
+        "animation": "notate_underline",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.material_swing.001",
+        "event": "material_swing",
+        "conditions": {
+          "mover": "opponent",
+          "swing": {
+            "min": 3
+          }
+        },
+        "text": "The numbers have changed.",
+        "subtitle": "The numbers have changed.",
+        "priority": 45,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 120,
+          "plies": 10
+        },
+        "maxUsesPerGame": 2,
+        "intensity": "low",
+        "audio": "vo.annotator.material_swing.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.material_swing.002",
+        "event": "material_swing",
+        "conditions": {
+          "mover": "player",
+          "swing": {
+            "max": -3
+          }
+        },
+        "text": "You're ahead. Count again.",
+        "subtitle": "You're ahead. Count again.",
+        "priority": 45,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.material_swing.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.material_swing.003",
+        "event": "material_swing",
+        "conditions": {
+          "materialBalance": {
+            "max": -5
+          }
+        },
+        "text": "I have been behind before. In this room.",
+        "subtitle": "I have been behind before. In this room.",
+        "priority": 55,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.material_swing.003",
+        "animation": "look_at",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.material_swing.004",
+        "event": "material_swing",
+        "conditions": {
+          "mover": "opponent",
+          "materialBalance": {
+            "min": 5
+          }
+        },
+        "text": "You can stop now. You won't. Nobody does.",
+        "subtitle": "You can stop now. You won't. Nobody does.",
+        "priority": 55,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "high",
+        "audio": "vo.annotator.material_swing.004",
+        "animation": "look_at",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.draw_repetition.001",
+        "event": "draw_repetition",
+        "text": "Third time in this position. We are going in circles. I don't mind circles.",
+        "subtitle": "Third time in this position. We are going in circles. I don't mind circles.",
+        "priority": 90,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.draw_repetition.001",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1200,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.draw_repetition.002",
+        "event": "draw_repetition",
+        "text": "Again. And again. Fine.",
+        "subtitle": "Again. And again. Fine.",
+        "priority": 95,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.draw_repetition.002",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1200,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.draw_fifty.001",
+        "event": "draw_fifty",
+        "text": "Fifty moves and nothing taken. The rule ends it, not me.",
+        "subtitle": "Fifty moves and nothing taken. The rule ends it, not me.",
+        "priority": 90,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.draw_fifty.001",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1200,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.draw_insufficient.001",
+        "event": "draw_insufficient",
+        "text": "Not enough left to finish it. Neither of us.",
+        "subtitle": "Not enough left to finish it. Neither of us.",
+        "priority": 90,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.draw_insufficient.001",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1200,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.draw_agreed.001",
+        "event": "draw_agreed",
+        "text": "Agreed. Half a line in the ledger.",
+        "subtitle": "Agreed. Half a line in the ledger. [writes]",
+        "priority": 90,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.draw_agreed.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "event",
+          "delayMs": 900,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.draw_agreed.002",
+        "event": "draw_agreed",
+        "text": "A draw. This time.",
+        "subtitle": "A draw. This time.",
+        "priority": 95,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.draw_agreed.002",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 900,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.resign.001",
+        "event": "resign",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "You stopped. Most people stop about here.",
+        "subtitle": "You stopped. Most people stop about here.",
+        "priority": 95,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.resign.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1500,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.resign.002",
+        "event": "resign",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Resignation noted. Lay the king down. Gently.",
+        "subtitle": "Resignation noted. Lay the king down. Gently.",
+        "priority": 100,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "high",
+        "audio": "vo.annotator.resign.002",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1500,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.resign.003",
+        "event": "resign",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "... I resign. Don't smile. It goes in the ledger all the same.",
+        "subtitle": "... I resign. Don't smile. It goes in the ledger all the same.",
+        "priority": 100,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.resign.003",
+        "animation": "resign_self",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.timeout.001",
+        "event": "timeout",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Time. You were thinking. I could hear it.",
+        "subtitle": "Time. You were thinking. I could hear it.",
+        "priority": 100,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.timeout.001",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1200,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.timeout.002",
+        "event": "timeout",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Your time is gone.",
+        "subtitle": "Your time is gone.",
+        "priority": 90,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.timeout.002",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 1200,
+          "interruptible": false,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.timeout.003",
+        "event": "timeout",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "My time. ... I lost count. That has not happened before.",
+        "subtitle": "My time. ... I lost count. That has not happened before.",
+        "priority": 100,
+        "probability": 1.0,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.timeout.003",
+        "animation": null,
+        "timing": {
+          "anchor": "event",
+          "delayMs": 2000,
+          "interruptible": false,
+          "maxLateMs": 4000
+        },
+        "notes": "The only line where he sounds unsettled. Keep it quiet, not alarmed."
+      },
+      {
+        "id": "annotator.blunder.001",
+        "event": "blunder",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Look at what you just did. No. Keep looking.",
+        "subtitle": "Look at what you just did. No. Keep looking.",
+        "priority": 90,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "high",
+        "audio": "vo.annotator.blunder.001",
+        "animation": "react_player_blunder",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.blunder.002",
+        "event": "blunder",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "There it is.",
+        "subtitle": "There it is. [writes ??]",
+        "priority": 80,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 180,
+          "plies": 12
+        },
+        "maxUsesPerGame": 2,
+        "intensity": "low",
+        "audio": "vo.annotator.blunder.002",
+        "animation": "react_player_blunder",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 1500,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.blunder.003",
+        "event": "blunder",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "... I'll be correcting that.",
+        "subtitle": "... I'll be correcting that.",
+        "priority": 80,
+        "probability": 0.8,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.blunder.003",
+        "animation": "react_own_blunder",
+        "timing": {
+          "anchor": "reaction_peak",
+          "delayMs": 0,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.mistake.001",
+        "event": "mistake",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Not your best. You know it. I know it.",
+        "subtitle": "Not your best. You know it. I know it.",
+        "priority": 50,
+        "probability": 0.4,
+        "cooldown": {
+          "seconds": 180,
+          "plies": 12
+        },
+        "maxUsesPerGame": 2,
+        "intensity": "medium",
+        "audio": "vo.annotator.mistake.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.mistake.002",
+        "event": "mistake",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "A small error. Mine. Noted.",
+        "subtitle": "A small error. Mine. Noted.",
+        "priority": 50,
+        "probability": 0.5,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.mistake.002",
+        "animation": "notate",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.inaccuracy.001",
+        "event": "inaccuracy",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Imprecise.",
+        "subtitle": "Imprecise.",
+        "priority": 20,
+        "probability": 0.2,
+        "cooldown": {
+          "seconds": 300,
+          "plies": 20
+        },
+        "maxUsesPerGame": 2,
+        "intensity": "low",
+        "audio": "vo.annotator.inaccuracy.001",
+        "animation": "notate",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.inaccuracy.002",
+        "event": "inaccuracy",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Nearly.",
+        "subtitle": "Nearly.",
+        "priority": 15,
+        "probability": 0.2,
+        "cooldown": {
+          "seconds": 300,
+          "plies": 20
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.inaccuracy.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.brilliant.001",
+        "event": "brilliant",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "Hm. That one I'll copy out twice.",
+        "subtitle": "Hm. That one I'll copy out twice. [writes]",
+        "priority": 85,
+        "probability": 0.8,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "low",
+        "audio": "vo.annotator.brilliant.001",
+        "animation": "notate_underline",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.brilliant.002",
+        "event": "brilliant",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "Watch what happens next. I will only do it once.",
+        "subtitle": "Watch what happens next. I will only do it once.",
+        "priority": 85,
+        "probability": 0.7,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.brilliant.002",
+        "animation": "look_at",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.missed_win.001",
+        "event": "missed_win",
+        "conditions": {
+          "mover": "player"
+        },
+        "text": "You had it. Two moves ago. You had it.",
+        "subtitle": "You had it. Two moves ago. You had it.",
+        "priority": 85,
+        "probability": 0.8,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.missed_win.001",
+        "animation": "look_at",
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      },
+      {
+        "id": "annotator.missed_win.002",
+        "event": "missed_win",
+        "conditions": {
+          "mover": "opponent"
+        },
+        "text": "I let that go. Don't ask me why.",
+        "subtitle": "I let that go. Don't ask me why.",
+        "priority": 70,
+        "probability": 0.6,
+        "cooldown": {
+          "seconds": 60,
+          "plies": 6
+        },
+        "maxUsesPerGame": 1,
+        "intensity": "medium",
+        "audio": "vo.annotator.missed_win.002",
+        "animation": null,
+        "timing": {
+          "anchor": "move_settled",
+          "delayMs": 700,
+          "interruptible": true,
+          "maxLateMs": 4000
+        }
+      }
+    ]
+  }
+}

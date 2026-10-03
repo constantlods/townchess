@@ -5,6 +5,9 @@ single industrial lamp, your own hands resting on the wood, across from a masked
 sound is generated procedurally in code — there are no third-party art or audio assets, and nothing is taken from
 any existing game.
 
+**Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)** · Chess rules: [docs/CHESS.md](docs/CHESS.md) ·
+Protocol: [docs/NETWORKING.md](docs/NETWORKING.md) · Engines/AI: [docs/AI.md](docs/AI.md) ·
+Characters: [docs/CHARACTERS.md](docs/CHARACTERS.md) ·
 Build report: [docs/REPORT.md](docs/REPORT.md) · Session summary: [docs/SESSION_SUMMARY.md](docs/SESSION_SUMMARY.md) ·
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Rendering / engine evaluation: [docs/RENDERING.md](docs/RENDERING.md) ·
 Performance on the RX 6650 XT: [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
@@ -25,7 +28,7 @@ Requires Node 20+.
 ```bash
 npm install
 npm run dev            # client → http://localhost:5173   (Play vs AI works with only this)
-npm run dev:server     # game server → ws://localhost:8787/ws (needed for Casual / Rated / Private)
+npm run dev:server     # game server → ws://localhost:8787/ws (needed for Casual / Rated / Private and CREATE_AI_GAME)
 ```
 
 The Vite dev server proxies `/ws` to the game server, so open the client URL in two browsers to play each other.
@@ -49,7 +52,8 @@ Checks:
 
 ```bash
 npm run typecheck
-npm test               # rules, clock, protocol, server authority (17 tests)
+npm test               # 290 tests: 123 FIDE fixture cases (vs chess.js and vs GameCore), core, protocol, server
+npm run e2e:offline    # browser vs the in-tab engine (client must be served, e.g. npm run start)
 node tools/gpubench.mjs 2560x1440   # FPS / frame time / 1% lows on the real GPU (client on :5199)
 npm run e2e:online     # two headless browsers play through the real server (server + client must be running)
 ```
@@ -75,12 +79,15 @@ npm run e2e:online     # two headless browsers play through the real server (ser
 
 ```
 packages/
-  shared/   chess.js rules wrapper, chess clock, zod-validated protocol, domain types  (used by client AND server)
-  server/   http + ws: PlayerStore (token identity, Elo), GameRoom (authority), Hub (routing, matchmaking, reconnect)
+  shared/   rules wrapper (chess.js), GameCore (game flow, FIDE draws, 6.9 timeouts), clock, openings (Lichess CC0),
+            deterministic events, PGN, zod protocol v2 (+ JSON Schema in docs/protocol)   (used by every client AND server)
+  engine/   house alpha-beta engine (seedable, node-limited), shared by the browser worker and the server pool
+  server/   http + ws: PlayerStore (token identity, Elo), GameRoom (seats/timers → GameCore), Hub (routing,
+            matchmaking, reconnect, abuse limits, AI games), AiPool (engine on worker threads)
   client/
     render/   procedural PBR textures, SDF modelling + surface-nets mesher, worker asset pipeline, post-processing
     scene/    world, camera rig, board, pieces, hands (17-bone IK arms), opponent, environments, move choreography
-    game/     Session interface, LocalSession (vs AI), presenter (input, animation queue, game-over), AI engine
+    game/     Session interface, LocalSession (vs AI, on GameCore), presenter (input, animation queue, game-over)
     net/      NetClient / NetSession (server-authoritative games, auto-reconnect)
     ui/       HUD, lobby, customization, environment picker, settings (institutional styling)
     audio/    Web Audio synthesis: hum, air, pipes, creaks, footsteps, metal; piece and clock sounds; drone

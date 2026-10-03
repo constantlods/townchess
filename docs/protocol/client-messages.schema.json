@@ -1,0 +1,455 @@
+{
+  "$comment": "TownChess protocol v2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "HELLO"
+        },
+        "token": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "username": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20,
+          "pattern": "^[A-Za-z0-9_]+$"
+        },
+        "cosmetics": {
+          "type": "object",
+          "properties": {
+            "hands": {
+              "type": "string",
+              "enum": [
+                "bare",
+                "dirty",
+                "scarred",
+                "tattooed"
+              ]
+            },
+            "gloves": {
+              "type": "string",
+              "enum": [
+                "none",
+                "leather",
+                "worn"
+              ]
+            },
+            "sleeves": {
+              "type": "string",
+              "enum": [
+                "none",
+                "institutional",
+                "jacket",
+                "rolled"
+              ]
+            },
+            "accessories": {
+              "type": "string",
+              "enum": [
+                "none",
+                "watch",
+                "strap",
+                "bandage"
+              ]
+            }
+          },
+          "required": [
+            "hands",
+            "gloves",
+            "sleeves",
+            "accessories"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "FIND_MATCH"
+        },
+        "timeControl": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "rated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "timeControl",
+        "rated"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "CANCEL_MATCH"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "CREATE_PRIVATE"
+        },
+        "timeControl": {
+          "type": "string",
+          "maxLength": 10
+        }
+      },
+      "required": [
+        "type",
+        "timeControl"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "CREATE_AI_GAME"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "novice",
+            "patient",
+            "warden"
+          ]
+        },
+        "color": {
+          "type": "string",
+          "enum": [
+            "w",
+            "b",
+            "random"
+          ]
+        },
+        "timeControl": {
+          "type": "string",
+          "maxLength": 10
+        }
+      },
+      "required": [
+        "type",
+        "level",
+        "color",
+        "timeControl"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "JOIN_GAME"
+        },
+        "gameId": {
+          "type": "string",
+          "pattern": "^GAME-[0-9A-F]{6}$"
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "LEAVE_GAME"
+        },
+        "gameId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "MOVE"
+        },
+        "gameId": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^[a-h][1-8]$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^[a-h][1-8]$"
+        },
+        "promotion": {
+          "type": "string",
+          "enum": [
+            "q",
+            "r",
+            "b",
+            "n"
+          ]
+        },
+        "ply": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "type",
+        "gameId",
+        "seq",
+        "from",
+        "to",
+        "ply"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "DRAW_OFFER"
+        },
+        "gameId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "DRAW_ACCEPT"
+        },
+        "gameId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "DRAW_DECLINE"
+        },
+        "gameId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "RESIGN"
+        },
+        "gameId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "CLAIM_DRAW"
+        },
+        "gameId": {
+          "type": "string"
+        },
+        "intended": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^[a-h][1-8]$"
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^[a-h][1-8]$"
+            },
+            "promotion": {
+              "type": "string",
+              "enum": [
+                "q",
+                "r",
+                "b",
+                "n"
+              ]
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "REMATCH"
+        },
+        "gameId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "gameId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "SET_COSMETICS"
+        },
+        "cosmetics": {
+          "type": "object",
+          "properties": {
+            "hands": {
+              "type": "string",
+              "enum": [
+                "bare",
+                "dirty",
+                "scarred",
+                "tattooed"
+              ]
+            },
+            "gloves": {
+              "type": "string",
+              "enum": [
+                "none",
+                "leather",
+                "worn"
+              ]
+            },
+            "sleeves": {
+              "type": "string",
+              "enum": [
+                "none",
+                "institutional",
+                "jacket",
+                "rolled"
+              ]
+            },
+            "accessories": {
+              "type": "string",
+              "enum": [
+                "none",
+                "watch",
+                "strap",
+                "bandage"
+              ]
+            }
+          },
+          "required": [
+            "hands",
+            "gloves",
+            "sleeves",
+            "accessories"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "cosmetics"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "PING"
+        },
+        "t": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "t"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

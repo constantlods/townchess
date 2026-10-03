@@ -1,0 +1,222 @@
+{
+  "type": "GAME_STATE_UPDATED",
+  "reason": "move",
+  "state": {
+    "id": "GAME-0A1B2C",
+    "white": {
+      "id": "P-EXAMPLE01",
+      "username": "PATIENT_07",
+      "rating": 1204,
+      "cosmetics": {
+        "hands": "dirty",
+        "gloves": "none",
+        "sleeves": "jacket",
+        "accessories": "strap"
+      }
+    },
+    "black": {
+      "id": "ai:warden",
+      "username": "UNKNOWN_13",
+      "rating": null,
+      "cosmetics": {
+        "hands": "dirty",
+        "gloves": "none",
+        "sleeves": "jacket",
+        "accessories": "strap"
+      },
+      "ai": {
+        "level": "warden"
+      }
+    },
+    "fen": "rnbqkbnr/1pp1pppp/p2P4/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3",
+    "moveHistory": [
+      {
+        "from": "e2",
+        "to": "e4",
+        "san": "e4",
+        "color": "w",
+        "piece": "p",
+        "flags": "b",
+        "fenAfter": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "w",
+            "from": "e2",
+            "to": "e4"
+          }
+        ],
+        "clockAfterMs": 300000
+      },
+      {
+        "from": "a7",
+        "to": "a6",
+        "san": "a6",
+        "color": "b",
+        "piece": "p",
+        "flags": "n",
+        "fenAfter": "rnbqkbnr/1ppppppp/p7/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "b",
+            "from": "a7",
+            "to": "a6"
+          }
+        ],
+        "clockAfterMs": 300000
+      },
+      {
+        "from": "e4",
+        "to": "e5",
+        "san": "e5",
+        "color": "w",
+        "piece": "p",
+        "flags": "n",
+        "fenAfter": "rnbqkbnr/1ppppppp/p7/4P3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "w",
+            "from": "e4",
+            "to": "e5"
+          }
+        ],
+        "clockAfterMs": 299000
+      },
+      {
+        "from": "d7",
+        "to": "d5",
+        "san": "d5",
+        "color": "b",
+        "piece": "p",
+        "flags": "b",
+        "fenAfter": "rnbqkbnr/1pp1pppp/p7/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "b",
+            "from": "d7",
+            "to": "d5"
+          }
+        ],
+        "clockAfterMs": 299000
+      },
+      {
+        "from": "e5",
+        "to": "d6",
+        "san": "exd6",
+        "color": "w",
+        "piece": "p",
+        "captured": "p",
+        "flags": "e",
+        "fenAfter": "rnbqkbnr/1pp1pppp/p2P4/8/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3",
+        "effects": [
+          {
+            "kind": "capture",
+            "square": "d5",
+            "piece": "p",
+            "color": "b"
+          },
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "w",
+            "from": "e5",
+            "to": "d6"
+          }
+        ],
+        "clockAfterMs": 298000
+      }
+    ],
+    "turn": "b",
+    "whiteClockMs": 298000,
+    "blackClockMs": 298500,
+    "clockSampledAt": 1791028800000,
+    "status": "active",
+    "winner": null,
+    "rated": false,
+    "timeControl": {
+      "initialMs": 300000,
+      "incrementMs": 0
+    },
+    "drawOfferBy": null,
+    "rematchOfferBy": null,
+    "createdAt": 1791028740000,
+    "updatedAt": 1791028800000,
+    "disconnected": [],
+    "termination": null,
+    "drawPolicy": "automatic",
+    "claimableDraw": null,
+    "legalMoves": [
+      "a8a7",
+      "b8d7",
+      "b8c6",
+      "c8d7",
+      "c8e6",
+      "c8f5",
+      "c8g4",
+      "c8h3",
+      "d8d7",
+      "d8d6",
+      "e8d7",
+      "g8h6",
+      "g8f6",
+      "b7b6",
+      "b7b5",
+      "c7c6",
+      "c7c5",
+      "c7d6",
+      "e7e6",
+      "e7e5",
+      "e7d6",
+      "f7f6",
+      "f7f5",
+      "g7g6",
+      "g7g5",
+      "h7h6",
+      "h7h5",
+      "a6a5"
+    ],
+    "opening": {
+      "eco": "B00",
+      "name": "St. George Defense",
+      "family": "St. George Defense",
+      "variation": null,
+      "subvariation": null,
+      "ply": 2,
+      "transposed": false
+    },
+    "inBook": false,
+    "lastEvents": [
+      {
+        "type": "move",
+        "ply": 5,
+        "color": "w",
+        "san": "exd6",
+        "piece": "p"
+      },
+      {
+        "type": "capture",
+        "ply": 5,
+        "color": "w",
+        "san": "exd6",
+        "piece": "p",
+        "captured": "p"
+      },
+      {
+        "type": "en_passant",
+        "ply": 5,
+        "color": "w",
+        "san": "exd6",
+        "piece": "p",
+        "captured": "p"
+      }
+    ],
+    "firstMoveDeadline": null
+  }
+}
