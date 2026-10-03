@@ -31,6 +31,7 @@ The owner's principles, which override everything below:
 | Perft | `perft.test.ts` | Move generation **through our wrapper** (`allLegalMoves` + `tryMove`/`undo`) matches the published counts for 7 positions |
 | Property games | `property.test.ts` | 8 invariants on every ply of seeded random games (see below) |
 | Master-game replay | `pgn-replay.test.ts`, `fixtures/pgn/*.pgn` | 16 complete historical games: legal replay, final status, opening name, PGN round-trip |
+| Restore / journal | `restore.test.ts`, `packages/server/test/journal.test.ts` | Random games rebuilt from `movesUci()` (and through `record()` → JSON → `fromRecord()`) match the original in FEN, history, the repetition table, halfmove clock, opening, status and clocks, ply by ply in lockstep. Intended-move claims match an independent prediction. PGN of restored games round-trips |
 | Pinned bugs | `regressions.test.ts` | Open bugs as `it.fails` |
 | Pinned limitations | `limitations.test.ts` | Deliberate deviations, so that changing one is a decision |
 
@@ -49,7 +50,7 @@ identification agrees with the incremental result.
 
 **Speed knobs:**
 - `PERFT_DEEP=1` adds position 3 at depth 5 (674 624) and position 6 at depth 3 (89 890).
-- `PROPERTY_GAMES=500` runs a large random sample.
+- `PROPERTY_GAMES=500` runs a large random sample. It also scales `restore.test.ts` (about 1 s per game).
 - `PERFT_VERBOSE=1` prints timings.
 
 ### Layer B: engine integration
@@ -141,3 +142,24 @@ Every chess problem follows the same six steps, in this order. Skipping a step i
 - **Property games:** a 240-game run kept every invariant.
 - **Master-game replay:** all 16 games replay.
 - **New findings:** BUG-001 to BUG-004 and LIM-007 (see the registry).
+
+## Rules audit 2 (2026-10-03, branch `agents/rules-audit-2`, on 34322b9)
+
+- **Scope:**
+  - `sanitizeCastling` FEN edge cases;
+  - `GameCore.restore` and the server journal, including the new first-move window;
+  - claims with an intended move under random play;
+  - `eventSeq` across restore;
+  - promotion, effects and PGN of restored games.
+- **Findings:** BUG-005 (`eventSeq` goes backwards after a journal restore), BUG-006 (fabricated `clockAfterMs` after
+  restore), LIM-008 (lenient castling field: Shredder letters silently dropped) and LIM-009 (state a restore drops).
+  The restore path skipping start-position checks was fixed by e819a2a before it was pinned. It is now a control test.
+- **Suite:** 446 tests (443 passed, 3 expected failures: BUG-005a, BUG-005b, BUG-006a).
+- **Timings (this machine):**
+
+| Run | Result | Wall time |
+| --- | --- | --- |
+| `npx vitest run` (full suite) | 443 passed + 3 `it.fails` | 46 s |
+| `PERFT_DEEP=1` `perft.test.ts` | 10/10 counts match | 95 s |
+| `PROPERTY_GAMES=200` `property.test.ts` + `restore.test.ts` (parallel) | 80/80 | 213 s |
+| `PROPERTY_GAMES=200` `restore.test.ts` alone | 44/44 | 206 s |
