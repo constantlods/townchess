@@ -84,6 +84,18 @@ def capture_export():
         unreal.log(f"[TCBENCH] capture_export failed: {e}")
 
 
+def log_viewport():
+    try:
+        pcm = _camera_manager()
+        vp = unreal.WidgetLayoutLibrary.get_viewport_size(pcm.get_world())
+        gus = unreal.GameUserSettings.get_game_user_settings()
+        r = gus.get_screen_resolution()
+        sp = unreal.SystemLibrary.get_console_variable_float_value("r.ScreenPercentage")
+        unreal.log(f"[TCBENCH] viewport={vp.x:.0f}x{vp.y:.0f} settings={r.x}x{r.y} screenpct={sp}")
+    except Exception as e:
+        unreal.log(f"[TCBENCH] log_viewport failed: {e}")
+
+
 def tick(_dt):
     state["f"] += 1
     f = state["f"]
@@ -97,6 +109,11 @@ def tick(_dt):
         cmd("r.VSync 0")
         if SP:
             cmd(f"r.ScreenPercentage {SP}")
+        want = arg("TCShotRes", "")
+        if want:
+            cmd(f"r.SetRes {want}w")  # -ResX/-ResY alone did not size the offscreen viewport
+    elif f == 30:
+        log_viewport()
     elif state["start"] is None:
         if f >= WARM and time.time() - state["t0"] >= WARM_SEC:
             state["start"] = f

@@ -150,7 +150,7 @@ npm run start          # production: builds the client and serves it plus /ws on
 | 0 Repository audit | Done |
 | 1 Hardware audit | Done ([PERFORMANCE.md](PERFORMANCE.md)) |
 | 2 Engine evaluation | Done: UE5 primary, Godot 4 fallback ([RENDERING.md](RENDERING.md)) |
-| 3 UE5 benchmark scene | **Blocked**: Epic account/EULA, and host RAM |
-| 4 Proxmox GPU configuration | GPU verified on the host (`amdgpu`, RADV, VA-API). The choice between host and passthrough VM is pending |
-| 5 Pixel Streaming | Hardware H.264 encode verified with ffmpeg/VA-API. UE Pixel Streaming itself not tested |
+| 3 UE5 benchmark scene | **Done.** 1440p HIGH with TSR at 67%: 64.5 fps, 1% low 59.6, 3.1 GB VRAM. Full matrix in PERFORMANCE.md |
+| 4 Proxmox GPU configuration | **Done.** VM 131 with the RX 6650 XT passed through. Mesa 26.2.3 is required for UE hardware ray tracing |
+| 5 Pixel Streaming | **Blocked by an engine limitation.** UE 5.8's only Linux hardware encoder is NVENC, and AMF is Windows-only. Options A–D are in RENDERING.md and need the owner's decision |
 | 6–19 | Not started |

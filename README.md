@@ -9,10 +9,12 @@ Build report: [docs/REPORT.md](docs/REPORT.md) · Session summary: [docs/SESSION
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Rendering / engine evaluation: [docs/RENDERING.md](docs/RENDERING.md) ·
 Performance on the RX 6650 XT: [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
 
-> **Photorealistic rendering phase.** The procedural Three.js renderer is version 0. It has been benchmarked on the
-> production GPU, an AMD RX 6650 XT: 59 fps at 1440p HIGH. Unreal Engine 5 has been chosen as the target renderer,
-> but a benchmark scene has to prove it on this hardware first. See RENDERING.md for that decision and for what is
-> blocking it.
+> **Photorealistic rendering phase.** The procedural Three.js renderer is version 0. A UE5 benchmark scene now runs
+> on the production GPU, an AMD RX 6650 XT, inside a Proxmox VM with the GPU passed through.
+>
+> - **Performance:** 64.5 fps at 1440p HIGH, with TSR from 67% internal resolution, using 3.1 GB of VRAM.
+> - **Details:** see RENDERING.md and PERFORMANCE.md.
+> - **Game code:** not migrated yet. The browser game below is still the playable build.
 
 ![Gameplay](docs/screenshots/gameplay-1920x1080.jpg)
 
@@ -32,6 +34,15 @@ Production (single process serving the built client and the WebSocket endpoint):
 
 ```bash
 npm run start          # builds the client, then serves it + /ws on PORT (default 8787)
+```
+
+UE5 benchmark (render VM; see `ue5/`):
+
+```bash
+python3 ue5/tools/fetch_polyhaven.py ~/assets/polyhaven 2k   # CC0 models/textures
+ue5/tools/build_scene.sh                                     # rebuild /Game/Bench/L_Bench headless
+ue5/tools/run_bench.sh 2560x1440 high 67                     # one run: CSV + telemetry + screenshot
+ue5/tools/bench_matrix.sh && python3 ue5/tools/summarize_bench.py <run dirs>
 ```
 
 Checks:

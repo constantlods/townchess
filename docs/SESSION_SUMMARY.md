@@ -88,3 +88,40 @@ server, with UE5 as the primary candidate engine and a benchmark required before
 
 - **UE5 benchmark scene and later phases.** These need the blockers above resolved. No game code was changed, so
   nothing that works today was put at risk.
+
+---
+
+# Session Summary — 2026-10-02/03 (photorealistic rendering phase, part 2)
+
+## What was done
+
+1. **Engine access.** The owner linked Epic to GitHub and downloaded UE 5.8.3 for Linux. The zip is archived on the
+   `TTB` HDD.
+2. **Render VM.** At the owner's request, UE runs in its own VM instead of on the hypervisor.
+   - VM 131 `townchess-ue5`: Ubuntu 26.04 cloud image, 10 vCPUs, 10 GiB RAM, a 200 GB disk on NVMe, and the RX 6650
+     XT passed through.
+   - VM 108 (an unused installer) is stopped.
+3. **Benchmark project.** `ue5/TownChessBench` with reproducible, scripted content.
+   - Scene: CC0 Poly Haven assets, a seated opponent with an authored pose, and the template hands.
+   - Runner: an in-game Python benchmark driver.
+   - Supporting tools: telemetry, a matrix runner and a summarizer.
+4. **Results.** UE5 is viable at 1440p with TSR. The full matrix is in PERFORMANCE.md.
+
+## Problems hit (all fixed, and recorded in the docs)
+
+- **Ray tracing.** Hardware ray tracing was disabled under Mesa 26.0.8. Fixed with Mesa 26.2.3 from the kisak PPA.
+- **Disk.** The NVMe filled while the zip existed both unpacked and inside the VM. The VM paused, the host copy was
+  removed, and the VM resumed with no data loss.
+- **Leftover editor.** A lingering editor process plus amdgpu's TTM page pool pushed the VM into heavy swapping.
+  The build wrapper now kills the editor, and the pool is capped.
+- **Two sets of invalid numbers, found and discarded before reporting:**
+  - an empty level saved by a level-load bug (169 fps);
+  - a whole matrix that silently rendered at 720p (about 122 fps "at every resolution").
+
+## Open decisions for the owner
+
+- **Streaming.** UE's Pixel Streaming has no AMD hardware encoder on Linux. Choose among options A–D in RENDERING.md.
+- **Assets.** MetaHuman and Megascans need a one-time Epic/Fab sign-in inside the editor, through a remote desktop
+  on the VM.
+- **Host firewall.** The Proxmox cluster firewall re-enables `bridge-nf-call-iptables`, which breaks networking for
+  firewalled VMs on vmbr0. This is a host networking change, left for the owner.

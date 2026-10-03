@@ -1,8 +1,10 @@
 # Rendering — engine evaluation (Phase 2)
 
-Status 2026-10-02: the evaluation is done and the decision is made. The UE5 benchmark is **blocked on two things
-only the owner can provide** (see below). No game code has been migrated yet. Following the spec, that waits until
-the benchmark has run.
+Status 2026-10-03:
+- **The UE5 benchmark has run on the RX 6650 XT.** UE5 is viable at 1440p with TSR. See
+  [PERFORMANCE.md § UE5 benchmark scene](PERFORMANCE.md#ue5-benchmark-scene-phase-3-2026-10-03).
+- The blockers below are resolved.
+- No game code has been migrated yet. Gameplay integration (Phase 14) and the streaming decision come next.
 
 ## Hardware facts this is based on
 
@@ -26,7 +28,7 @@ All of these were measured; see [PERFORMANCE.md](PERFORMANCE.md).
 | Hands and character rigs | Hand-written IK (exists today, 17 bones) | IK, but small ecosystem | Control Rig, Full-Body IK, MetaHuman hands |
 | Upscaling on AMD | None built in | FSR 2 built in | TSR built in (vendor-neutral); AMD FSR plugin |
 | Delivery to players | Native browser; everyone renders locally | Native, or web export (weaker) | Pixel Streaming: server renders and streams video |
-| Runs on this host today | **Yes, measured: 59 fps at 1440p HIGH** | Yes (Vulkan works) | Not yet. See blockers |
+| Runs on this hardware | **Yes, measured: 59 fps at 1440p HIGH** | Yes (Vulkan works) | **Yes, measured: 64.5 fps at 1440p HIGH with TSR at 67%** |
 | Editor cost | None | ~150 MB, light | Editor ~60–100 GB on disk; **32 GB RAM recommended** |
 
 ### Assessment
@@ -73,42 +75,56 @@ The assets have to be original and legally clean. Usable sources:
 
 So the Epic account is also what unlocks the asset quality, not just the engine.
 
-## Blockers for Unreal Engine 5
+## Blockers for Unreal Engine 5 (resolved 2026-10-02/03)
 
-1. **Epic account / EULA.**
-   - Prebuilt Linux UE5 binaries can only be downloaded after logging into an Epic account.
-   - Engine source needs the GitHub account linked to Epic. Today `gh api repos/EpicGames/UnrealEngine` returns 404
-     for `constantlods`, so the account is not linked.
-   - Only the owner can accept the EULA.
+1. **Epic account.**
+   - The owner linked their Epic account to GitHub; membership in the EpicGames organization is active.
+   - They downloaded the UE 5.8.3 Linux zip themselves.
+   - The zip is archived at `TTB:/ue5-archive/`.
 2. **RAM.**
-   - The UE5 editor with Lumen and Nanite shader compilation needs about 16 GB just for itself, and 32 GB is
-     recommended.
-   - The host has 15 GiB in total, with 13 GiB allocated to guests and swap already in use.
-   - Running the editor next to VM 108 (8 GiB) would make the host swap heavily, or trigger the OOM killer.
-   - Options:
-     - Stop or shrink VM 108 while working in UE.
-     - Add RAM (the B550/A520 platform takes up to 128 GB).
-     - Author content on another machine and only run packaged builds here.
-3. **Disk.**
-   - `/` has only 7.6 GB free.
-   - UE should go on `smalldrive` (NVMe, 232 GB free), not on the root filesystem and not on the HDD.
+   - VM 108 is stopped while UE work runs. It had only ever been sitting at an installer screen.
+   - The render VM gets 10 GiB plus a 16 GiB swap file of its own.
+   - amdgpu's TTM page pool is capped at 1 GiB in the VM, because it had been holding about 4.8 GB.
+   - Benchmark runs never dropped below 6.4 GB of available memory.
+3. **Disk.** The engine (73 GB) and project live on the VM's 200 GB disk on the `smalldrive` NVMe.
 
-## Where UE5 would run (Proxmox architecture)
+## What was learned on this hardware
 
-The GPU is currently bound to `amdgpu` **on the host**, and no VM has it passed through. That leaves two options:
+- **Hardware ray tracing on RADV needs a newer Mesa than Ubuntu 26.04 ships.**
+  - With Mesa 26.0.8, UE 5.8 logs "driver does not support acceleration structures in the mutable descriptor set"
+    and disables ray tracing entirely.
+  - Mesa 26.2.3 from `ppa:kisak/kisak-mesa` fixes it: "Ray tracing is enabled".
+  - Any deployment has to pin a Mesa at least that new.
+- **Hardware Lumen is not worth it in this scene.** Software Lumen was 4% faster and looked the same. The default plan
+  is software Lumen plus Virtual Shadow Maps. Hardware ray tracing gets another look once there are glossy metal
+  surfaces (the mask) whose reflections it could improve.
+- **TSR is the temporal reconstruction.** It is vendor-neutral and built into UE5. 1440p output from 67% internal
+  resolution (about 1715×965) gives roughly 65 fps. AMD FSR has not been evaluated in UE yet: AMD's UE plugin would
+  have to support Linux/Vulkan, and that needs checking. **No DLSS.**
+- **Proxmox layout.** UE runs in a dedicated VM (131) with the GPU passed through, not on the host. The host then
+  can't use the GPU while the VM is running.
 
-- **Option 1: run UE5 and Pixel Streaming directly on the host.**
-  - It is the simplest option, needs no vfio changes, and the GPU and encoder are already proven to work.
-  - The cost is running a heavy graphics workload in the hypervisor's own OS.
-- **Option 2: run a dedicated VM with `hostpci0: 0000:03:00,pcie=1`.**
-  - This is the spec's preferred layout.
-  - VM 130 (Bazzite) used exactly this before it was removed, so passthrough is known to work on this board.
-  - The GPU is then unavailable to the host, and the VM needs its own large RAM allocation, which runs into
-    blocker 2.
+## Pixel Streaming on Linux + AMD: an engine limitation
 
-A Windows VM would only be justified if Linux Pixel Streaming encoding fails on AMD. Whether Linux Pixel
-Streaming can drive AMD encoding (through VA-API, AMF or Vulkan Video, depending on the UE version) is **not yet
-verified**. It is the first thing to test after the benchmark scene renders.
+These facts come from UE 5.8.3's plugin files:
+- **Hardware encoders on Linux.** PixelStreaming2 uses the AVCodecs plugins. On Linux the only hardware encoder
+  binaries are `NVCodecs`/`NVENC`, which are NVIDIA-only.
+- **AMD's encoder plugin.** `AMFCodecs` lists `SupportedTargetPlatforms: ["Win64"]` and ships no Linux binaries.
+- **Software fallback.** `LibVpxCodecs` (VP8/VP9 on the CPU) is available on Linux.
+
+The GPU's own H.264 and HEVC encoder works on Linux through VA-API: about 220 fps at 1080p, measured with ffmpeg.
+UE's Pixel Streaming just can't use it.
+
+| Option | What it means | Cost |
+| --- | --- | --- |
+| A. Linux + PixelStreaming2 with VP8/VP9 software encoding | Simplest, stays in UE | CPU encode on a 6-core host that also runs the game thread and render thread. Needs measuring |
+| B. Windows render VM + PixelStreaming2 with AMF H.264 | The supported AMD path | A Windows licence/VM; the same passthrough GPU |
+| C. Linux, UE renders → external capture → VA-API H.264 → WebRTC (for example GStreamer `webrtcbin`) | Keeps Linux and the hardware encoder | Custom streaming layer; input has to be forwarded back into UE |
+| D. No streaming: players run a packaged client locally | No server GPU limit on player count | Players need their own capable GPU |
+
+**Recommendation:** measure option A first, since it costs only a test. If the CPU cost or latency is unacceptable,
+choose between B and C. This needs the owner's input, because it affects licensing and how many people can play at
+once. The server's single GPU can render roughly one 1440p session at a time.
 
 ## Separation of game logic and rendering
 
