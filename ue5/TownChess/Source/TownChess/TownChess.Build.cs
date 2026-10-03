@@ -6,7 +6,7 @@ public class TownChess : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new string[] {
-			"Core", "CoreUObject", "Engine", "InputCore", "CinematicCamera", "WebSockets", "Json", "JsonUtilities"
+			"Core", "CoreUObject", "Engine", "InputCore", "CinematicCamera", "WebSockets", "Json", "JsonUtilities", "RHI"
 		});
 	}
 }

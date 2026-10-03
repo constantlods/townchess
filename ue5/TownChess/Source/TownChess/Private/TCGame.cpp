@@ -6,7 +6,10 @@
 #include "Engine/Font.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "DynamicRHI.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Misc/Parse.h"
 #include "TCBoard.h"
 #include "TCCoreClient.h"
@@ -40,6 +43,7 @@ namespace
 
 ATCGameMode::ATCGameMode()
 {
+	PrimaryActorTick.bCanEverTick = true;
 	PlayerControllerClass = ATCPlayerController::StaticClass();
 	HUDClass = ATCHUD::StaticClass();
 	DefaultPawnClass = nullptr;
@@ -56,6 +60,13 @@ void ATCGameMode::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("-tcserver="), ServerUrl);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcauto="), Auto);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcname="), Username);
+	FParse::Value(FCommandLine::Get(), TEXT("-tcsmoke="), SmokePlies);
+	if (SmokePlies > 0)
+	{
+		if (Auto.IsEmpty()) Auto = TEXT("cpu:novice:w:untimed");
+		SmokeDeadline = FPlatformTime::Seconds() + 600.0;
+		UE_LOG(LogTownChess, Log, TEXT("smoke test: %d plies"), SmokePlies);
+	}
 	UGameInstance* GI = GetGameInstance();
 	UTCCoreClient* Core = GI->GetSubsystem<UTCCoreClient>();
 	Core->OnConnectionChanged.AddDynamic(this, &ATCGameMode::OnConnection);
@@ -74,6 +85,51 @@ void ATCGameMode::BeginPlay()
 		Local->OnReady.AddDynamic(this, &ATCGameMode::OnCoreReady);
 		if (Local->IsReady()) OnCoreReady(Local->GetUrl()); else Local->Start();
 	}
+}
+
+void ATCGameMode::Tick(float Dt)
+{
+	Super::Tick(Dt);
+	if (SmokePlies > 0) SmokeTick();
+}
+
+void ATCGameMode::SmokeTick()
+{
+	UTCCoreClient* C = GetGameInstance()->GetSubsystem<UTCCoreClient>();
+	ATCBoard* B = Cast<ATCBoard>(UGameplayStatics::GetActorOfClass(GetWorld(), ATCBoard::StaticClass()));
+	if (!C || !B) return;
+	if (FPlatformTime::Seconds() > SmokeDeadline) { SmokeFinish(TEXT("timeout")); return; }
+	const FTCGameState& S = C->GetState();
+	if (!C->HasGame() || B->IsAnimating() || B->IsAwaitingCore()) return;
+	const int32 Ply = S.History.Num();
+	if (Ply != SmokeChecked)
+	{
+		// every authoritative position must be shown exactly, without a silent repair
+		const bool bOk = B->IsInSync() && B->GetResyncs() == 0 && B->GetPhysicalMismatches() == 0;
+		if (!bOk) ++SmokeFailures;
+		SmokeLog.Add(FString::Printf(TEXT("ply %d %s %s"), Ply, Ply > 0 ? *S.History.Last().San : TEXT("start"), bOk ? TEXT("ok") : TEXT("MISMATCH")));
+		SmokeChecked = Ply;
+	}
+	if (S.IsFinished() || Ply >= SmokePlies) { SmokeFinish(S.IsFinished() ? S.Status : TEXT("plies reached")); return; }
+	if (!C->IsMyTurn() || S.LegalMoves.Num() == 0) return;
+	const FString Mv = S.LegalMoves[0];
+	B->ClickSquare(Mv.Left(2));
+	if (B->ClickSquare(Mv.Mid(2, 2)) == ETCClickResult::NeedsPromotion) B->ChoosePromotion(Mv.Len() == 5 ? Mv.Mid(4, 1) : TEXT("q"));
+}
+
+void ATCGameMode::SmokeFinish(const FString& Why)
+{
+	UTCCoreClient* C = GetGameInstance()->GetSubsystem<UTCCoreClient>();
+	UTCLocalCore* L = GetGameInstance()->GetSubsystem<UTCLocalCore>();
+	const bool bPass = SmokeFailures == 0 && SmokeChecked >= FMath::Min(SmokePlies, 2) && Why != TEXT("timeout");
+	FString Json = FString::Printf(TEXT("{\n  \"pass\": %s,\n  \"reason\": \"%s\",\n  \"plies\": %d,\n  \"failures\": %d,\n  \"rhi\": \"%s\",\n  \"corePid\": %d,\n  \"coreUrl\": \"%s\",\n  \"log\": [\n"),
+		bPass ? TEXT("true") : TEXT("false"), *Why, SmokeChecked, SmokeFailures, GDynamicRHI ? GDynamicRHI->GetName() : TEXT("?"), L ? L->GetCorePid() : 0, L ? *L->GetUrl() : TEXT(""));
+	for (int32 i = 0; i < SmokeLog.Num(); ++i) Json += FString::Printf(TEXT("    \"%s\"%s\n"), *SmokeLog[i], i + 1 < SmokeLog.Num() ? TEXT(",") : TEXT(""));
+	Json += TEXT("  ]\n}\n");
+	FFileHelper::SaveStringToFile(Json, *(FPaths::ProjectSavedDir() / TEXT("TownChess") / TEXT("smoke.json")));
+	UE_LOG(LogTownChess, Log, TEXT("smoke test %s (%s, %d plies, %d failures)"), bPass ? TEXT("PASS") : TEXT("FAIL"), *Why, SmokeChecked, SmokeFailures);
+	SmokePlies = 0;
+	FGenericPlatformMisc::RequestExit(false);
 }
 
 void ATCGameMode::EndPlay(const EEndPlayReason::Type Reason)

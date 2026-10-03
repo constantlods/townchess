@@ -16,6 +16,9 @@ class UTCCoreClient;
  * - Online: `-tcserver=ws://host:port/ws` connects to a TownChess server instead.
  * - `-tcauto=cpu:<level>:<w|b|random>:<tc>` creates an engine game as soon as the session is up (demos, automation).
  * - `-tcname=<username>` sets the requested username.
+ * - `-tcsmoke=<plies>` (packaged-build smoke test, no Python needed): plays that many plies against the engine
+ *   through the board's click path, checks every position (in sync, no silent repair, no misplaced piece), writes
+ *   Saved/TownChess/smoke.json and quits.
  * Actors tagged `TC_SeatMirror` (opponent, chair, player hands, lamp) are mirrored to the other side of the table when
  * the player sits as Black; cameras tagged `TC_Camera_White` / `TC_Camera_Black` frame each seat.
  */
@@ -29,6 +32,7 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	UFUNCTION(BlueprintPure, Category = "TownChess") bool IsOnline() const { return !ServerUrl.IsEmpty(); }
 	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetServerLabel() const;
+	virtual void Tick(float Dt) override;
 
 private:
 	UFUNCTION() void OnCoreReady(const FString& Url);
@@ -37,6 +41,11 @@ private:
 	void ApplySeat(const FString& Color);
 
 	FString ServerUrl, Auto, Username, SeatApplied;
+	int32 SmokePlies = 0, SmokeChecked = -1, SmokeFailures = 0;
+	double SmokeDeadline = 0;
+	TArray<FString> SmokeLog;
+	void SmokeTick();
+	void SmokeFinish(const FString& Why);
 	bool bAutoDone = false;
 	TMap<TWeakObjectPtr<AActor>, FTransform> SeatOriginals;
 };
