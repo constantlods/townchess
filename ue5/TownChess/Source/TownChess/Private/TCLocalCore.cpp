@@ -48,6 +48,13 @@ void UTCLocalCore::Launch()
 	FParse::Value(FCommandLine::Get(), TEXT("-tccoreargs="), Args);
 	if (Script.IsEmpty()) { UE_LOG(LogTownChess, Error, TEXT("local core: no ScriptPath configured")); return; }
 	if (FPaths::IsRelative(Script)) Script = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / Script);
+	// Node resolves --import specifiers against its own working directory, and absolute paths must be file URLs on
+	// Windows: @PROJECTDIRURL@ expands to the project directory as a file:// URL.
+	FString ProjectDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
+	ProjectDir.ReplaceInline(TEXT("\\"), TEXT("/"));
+	FPaths::NormalizeDirectoryName(ProjectDir);
+	const FString ProjectUrl = ProjectDir.StartsWith(TEXT("/")) ? TEXT("file://") + ProjectDir : TEXT("file:///") + ProjectDir;
+	Args.ReplaceInline(TEXT("@PROJECTDIRURL@"), *ProjectUrl);
 
 	verify(FPlatformProcess::CreatePipe(StdoutRead, StdoutWrite));
 	// stdin: we keep the write end; the child exits when it closes (our process ended)

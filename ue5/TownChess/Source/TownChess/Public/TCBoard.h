@@ -91,6 +91,7 @@ private:
 	void AnimateMove(const FTCMoveRecord& Move);
 	FTCPieceVisual SpawnPiece(const FString& Code, const FVector& Local);
 	void SetPieceMesh(FTCPieceVisual& P, const FString& Code);
+	static void DestroyPiece(FTCPieceVisual& P);
 	FVector LocalOf(const FString& Square) const;
 	FVector GraveyardSlot(const FString& CapturedColor);
 	void RefreshMarkers();
@@ -102,6 +103,9 @@ private:
 	UPROPERTY() TMap<FString, FTCPieceVisual> Pieces;
 	UPROPERTY() TArray<FTCPieceVisual> Captured;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Markers;
+	/** Held as properties so garbage collection can never free them while no marker happens to reference them. */
+	UPROPERTY() TObjectPtr<UStaticMesh> MarkerMesh;
+	UPROPERTY() TObjectPtr<UMaterialInterface> MarkerMaterial;
 
 	struct FAnim
 	{

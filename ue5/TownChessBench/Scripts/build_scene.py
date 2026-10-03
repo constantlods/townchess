@@ -17,7 +17,19 @@ import zlib
 import unreal
 
 ASSETS = os.path.expanduser(os.environ.get("TC_ASSETS", "~/assets/polyhaven"))
-ROOT = "/Game/Bench"
+ROOT = os.environ.get("TC_ROOT", "/Game/Bench")
+LEVEL = os.environ.get("TC_LEVEL", "L_Bench")
+# Gameplay mode (ue5/TownChess): the board and pieces are the C++ ATCBoard actor, driven by the core; seat-relative
+# props are tagged so the game can mirror them when the player sits as Black.
+GAMEPLAY = os.environ.get("TC_GAMEPLAY") == "1"
+MIRROR_TAG = "TC_SeatMirror"
+
+
+def tag(actors, name=MIRROR_TAG):
+    for a in actors if isinstance(actors, (list, tuple)) else [actors]:
+        tags = list(a.get_editor_property("tags"))
+        tags.append(unreal.Name(name))
+        a.set_editor_property("tags", tags)
 AT = unreal.AssetToolsHelpers.get_asset_tools()
 MEL = unreal.MaterialEditingLibrary
 EAL = unreal.EditorAssetLibrary
@@ -446,7 +458,7 @@ def look_at_rot(src, dst):
 
 def build():
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
-    level_path = f"{ROOT}/L_Bench"
+    level_path = f"{ROOT}/{LEVEL}"
     # The project opens L_Bench at startup, so it cannot be deleted/recreated in place (NewLevel refuses: "an asset
     # already exists"), and actors would land in an unsaved transient world. Load it and clear it instead.
     if EAL.does_asset_exist(level_path):
@@ -513,12 +525,31 @@ def build():
         kx, ky = (b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2
         cyaw = math.degrees(math.atan2(0, -1) - math.atan2(ky, kx))
         log("white king at", kx, ky, "-> yaw", cyaw)
-    place_model(chess, (0, 0, 0), yaw=cyaw, label="Chess", sit_on=top)
+    if GAMEPLAY:
+        board = EAS.spawn_actor_from_class(unreal.TCBoard, unreal.Vector(0, 0, top), unreal.Rotator(0, 0, 0))
+        board.set_actor_label("Board")
+        names = {"pawn": "p", "knight": "n", "bishop": "b", "rook": "r", "queen": "q", "king": "k"}
+        meshes = {}
+        for m in chess:
+            n = m.get_name().lower()
+            if "board" in n:
+                setp(board, "board_mesh", m)
+                continue
+            colour = "w" if "white" in n else "b" if "black" in n else None
+            kind = next((v for k, v in names.items() if k in n), None)
+            if colour and kind and (colour + kind) not in meshes:
+                meshes[colour + kind] = m
+        setp(board, "piece_meshes", meshes)
+        setp(board, "board_mesh_yaw", 90.0)  # a1 must be a dark square ("light on the right"), checked by screenshot
+        log("board pieces", sorted(meshes.keys()))
+    else:
+        place_model(chess, (0, 0, 0), yaw=cyaw, label="Chess", sit_on=top)
 
     # ---- Props with intentional placement.
     lamp = import_model("desk_lamp_arm_01")
     # Upper-left of frame, arm reaching over the board's corner.
-    _, llo, lhi = place_model(lamp, (30, -52, 0), yaw=70, label="Lamp", sit_on=top)
+    lamp_actors, llo, lhi = place_model(lamp, (30, -52, 0), yaw=70, label="Lamp", sit_on=top)
+    tag(lamp_actors)
     log("lamp bounds", llo, lhi)
     clock = import_model("alarm_clock_01")
     if clock:  # this FBX currently imports without a static mesh; skip rather than fail
@@ -526,7 +557,7 @@ def build():
     binder = import_model("binder_notebook")
     place_model(binder, (-30, -40, 0), yaw=12, label="Binder", sit_on=top)
     chair = import_model("painted_wooden_chair_01")
-    place_model(chair, (92, 0, 0), yaw=180, label="OpponentChair", sit_on=0.0)
+    tag(place_model(chair, (92, 0, 0), yaw=180, label="OpponentChair", sit_on=0.0)[0])
     cabinet = import_model("drawer_cabinet")
     place_model(cabinet, (cx + L / 2 - 40, -140, 0), yaw=180, label="Cabinet", sit_on=0.0)
     wheel = import_model("wheelchair_01")
@@ -551,6 +582,7 @@ def build():
             log("WARNING seated pose failed\n" + traceback.format_exc())
         opp = EAS.spawn_actor_from_object(manny, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> faces -X
         opp.set_actor_label("Opponent")
+        tag(opp)
         smc = opp.skeletal_mesh_component
         setp(smc, "animation_mode", unreal.AnimationMode.ANIMATION_SINGLE_NODE)
         data = unreal.SingleAnimationPlayData()
@@ -570,14 +602,16 @@ def build():
             # Fingers point along +Y in mesh space; yaw -90 points them at the board (+X).
             h = EAS.spawn_actor_from_object(hm, unreal.Vector(-22, y * 1.35, top + 6), unreal.Rotator(0, 0, -90))
             h.set_actor_label(f"Hand_{side}")
+            tag(h)
             h.set_folder_path("Player")
         else:
             log("WARNING: XR hand not found", side)
 
     # ---- Lighting: warm practical lamp (key), cool fluorescent fill, cool rim.
     lamp_head = (24, -34, top + (lhi[2] - llo[2]) - 8)
-    spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (4, 0, top)), 450, 2700, 600, 58, src=3.0, vol=1.6)
+    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (4, 0, top)), 450, 2700, 600, 58, src=3.0, vol=1.6))
     bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 2), 60, 2700, 120, src=2.0, shadows=False)
+    tag(bulb)
     rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 2200, 6200, 120, 15, 900, vol=0.2)
     point("Rim", (170, 80, 190), 120, 7000, 400, src=8.0)
 
@@ -599,6 +633,7 @@ def build():
     eye = (-66.0, 0.0, top + 50.0)
     cam = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(*eye), unreal.Rotator(0, -27, 0))
     cam.set_actor_label("PlayerEye")
+    tag(cam, "TC_Camera_White")
     cc = cam.get_cine_camera_component()
     fb = cc.get_editor_property("filmback")
     setp(fb, "sensor_width", 36.0)
@@ -610,7 +645,18 @@ def build():
     setp(fs, "focus_method", unreal.CameraFocusMethod.MANUAL)
     setp(fs, "manual_focus_distance", 75.0)
     setp(cc, "focus_settings", fs)
-    setp(cam, "auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
+    if not GAMEPLAY:
+        setp(cam, "auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
+    else:
+        # Black's seat: the same framing from the other side of the table (the game picks the camera per seat)
+        cam_b = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(-eye[0], 0, eye[2]), unreal.Rotator(0, -27, 180))
+        cam_b.set_actor_label("PlayerEyeBlack")
+        tag(cam_b, "TC_Camera_Black")
+        cb = cam_b.get_cine_camera_component()
+        setp(cb, "filmback", cc.get_editor_property("filmback"))
+        setp(cb, "current_focal_length", cc.get_editor_property("current_focal_length"))
+        setp(cb, "current_aperture", cc.get_editor_property("current_aperture"))
+        setp(cb, "focus_settings", cc.get_editor_property("focus_settings"))
 
     # Screenshot capture parked at the eye: -RenderOffscreen never reads the game viewport back, so the benchmark
     # driver switches this on to grab the player's view (Scripts/bench_game.py).
@@ -647,7 +693,7 @@ def build():
         raise RuntimeError("save_current_level failed")
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
     n = len(EAS.get_all_level_actors())
-    if n < 100:  # room + table + 33 chess meshes + props + lights: anything far below means the build went wrong
+    if n < (60 if GAMEPLAY else 100):  # room + table + 33 chess meshes + props + lights: anything far below means the build went wrong
         raise RuntimeError(f"only {n} actors in the saved level")
     log("BUILD OK", level_path, n, "actors")
 

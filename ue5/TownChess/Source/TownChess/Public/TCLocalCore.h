@@ -48,7 +48,8 @@ public:
 	UPROPERTY(Config) FString NodePath = TEXT("node");
 	/** Core entry script; relative paths are resolved against the project directory. */
 	UPROPERTY(Config) FString ScriptPath;
-	/** Extra args before the script (dev builds run the TypeScript sources through tsx: "--import tsx"). */
+	/** Extra args before the script. @PROJECTDIRURL@ expands to the project directory as a file:// URL (dev builds run
+	 *  the TypeScript sources through the repo's tsx loader). */
 	UPROPERTY(Config) FString NodeArgs;
 
 private:

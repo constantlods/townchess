@@ -6,7 +6,7 @@
 class FJsonObject;
 
 /**
- * Wire types of the TownChess protocol v2 (docs/protocol/*.schema.json, docs/NETWORKING.md).
+ * Wire types of the TownChess protocol v2 (JSON Schema in docs/protocol, docs/NETWORKING.md).
  * These are plain data mirrors of what the core sends. The client never computes chess rules from them: legal moves,
  * move effects, status and results all arrive from the core.
  */

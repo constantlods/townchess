@@ -6,6 +6,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TCCoreClient.h"
 #include "TCLog.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -23,6 +24,19 @@ ATCBoard::ATCBoard()
 	SetRootComponent(Root);
 	BoardComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BoardMesh"));
 	BoardComp->SetupAttachment(Root);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ShapeMat(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	MarkerMesh = Cylinder.Object;
+	MarkerMaterial = ShapeMat.Object;
+}
+
+void ATCBoard::DestroyPiece(FTCPieceVisual& P)
+{
+	// destroy the mesh explicitly: DestroyComponent(true) on the root would promote it instead of removing it
+	if (P.Mesh) P.Mesh->DestroyComponent();
+	if (P.Root) P.Root->DestroyComponent();
+	P.Mesh = nullptr;
+	P.Root = nullptr;
 }
 
 UTCCoreClient* ATCBoard::Core() const
@@ -126,8 +140,8 @@ FVector ATCBoard::GraveyardSlot(const FString& CapturedColor)
 
 void ATCBoard::Rebuild(const FTCGameState& State)
 {
-	for (auto& KV : Pieces) if (KV.Value.Root) KV.Value.Root->DestroyComponent(true);
-	for (FTCPieceVisual& P : Captured) if (P.Root) P.Root->DestroyComponent(true);
+	for (auto& KV : Pieces) DestroyPiece(KV.Value);
+	for (FTCPieceVisual& P : Captured) DestroyPiece(P);
 	Pieces.Empty();
 	Captured.Empty();
 	Anims.Empty();
@@ -337,11 +351,10 @@ TArray<FString> ATCBoard::GetMarkedSquares() const
 
 UStaticMeshComponent* ATCBoard::AddMarker(const FVector& Local, const FLinearColor& Color, float Radius, float Height)
 {
-	static UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	static UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	UMaterialInterface* Mat = MarkerMaterial;
 	UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(this);
 	M->SetupAttachment(Root);
-	M->SetStaticMesh(Cylinder);
+	M->SetStaticMesh(MarkerMesh);
 	M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	M->SetCastShadow(false);
 	M->RegisterComponent();
