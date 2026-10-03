@@ -1,5 +1,5 @@
 import { Chess, type Move } from 'chess.js';
-import type { Color, GameStatus, MoveRecord, PieceType, Promotion, Square } from './types.js';
+import type { Color, MoveEffect, MoveRecord, PieceType, Promotion, Square } from './types.js';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -34,10 +34,9 @@ export class ChessRules {
     return r;
   }
 
+  /** Copy of the current position (history is not carried over; GameCore tracks history and repetitions). */
   clone(): ChessRules {
-    const r = new ChessRules();
-    r.chess.loadPgn(this.chess.pgn());
-    return r;
+    return new ChessRules(this.chess.fen());
   }
 
   get fen(): string {
@@ -75,11 +74,15 @@ export class ChessRules {
     return this.legalMovesFrom(from).some((m) => m.to === to && !!m.promotion);
   }
 
-  /** Attempts a move. Returns a MoveRecord, or null if illegal. Never throws. */
+  /**
+   * Attempts a move. Returns a MoveRecord, or null if illegal. Never throws.
+   * A promotion move must name its piece: there is no silent promotion to a queen.
+   */
   tryMove(input: MoveInput): MoveRecord | null {
+    if (!input.promotion && this.isPromotionMove(input.from, input.to)) return null;
     let m: Move;
     try {
-      m = this.chess.move({ from: input.from, to: input.to, promotion: input.promotion ?? 'q' });
+      m = this.chess.move({ from: input.from, to: input.to, promotion: input.promotion });
     } catch {
       return null;
     }
@@ -93,6 +96,7 @@ export class ChessRules {
       captured: m.captured,
       flags: m.flags,
       fenAfter: this.chess.fen(),
+      effects: moveEffects(m),
     };
   }
 
@@ -108,27 +112,26 @@ export class ChessRules {
     return this.pieces().find((p) => p.type === 'k' && p.color === color)?.square ?? null;
   }
 
-  /** Status derived purely from the position (not clocks, resignations, or agreements). */
-  positionStatus(): { status: GameStatus; winner: Color | null } {
-    const c = this.chess;
-    if (c.isCheckmate()) return { status: 'checkmate', winner: c.turn() === 'w' ? 'b' : 'w' };
-    if (c.isStalemate()) return { status: 'stalemate', winner: null };
-    if (c.isInsufficientMaterial()) return { status: 'draw_insufficient', winner: null };
-    if (c.isThreefoldRepetition()) return { status: 'draw_repetition', winner: null };
-    if (c.isDrawByFiftyMoves()) return { status: 'draw_fifty', winner: null };
-    return { status: 'active', winner: null };
-  }
-
-  /** True if `color` has enough material to theoretically mate (used for timeout-vs-insufficient). */
-  hasMatingMaterial(color: Color): boolean {
-    const mine = this.pieces().filter((p) => p.color === color && p.type !== 'k');
-    if (mine.some((p) => p.type === 'p' || p.type === 'r' || p.type === 'q')) return true;
-    const minors = mine.filter((p) => p.type === 'n' || p.type === 'b').length;
-    return minors >= 2;
-  }
 }
 
 export const otherColor = (c: Color): Color => (c === 'w' ? 'b' : 'w');
 export const FILES = 'abcdefgh';
 export const squareToFR = (sq: Square): [number, number] => [FILES.indexOf(sq[0]), Number(sq[1]) - 1];
 export const frToSquare = (f: number, r: number): Square => `${FILES[f]}${r + 1}`;
+
+/** Physical effects of a chess.js move, in order: capture, every piece movement, promotion swap. */
+export function moveEffects(m: Move): MoveEffect[] {
+  const color = m.color as Color;
+  const enemy = otherColor(color);
+  const out: MoveEffect[] = [];
+  if (m.flags.includes('e')) out.push({ kind: 'capture', square: `${m.to[0]}${m.from[1]}`, piece: 'p', color: enemy });
+  else if (m.captured) out.push({ kind: 'capture', square: m.to, piece: m.captured as PieceType, color: enemy });
+  out.push({ kind: 'move', piece: m.piece as PieceType, color, from: m.from, to: m.to });
+  if (m.flags.includes('k') || m.flags.includes('q')) {
+    const rank = m.from[1];
+    const kingside = m.flags.includes('k');
+    out.push({ kind: 'move', piece: 'r', color, from: `${kingside ? 'h' : 'a'}${rank}`, to: `${kingside ? 'f' : 'd'}${rank}` });
+  }
+  if (m.promotion) out.push({ kind: 'promote', square: m.to, color, from: 'p', to: m.promotion as Promotion });
+  return out;
+}

@@ -1,10 +1,16 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage, Server } from 'node:http';
-import { parseClientMessage, TIME_CONTROLS, isFinished, type ClientMessage, type ServerMessage } from '@hc/shared';
+import { parseClientMessage, PROTOCOL_VERSION, TIME_CONTROLS, isFinished, type ClientMessage, type ServerMessage, type TimeControl } from '@hc/shared';
+import { AI_LEVELS, type AiLevel } from '@hc/engine';
 import { PlayerStore } from './players.js';
-import { GameRoom, newGameId, type RoomEvents } from './room.js';
+import { GameRoom, isAiSeat, newGameId, type RoomEvents } from './room.js';
+import { AiPool } from './aiPool.js';
 
-interface Conn { ws: WebSocket; playerId: string | null; alive: boolean; msgCount: number; windowStart: number }
+/** Abuse limits. Per IP: concurrent sockets and new identities per minute. AI games: one active per player. */
+export const LIMITS = { socketsPerIp: 20, newIdentitiesPerIpPerMinute: 10 };
+const UNTIMED: TimeControl = { initialMs: 0, incrementMs: 0 };
+
+interface Conn { ws: WebSocket; ip: string; playerId: string | null; alive: boolean; msgCount: number; windowStart: number }
 interface QueueEntry { playerId: string; tc: string; rated: boolean; since: number }
 
 /**
@@ -19,9 +25,20 @@ export class Hub implements RoomEvents {
   private queue: QueueEntry[] = [];
   private matchTimer: NodeJS.Timeout;
   private pingTimer: NodeJS.Timeout;
+  private socketsByIp = new Map<string, number>();
+  private identitiesByIp = new Map<string, number[]>();
+  readonly ai = new AiPool();
+  /** Minimum engine "thinking" time so moves don't appear instantly (spent on the engine's own clock). */
+  aiMinThinkMs = Number(process.env.HC_AI_MIN_THINK_MS ?? 700);
 
-  constructor(server: Server, public players: PlayerStore, path = '/ws') {
-    this.wss = new WebSocketServer({ server, path, maxPayload: 4096 });
+  constructor(server: Server, public players: PlayerStore, path = '/ws', opts: { allowedOrigins?: string[]; trustProxy?: boolean } = {}) {
+    const allowed = opts.allowedOrigins ?? (process.env.HC_ALLOWED_ORIGINS ? process.env.HC_ALLOWED_ORIGINS.split(',') : null);
+    this.trustProxy = opts.trustProxy ?? process.env.HC_TRUST_PROXY === '1';
+    this.wss = new WebSocketServer({
+      server, path, maxPayload: 4096,
+      // Browsers always send Origin; native clients (UE) don't. When an allow-list is configured, browser origins must match.
+      verifyClient: allowed ? ({ origin }: { origin?: string }) => !origin || allowed.includes(origin) : undefined,
+    });
     this.wss.on('connection', (ws, req) => this.onConnection(ws, req));
     this.matchTimer = setInterval(() => this.matchmake(), 1000);
     this.pingTimer = setInterval(() => {
@@ -33,7 +50,10 @@ export class Hub implements RoomEvents {
     }, 15000);
   }
 
+  private trustProxy: boolean;
+
   close() {
+    this.ai.close();
     clearInterval(this.matchTimer);
     clearInterval(this.pingTimer);
     for (const r of this.rooms.values()) r.dispose();
@@ -59,8 +79,13 @@ export class Hub implements RoomEvents {
     if (c.ws.readyState === WebSocket.OPEN) c.ws.send(JSON.stringify(msg));
   }
 
-  private onConnection(ws: WebSocket, _req: IncomingMessage) {
-    const c: Conn = { ws, playerId: null, alive: true, msgCount: 0, windowStart: Date.now() };
+  private onConnection(ws: WebSocket, req: IncomingMessage) {
+    const fwd = this.trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '';
+    const ip = fwd || req.socket.remoteAddress || 'unknown';
+    const open = this.socketsByIp.get(ip) ?? 0;
+    if (open >= LIMITS.socketsPerIp) { ws.close(4029, 'too many connections'); return; }
+    this.socketsByIp.set(ip, open + 1);
+    const c: Conn = { ws, ip, playerId: null, alive: true, msgCount: 0, windowStart: Date.now() };
     this.conns.add(c);
     ws.on('pong', () => { c.alive = true; });
     ws.on('message', (data) => {
@@ -70,10 +95,15 @@ export class Hub implements RoomEvents {
       if (++c.msgCount > 40) { this.reply(c, { type: 'ERROR', code: 'rate', message: 'slow down' }); return; }
       const msg = parseClientMessage(String(data));
       if ('error' in msg) { this.reply(c, { type: 'ERROR', code: 'bad_message', message: msg.error }); return; }
-      try { this.handle(c, msg); } catch (e) { this.reply(c, { type: 'ERROR', code: 'server', message: String(e) }); }
+      try { this.handle(c, msg); } catch (e) {
+        console.error('[hub] handler error', e); // details stay in the server log, never on the wire
+        this.reply(c, { type: 'ERROR', code: 'server', message: 'internal error' });
+      }
     });
     ws.on('close', () => {
       this.conns.delete(c);
+      const n = (this.socketsByIp.get(c.ip) ?? 1) - 1;
+      if (n <= 0) this.socketsByIp.delete(c.ip); else this.socketsByIp.set(c.ip, n);
       if (!c.playerId) return;
       if (this.socketOf.get(c.playerId) === c) {
         this.socketOf.delete(c.playerId);
@@ -86,6 +116,14 @@ export class Hub implements RoomEvents {
 
   private handle(c: Conn, m: ClientMessage) {
     if (m.type === 'HELLO') {
+      const resuming = !!m.token && this.players.hasToken(m.token);
+      if (!resuming) {
+        const now = Date.now();
+        const recent = (this.identitiesByIp.get(c.ip) ?? []).filter((t) => now - t < 60_000);
+        if (recent.length >= LIMITS.newIdentitiesPerIpPerMinute) { this.reply(c, { type: 'ERROR', code: 'rate', message: 'too many new identities' }); return; }
+        recent.push(now);
+        this.identitiesByIp.set(c.ip, recent);
+      }
       const { player, token } = this.players.authenticate(m.token, m.username);
       if (m.cosmetics) this.players.setCosmetics(player.id, m.cosmetics);
       const prev = this.socketOf.get(player.id);
@@ -93,7 +131,7 @@ export class Hub implements RoomEvents {
       c.playerId = player.id;
       this.socketOf.set(player.id, c);
       const active = this.activeGame.get(player.id) ?? null;
-      this.reply(c, { type: 'WELCOME', token, player: { ...this.players.publicOf(player.id)!, gamesPlayed: player.gamesPlayed, wins: player.wins, losses: player.losses, draws: player.draws }, activeGameId: active });
+      this.reply(c, { type: 'WELCOME', protocolVersion: PROTOCOL_VERSION, token, player: { ...this.players.publicOf(player.id)!, gamesPlayed: player.gamesPlayed, wins: player.wins, losses: player.losses, draws: player.draws }, activeGameId: active });
       return;
     }
     const pid = c.playerId;
@@ -121,6 +159,22 @@ export class Hub implements RoomEvents {
         this.reply(c, { type: 'GAME_JOINED', color: 'w', state: r.dto() });
         break;
       }
+      case 'CREATE_AI_GAME': {
+        const tc = m.timeControl === 'untimed' ? null : TIME_CONTROLS[m.timeControl];
+        if (tc === undefined) { this.reply(c, { type: 'ERROR', code: 'tc', message: 'unknown time control' }); break; }
+        if (this.activeGame.has(pid)) { this.reply(c, { type: 'ERROR', code: 'busy', message: 'Finish or leave your current game first.' }); break; }
+        const human = m.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : m.color;
+        const bot = `ai:${m.level}`;
+        const r = this.createRoom(tc, false, human === 'w' ? pid : bot, human === 'w' ? bot : pid);
+        this.reply(c, { type: 'GAME_JOINED', color: human, state: r.dto() });
+        break;
+      }
+      case 'CLAIM_DRAW': {
+        if (!room) { this.reply(c, { type: 'ERROR', code: 'not_found', message: 'no such game' }); break; }
+        const err = room.claimDraw(pid, m.intended);
+        if (err) this.reply(c, { type: 'ERROR', code: 'claim_rejected', message: err });
+        break;
+      }
       case 'JOIN_GAME': {
         const r = this.rooms.get(m.gameId);
         if (!r) { this.reply(c, { type: 'ERROR', code: 'not_found', message: 'No table with that code.' }); break; }
@@ -136,7 +190,7 @@ export class Hub implements RoomEvents {
       }
       case 'LEAVE_GAME':
         if (room && room.colorOf(pid)) {
-          if (room.status === 'waiting') room.finish('abandoned', null, 'left');
+          if (room.status === 'waiting') room.leaveWaiting();
           else if (room.status === 'active') room.resign(pid);
           this.activeGame.delete(pid);
         }
@@ -153,9 +207,14 @@ export class Hub implements RoomEvents {
       case 'DRAW_DECLINE': room?.declineDraw(pid); break;
       case 'RESIGN': room?.resign(pid); break;
       case 'REMATCH': {
-        const nr = room?.rematch(pid, (w, b) => this.createRoom(room.tc, room.rated, w, b));
+        // a player already seated elsewhere cannot be pulled into a rematch
+        if (room && [room.white, room.black].some((id) => id && !isAiSeat(id) && this.activeGame.has(id) && this.activeGame.get(id) !== room.id)) {
+          this.reply(c, { type: 'ERROR', code: 'busy', message: 'Your opponent is already at another table.' });
+          break;
+        }
+        const nr = room?.rematch(pid, (w, b) => this.createRoom(room.untimed ? null : room.tc, room.rated, w, b));
         if (nr) {
-          for (const id of [nr.white!, nr.black!]) this.send(id, { type: 'GAME_JOINED', color: nr.colorOf(id), state: nr.dto() });
+          for (const id of [nr.white!, nr.black!]) if (!isAiSeat(id)) this.send(id, { type: 'GAME_JOINED', color: nr.colorOf(id), state: nr.dto() });
         }
         break;
       }
@@ -169,14 +228,36 @@ export class Hub implements RoomEvents {
     this.send(pid, { type: 'GAME_JOINED', color: r.colorOf(pid), state: r.dto() });
   }
 
-  createRoom(tc: typeof TIME_CONTROLS[string], rated: boolean, white: string, black: string | null, isPrivate = false): GameRoom {
+  /** `tc` null = untimed. Engine seats (ai:*) are never tracked as active players and games with them are never rated. */
+  createRoom(tc: TimeControl | null, rated: boolean, white: string, black: string | null, isPrivate = false): GameRoom {
     let id = newGameId();
     while (this.rooms.has(id)) id = newGameId();
-    const r = new GameRoom(id, tc, rated, white, black, this.players, this, isPrivate);
+    const withAi = isAiSeat(white) || isAiSeat(black);
+    const r = new GameRoom(id, tc ?? UNTIMED, rated && !withAi, white, black, this.players, this, { isPrivate, timeControl: tc });
     this.rooms.set(id, r);
-    this.activeGame.set(white, id);
-    if (black) { this.activeGame.set(black, id); r.start(); }
+    if (!isAiSeat(white)) this.activeGame.set(white, id);
+    if (black && !isAiSeat(black)) this.activeGame.set(black, id);
+    if (black) r.start();
     return r;
+  }
+
+  /** RoomEvents: search for the engine seat off the event loop, then submit through the same validation as a human. */
+  aiToMove(room: GameRoom) {
+    const ply = room.core.ply;
+    const fen = room.core.fen;
+    const aiId = room.playerOf(room.core.turn)!;
+    const level = aiId.split(':')[1] as AiLevel;
+    const { maxDepth, timeMs, noise } = AI_LEVELS[level] ?? AI_LEVELS.patient;
+    const started = Date.now();
+    void this.ai.search(fen, { maxDepth, timeMs, noise }).then((mv) => {
+      const wait = Math.max(0, this.aiMinThinkMs - (Date.now() - started));
+      setTimeout(() => {
+        if (room.status !== 'active' || room.core.ply !== ply) return; // game moved on (resign, flag, abort)
+        if (!mv) { console.error(`[hub] engine returned no move in ${room.id} at ply ${ply}: ${fen}`); return; }
+        const err = room.move(aiId, mv.from, mv.to, mv.promotion as never, ply);
+        if (err) console.error(`[hub] engine move rejected in ${room.id}: ${err}`);
+      }, wait).unref();
+    });
   }
 
   /** Pair waiting players. Casual: first come. Rated: rating window widens with waiting time. */

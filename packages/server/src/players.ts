@@ -71,12 +71,19 @@ export class PlayerStore {
 
   get(id: string) { return this.byId.get(id); }
 
+  hasToken(token: string) { return this.byToken.has(hash(token)); }
+
   setCosmetics(id: string, c: Cosmetics) {
     const p = this.byId.get(id);
     if (p) { p.cosmetics = c; this.dirty = true; }
   }
 
   publicOf(id: string): PlayerPublic | null {
+    if (id.startsWith('ai:')) {
+      // Engine seats: 'ai:<level>'. No rating is claimed for the house engine (labels only, not calibrated).
+      const level = id.split(':')[1];
+      return { id, username: 'UNKNOWN_13', rating: null, cosmetics: { ...DEFAULT_COSMETICS }, ai: { level } };
+    }
     const p = this.byId.get(id);
     return p ? { id: p.id, username: p.username, rating: Math.round(p.rating), cosmetics: p.cosmetics } : null;
   }
