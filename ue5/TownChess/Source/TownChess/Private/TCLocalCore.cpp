@@ -43,6 +43,21 @@ void UTCLocalCore::Launch()
 	FString Node = NodePath, Script = ScriptPath, Args = NodeArgs, Env;
 	if (FPlatformMisc::GetEnvironmentVariable(TEXT("TOWNCHESS_NODE")).Len()) Node = FPlatformMisc::GetEnvironmentVariable(TEXT("TOWNCHESS_NODE"));
 	if (FPlatformMisc::GetEnvironmentVariable(TEXT("TOWNCHESS_CORE_SCRIPT")).Len()) Script = FPlatformMisc::GetEnvironmentVariable(TEXT("TOWNCHESS_CORE_SCRIPT"));
+#if !WITH_EDITOR
+	// Packaged game: the core ships inside the build (Content/TownChessCore: node runtime + bundled core). Use it, so
+	// a shipped game needs no repository, no tsx and no system-wide Node.js.
+	{
+		const FString Bundled = FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir() / TEXT("TownChessCore"));
+		const FString BundledScript = Bundled / TEXT("townchess-core.mjs");
+		const FString BundledNode = Bundled / (PLATFORM_WINDOWS ? TEXT("node.exe") : TEXT("node"));
+		if (FPaths::FileExists(BundledScript) && FPaths::FileExists(BundledNode))
+		{
+			Node = BundledNode;
+			Script = BundledScript;
+			Args.Empty();
+		}
+	}
+#endif
 	FParse::Value(FCommandLine::Get(), TEXT("-tccorenode="), Node);
 	FParse::Value(FCommandLine::Get(), TEXT("-tccorescript="), Script);
 	FParse::Value(FCommandLine::Get(), TEXT("-tccoreargs="), Args);
