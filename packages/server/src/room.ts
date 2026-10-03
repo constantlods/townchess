@@ -15,6 +15,25 @@ export interface RoomEvents {
   finished(room: GameRoom): void;
   /** A seat played by the engine must move now (the hub schedules the search off the event loop). */
   aiToMove?(room: GameRoom): void;
+  /** Called after every state change (journal for crash recovery of the local core). */
+  persist?(room: GameRoom): void;
+}
+
+/** Journal entry for an unfinished game: enough to rebuild it after a core restart. */
+export interface RoomRecord {
+  v: 1;
+  id: string;
+  white: string | null;
+  black: string | null;
+  tc: TimeControl;
+  untimed: boolean;
+  rated: boolean;
+  isPrivate: boolean;
+  drawPolicy: DrawPolicy;
+  moves: string[];
+  clocks: Record<Color, number> | null;
+  status: string;
+  createdAt: number;
 }
 
 export const newGameId = () => 'GAME-' + randomBytes(3).toString('hex').toUpperCase();
@@ -89,6 +108,7 @@ export class GameRoom {
     this.core.start(this.now());
     this.armTimers();
     this.touch();
+    this.ev.persist?.(this);
     this.maybeAi();
   }
 
@@ -133,8 +153,33 @@ export class GameRoom {
     };
   }
 
+  record(): RoomRecord {
+    const now = this.now();
+    return {
+      v: 1, id: this.id, white: this.white, black: this.black, tc: this.tc, untimed: this.untimed, rated: this.rated,
+      isPrivate: this.isPrivate, drawPolicy: this.core.drawPolicy, moves: this.core.movesUci(),
+      clocks: this.core.clock ? { w: this.core.clock.peek('w', now), b: this.core.clock.peek('b', now) } : null,
+      status: this.status, createdAt: this.createdAt,
+    };
+  }
+
+  /** Rebuild an unfinished game from its journal record (moves replayed through GameCore validation). */
+  static fromRecord(rec: RoomRecord, players: PlayerStore, ev: RoomEvents): GameRoom {
+    const room = new GameRoom(rec.id, rec.tc, rec.rated, rec.white, rec.black, players, ev, { isPrivate: rec.isPrivate, timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy });
+    room.createdAt = rec.createdAt;
+    if (rec.status === 'active' && rec.white && rec.black) {
+      room.core = GameCore.restore({ timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, moves: rec.moves, clocks: rec.clocks }, room.now());
+      room.armTimers();
+    }
+    return room;
+  }
+
+  /** After restore: hand the move to the engine if it is its turn. */
+  resumeAfterRestore() { this.maybeAi(); }
+
   private update(reason: string) {
     this.touch();
+    this.ev.persist?.(this);
     this.ev.broadcast(this, { type: 'GAME_STATE_UPDATED', state: this.dto(), reason });
   }
 
@@ -163,7 +208,7 @@ export class GameRoom {
     return null;
   }
 
-  private armTimers() {
+  armTimers() {
     if (this.flagTimer) clearTimeout(this.flagTimer);
     if (this.abortTimer) clearTimeout(this.abortTimer);
     this.flagTimer = this.abortTimer = null;

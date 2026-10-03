@@ -1,10 +1,22 @@
+import fs from 'node:fs';
+import nodePath from 'node:path';
+import { timingSafeEqual } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage, Server } from 'node:http';
 import { parseClientMessage, PROTOCOL_VERSION, TIME_CONTROLS, isFinished, type ClientMessage, type ServerMessage, type TimeControl } from '@hc/shared';
 import { AI_LEVELS, type AiLevel } from '@hc/engine';
 import { PlayerStore } from './players.js';
-import { GameRoom, isAiSeat, newGameId, type RoomEvents } from './room.js';
+import { GameRoom, isAiSeat, newGameId, type RoomEvents, type RoomRecord } from './room.js';
 import { AiPool } from './aiPool.js';
+
+export interface HubOptions {
+  allowedOrigins?: string[];
+  trustProxy?: boolean;
+  /** Required per-connection secret (local core / sidecar mode). Sent as `x-townchess-secret` or `?secret=`. */
+  secret?: string;
+  /** Directory for the unfinished-game journal (crash recovery). */
+  journalDir?: string;
+}
 
 /** Abuse limits. Per IP: concurrent sockets and new identities per minute. AI games: one active per player. */
 export const LIMITS = { socketsPerIp: 20, newIdentitiesPerIpPerMinute: 10, aiGamesPerIp: 3, aiQueueMax: 64 };
@@ -34,14 +46,25 @@ export class Hub implements RoomEvents {
   /** Minimum engine "thinking" time so moves don't appear instantly (spent on the engine's own clock). */
   aiMinThinkMs = Number(process.env.HC_AI_MIN_THINK_MS ?? 700);
 
-  constructor(server: Server, public players: PlayerStore, path = '/ws', opts: { allowedOrigins?: string[]; trustProxy?: boolean } = {}) {
+  constructor(server: Server, public players: PlayerStore, path = '/ws', opts: HubOptions = {}) {
     const allowed = opts.allowedOrigins ?? (process.env.HC_ALLOWED_ORIGINS ? process.env.HC_ALLOWED_ORIGINS.split(',') : null);
     this.trustProxy = opts.trustProxy ?? process.env.HC_TRUST_PROXY === '1';
+    this.journalDir = opts.journalDir ?? null;
+    const secret = opts.secret ? Buffer.from(opts.secret) : null;
     this.wss = new WebSocketServer({
       server, path, maxPayload: 4096,
-      // Browsers always send Origin; native clients (UE) don't. When an allow-list is configured, browser origins must match.
-      verifyClient: allowed ? ({ origin }: { origin?: string }) => !origin || allowed.includes(origin) : undefined,
+      verifyClient: (info: { origin?: string; req: IncomingMessage }) => {
+        // Browsers always send Origin; native clients (UE) don't. When an allow-list is configured, browser origins must match.
+        if (allowed && info.origin && !allowed.includes(info.origin)) return false;
+        if (secret) {
+          // Local core (sidecar): only the process that launched it knows the per-launch secret.
+          const given = Buffer.from(String(info.req.headers['x-townchess-secret'] ?? new URL(info.req.url ?? '/', 'http://x').searchParams.get('secret') ?? ''));
+          if (given.length !== secret.length || !timingSafeEqual(given, secret)) return false;
+        }
+        return true;
+      },
     });
+    if (this.journalDir) this.restoreJournal();
     this.wss.on('connection', (ws, req) => this.onConnection(ws, req));
     this.matchTimer = setInterval(() => this.matchmake(), 1000);
     this.pingTimer = setInterval(() => {
@@ -54,6 +77,37 @@ export class Hub implements RoomEvents {
   }
 
   private trustProxy: boolean;
+  private journalDir: string | null;
+
+  // ── journal (local core crash recovery) ──
+  private journalFile(id: string) { return nodePath.join(this.journalDir!, `${id}.json`); }
+
+  /** RoomEvents: keep an up-to-date record of every unfinished game; finished games leave the journal. */
+  persist(room: GameRoom) {
+    if (!this.journalDir) return;
+    try {
+      if (isFinished(room.status)) { fs.rmSync(this.journalFile(room.id), { force: true }); return; }
+      fs.mkdirSync(this.journalDir, { recursive: true });
+      const tmp = this.journalFile(room.id) + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(room.record()));
+      fs.renameSync(tmp, this.journalFile(room.id));
+    } catch (e) { console.error('[hub] journal write failed', e); }
+  }
+
+  private restoreJournal() {
+    if (!this.journalDir || !fs.existsSync(this.journalDir)) return;
+    for (const f of fs.readdirSync(this.journalDir).filter((x) => x.endsWith('.json'))) {
+      try {
+        const rec = JSON.parse(fs.readFileSync(nodePath.join(this.journalDir, f), 'utf8')) as RoomRecord;
+        const room = GameRoom.fromRecord(rec, this.players, this);
+        if (room.status !== 'active') { fs.rmSync(nodePath.join(this.journalDir, f), { force: true }); continue; }
+        this.rooms.set(room.id, room);
+        for (const id of [room.white, room.black]) if (id && !isAiSeat(id)) this.activeGame.set(id, room.id);
+        console.log(`[hub] restored ${room.id} at ply ${room.core.ply}`);
+        room.resumeAfterRestore();
+      } catch (e) { console.error(`[hub] could not restore ${f}`, e); }
+    }
+  }
 
   close() {
     this.ai.close();

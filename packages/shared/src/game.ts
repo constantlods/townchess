@@ -99,6 +99,30 @@ export class GameCore {
     this.eventSeq++;
   }
 
+  /**
+   * Rebuild a game from its move record (crash recovery of the local core, reconnects after a restart). Moves are
+   * replayed through the normal validation path, so a corrupt record fails loudly instead of producing an illegal
+   * game. Clocks resume from the saved remaining times with the side to move running from `now`.
+   */
+  static restore(opts: GameCoreOptions & { moves: string[]; clocks: Record<Color, number> | null }, now: number): GameCore {
+    const g = new GameCore({ ...opts, firstMoveMs: null });
+    g.status = 'active';
+    opts.moves.forEach((m, i) => {
+      const r = g.move(g.turn, { from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] as MoveInput['promotion'] }, i);
+      if (!r.ok) throw new Error(`restore: move ${i + 1} (${m}) rejected: ${r.reason}`);
+    });
+    if (g.clock && opts.clocks && g.status === 'active') {
+      g.clock.remaining = { ...opts.clocks };
+      g.clock.start(g.turn, now);
+    }
+    return g;
+  }
+
+  /** Move record as UCI strings (the journal format). */
+  movesUci(): string[] {
+    return this.history.map((m) => m.from + m.to + (m.promotion ?? ''));
+  }
+
   get turn(): Color { return this.rules.turn; }
   get fen(): string { return this.rules.fen; }
   get ply(): number { return this.history.length; }
