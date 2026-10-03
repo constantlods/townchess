@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ChessRules, GameCore } from '../src/index.js';
+import { ChessRules, GameCore, sanitizeCastling } from '../src/index.js';
 
 /**
  * Pinned rules bugs found by the Layer A audit (docs/ENGINE_AGENT.md, docs/KNOWN_LIMITATIONS.md).
@@ -105,5 +105,75 @@ describe('BUG-003 a start FEN that is already drawn by the 75-move rule is not e
     g.start(0);
     expect([g.status, g.termination]).toEqual(['draw_seventyfive', 'seventy_five_move']);
     expect(g.move('w', { from: 'a2', to: 'a3' }, 1)).toMatchObject({ ok: false, reason: 'game is not active' });
+  });
+});
+
+describe('BUG-006 a restored history carries fabricated clockAfterMs values', () => {
+  // GameCore.restore replays the journal on a synthetic timeline (now = 0, 1, 2 ... ms per ply), so every replayed
+  // MoveRecord gets clockAfterMs = initial + increments - ~1 ms instead of the time the player really had. The journal
+  // (RoomRecord) does not store per-move clocks, so the values are invented and are sent to clients in moveHistory.
+  // A restored game that ENDS on the replayed list also reports the synthetic clocks, not the saved ones.
+  // Either fix is acceptable: store and restore the per-move clocks, or leave clockAfterMs undefined after a restore.
+  const tc = { initialMs: 60_000, incrementMs: 1_000 };
+  const play = () => {
+    const g = new GameCore({ timeControl: tc, firstMoveMs: null });
+    g.start(0);
+    const moves: [string, string, number][] = [['e2', 'e4', 5_000], ['e7', 'e5', 12_000], ['g1', 'f3', 20_000], ['b8', 'c6', 41_000]];
+    for (const [from, to, t] of moves) expect(g.move(g.turn, { from, to }, t).ok).toBe(true);
+    return g;
+  };
+
+  it('control: the live game records the real clocks (60 000 - 5 000 + 1 000 = 56 000 after 1.e4)', () => {
+    expect(play().history.map((h) => h.clockAfterMs)).toEqual([56_000, 54_000, 49_000, 34_000]);
+  });
+
+  it.fails('BUG-006a: after restore every clockAfterMs is the original value or undefined, never invented', () => {
+    const g = play();
+    const clocks = { w: g.clock!.peek('w', 41_000), b: g.clock!.peek('b', 41_000) };
+    const r = GameCore.restore({ timeControl: tc, firstMoveMs: null, moves: g.movesUci(), clocks }, 100_000);
+    r.history.forEach((h, i) => expect([undefined, g.history[i].clockAfterMs], `ply ${i + 1}`).toContain(h.clockAfterMs));
+  });
+});
+
+describe('restore applies the start-position checks (control; restore calls start() since e819a2a)', () => {
+  it('a stalemate start FEN restored with no moves is a stalemate, not an active game', () => {
+    const r = GameCore.restore({ startFen: '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1', timeControl: null, moves: [], clocks: null }, 0);
+    expect(r.status).toBe('stalemate');
+  });
+  it('a start FEN past 75 moves restored with no moves is drawn (BUG-003 on the restore path)', () => {
+    const r = GameCore.restore({ startFen: '4k3/p7/8/8/8/8/P7/R3K3 w - - 150 200', timeControl: null, moves: [], clocks: null }, 0);
+    expect([r.status, r.termination]).toEqual(['draw_seventyfive', 'seventy_five_move']);
+  });
+});
+
+describe('sanitizeCastling FEN edge cases (behaviour pinned; see LIM-008)', () => {
+  const B = 'r3k2r/8/8/8/8/8/8/R3K2R';
+  const field = (c: string) => new ChessRules(`${B} w ${c} - 0 1`).fen.split(' ')[2];
+
+  it('any order of valid letters is accepted and normalised (Kq, qK, kqKQ, KK)', () => {
+    expect([field('Kq'), field('qK'), field('kqKQ'), field('KK')]).toEqual(['Kq', 'Kq', 'KQkq', 'K']);
+  });
+  it('invalid characters are dropped, not rejected (KQx -> KQ, KQkq3 -> KQkq)', () => {
+    expect(sanitizeCastling(`${B} w KQx - 0 1`).split(' ')[2]).toBe('KQ');
+    expect([field('KQx'), field('KQkq3')]).toEqual(['KQ', 'KQkq']);
+  });
+  it('LIM-008: X-FEN / Shredder letters (HAha, AHah, Hh) are ignored, so every castling right is silently lost', () => {
+    expect([field('HAha'), field('AHah'), field('Hh')]).toEqual(['-', '-', '-']);
+  });
+  it('rights without the matching rook are stripped', () => {
+    expect(new ChessRules('4k3/8/8/8/8/8/8/4K3 w K - 0 1').fen.split(' ')[2]).toBe('-');
+  });
+  it('en passant: a square nobody can capture on becomes "-"; a capturable one is kept and playable', () => {
+    expect(new ChessRules('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1').fen.split(' ')[3]).toBe('-');
+    const r = new ChessRules('rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPP1PPP/RNBQKBNR b Kkq e3 0 1');
+    expect(r.fen).toBe('rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPP1PPP/RNBQKBNR b Kkq e3 0 1');
+    expect(r.allLegalMoves().some((m) => m.from === 'd4' && m.to === 'e3')).toBe(true);
+  });
+  it('en passant on the wrong rank for the side to move is rejected (constructor throws)', () => {
+    expect(() => new ChessRules('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e3 0 1')).toThrow(/en-passant/);
+  });
+  it('extra whitespace and missing clock fields are tolerated', () => {
+    expect(new ChessRules('  4k3/8/8/8/8/8/8/4K2R   w   K  -  0  1 ').fen).toBe('4k3/8/8/8/8/8/8/4K2R w K - 0 1');
+    expect(new ChessRules('4k3/8/8/8/8/8/8/4K2R w K').fen).toBe('4k3/8/8/8/8/8/8/4K2R w K - 0 1');
   });
 });

@@ -35,6 +35,10 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [BUG-002](#bug-002) | Promotion piece accepted on a non-promotion move | Low | **Fixed 2026-10-03** (regression test now a normal passing test) |
 | [BUG-003](#bug-003) | Start FEN already past 75 moves is not ended | Low | **Fixed 2026-10-03** (regression test now a normal passing test) |
 | [BUG-004](#bug-004) | House engine noise picks among fail-low bounds | Medium (Novice/Patient hang mate in one) | **Fixed 2026-10-03** (regression test now a normal passing test) |
+| [BUG-005](#bug-005) | `eventSeq` goes backwards across a journal restore | Medium (clients drop real events after a restart) | Open |
+| [BUG-006](#bug-006) | Restored history carries fabricated `clockAfterMs` | Low (wrong clock annotations) | Open |
+| [LIM-008](#lim-008) | Lenient FEN castling field (X-FEN/Shredder letters ignored) | Low | Open, documented |
+| [LIM-009](#lim-009) | What a journal restore does not bring back | Low/informational | Open, documented |
 
 ---
 
@@ -276,3 +280,58 @@ This is in the engine (Layer B), not in the rules.
   the window. The usual approach is a full-window re-search of each candidate, or MultiPV-style search of the top N.
   The alternative is to apply noise to the evaluation rather than to the selection. Strength labels must be re-checked
   afterwards (docs/AI.md).
+
+## BUG-005
+
+**`eventSeq` goes backwards when the server restores a game from its journal.**
+
+- **Contract:** `GameStateDTO.eventSeq` (types.ts): "a client must act on lastEvents only when eventSeq is new to it".
+- **What happens:** `RoomRecord` does not store `eventSeq`, and `GameCore.restore` re-derives it from the replayed
+  moves only. Every non-move `setEvents` (draw offer, decline) is lost. After a restart the sequence is lower than what
+  the clients saw, and the next real events reuse numbers the clients treat as already processed.
+- **Reproduction (untimed room, automatic policy):** 1.e4 (seq 1), Black offers a draw (seq 2), White declines (seq 3),
+  `record()` → JSON → `fromRecord()`: seq is **1**. Then 1...e5 gets seq **2**, which is below 3.
+- **Pinned by:** `BUG-005a` and `BUG-005b` (`it.fails`) in `packages/server/test/journal.test.ts`. A control checks
+  that the original sequence is 3.
+- **Fix (for the lead):** persist `eventSeq` in `RoomRecord` and pass it to `GameCore.restore` (taking the max of it
+  and the replayed value). An alternative is a per-boot epoch that clients compare first.
+
+## BUG-006
+
+**A restored history carries fabricated `clockAfterMs` values.**
+
+- **What happens:** `restore` replays on a synthetic timeline (`now` = ply index in ms). Every replayed `MoveRecord`
+  gets `clockAfterMs` = initial + increments − about 1 ms, instead of the time the player really had. These values reach
+  clients in `moveHistory`. A restored list that ends the game also leaves the synthetic clocks in place.
+- **Reproduction:** a 60+1 game, `firstMoveMs: null`, 1.e4 at 5 s, 1...e5 at 12 s, 2.Nf3 at 20 s, 2...Nc6 at 41 s.
+  The live history clocks are `[56000, 54000, 49000, 34000]`. After restore, ply 1 is **61000**.
+- **Pinned by:** `BUG-006a` (`it.fails`, plus a control) in `packages/shared/test/regressions.test.ts`.
+- **Fix (for the lead):** store the per-move clocks in the journal and restore them. The alternative is to leave
+  `clockAfterMs` undefined on replayed moves. Either passes the test.
+
+## LIM-008
+
+**The FEN castling field is parsed leniently.**
+
+`sanitizeCastling` keeps only the letters `KQkq` whose king and rook are on their home squares, and chess.js 1.4.0
+normalises the order. Pinned in `regressions.test.ts` ("sanitizeCastling FEN edge cases"):
+- Any order is accepted: `qK` becomes `Kq` and `kqKQ` becomes `KQkq`. Duplicates collapse (`KK` becomes `K`).
+- Invalid characters are **dropped, not rejected**: `KQx` becomes `KQ`, and `KQkq3` becomes `KQkq`.
+- **X-FEN/Shredder letters (`HAha`, `AHah`, `Hh`) are ignored**, so every castling right is silently lost. A
+  Chess960-style FEN imported from another tool would play without castling.
+- En passant: a square with no capturing pawn becomes `-`. A capturable one is kept and playable. A square on the
+  wrong rank for the side to move throws.
+- Extra whitespace and missing clock fields are tolerated.
+- **Plan:** a decision for the lead. Either reject unknown letters (constructor throws), or map `H`/`A` to `K`/`Q`
+  when the rook is on h/a. In either case, flip the LIM-008 pin.
+
+## LIM-009
+
+**What a journal restore does not bring back.** Pinned in `packages/server/test/journal.test.ts`:
+- A pending draw offer is dropped.
+- A draw that was claimed is not in the move list. This is harmless: the room is then finished and is not restored.
+- An `active` record whose moves already end the game comes back finished. `hub.restoreJournal` then deletes the file
+  without recording the result or the rating. This is reachable only if the final journal write was lost.
+- Time between the last journal write and the crash is given back to the side to move (clocks come from `record()`).
+- Resolved by e819a2a: the first-move window is now restored when fewer than two moves were played. This is pinned
+  as a control.
