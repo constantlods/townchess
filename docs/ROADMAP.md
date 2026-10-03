@@ -10,6 +10,8 @@ lists its scope, how we'll know it's done, and what is deliberately not in it.
 
 ## 1. Audit: what actually exists
 
+A snapshot taken before Milestone 1. Items fixed or built since then are tracked in §5 and §5b, not edited here.
+
 ### Complete and reusable (keep)
 
 | System | Where | Evidence |
@@ -60,7 +62,7 @@ lists its scope, how we'll know it's done, and what is deliberately not in it.
 - The agent lab.
 - The analysis cart.
 - The character system.
-- A **UE5 game client**: zero gameplay code. The benchmark is a static scene.
+- A **UE5 game client**: zero gameplay code. The benchmark is a static scene. (Since built: §5b.)
 - Windows packaging.
 - Persistence beyond `players.json`.
 
@@ -143,9 +145,9 @@ event stream. So the core comes before any UE gameplay, and the first UE milesto
 | # | Milestone | Scope | Definition of done |
 | --- | --- | --- | --- |
 | 0 | **Done**: prototype and renderer feasibility | Browser game; UE5 benchmark (1440p HIGH, TSR at 67%, 64.5 fps) | — |
-| **1** | **Core foundation** (current) | `GameCore` shared by server and browser offline; FIDE-complete draws and timeout rules; PGN; opening recognition (Lichess CC0); deterministic `GameEvents`; engine package shared by worker and server; server-hosted AI games; protocol v2 (legal moves, opening and events in state) | All rules cases from the FIDE fixture suite pass; the browser still plays against the AI and online; e2e passes; docs `CHESS.md`, `NETWORKING.md` |
-| **gate** | **Windows host decision (owner)** | A second machine, or more RAM plus a Windows VM sharing the GPU in turns. Both VMs can't use the single passed-through GPU at once, and the host has 15 GiB of RAM. Needed before the Milestone 2 packaged-Windows test | Decision recorded |
-| 2 | **UE5 playable slice** (thin) | `ue5/TownChess` C++ project: WebSocket protocol client, board mirror from the FEN, piece actors, click-to-select with legal-move markers, White and Black seat cameras, promotion picker, game end. Uses benchmark-quality art | A full game against the server-hosted AI and against a browser opponent, from either seat; reconnect works; **a packaged Win64 build launches the core sidecar, plays a full CPU game, and survives killing either process** |
+| **1** | **Core foundation** (done, §5) | `GameCore` shared by server and browser offline; FIDE-complete draws and timeout rules; PGN; opening recognition (Lichess CC0); deterministic `GameEvents`; engine package shared by worker and server; server-hosted AI games; protocol v2 (legal moves, opening and events in state) | All rules cases from the FIDE fixture suite pass; the browser still plays against the AI and online; e2e passes; docs `CHESS.md`, `NETWORKING.md` |
+| **gate** | **Windows host decision (owner)** | A second machine, or more RAM plus a Windows VM sharing the GPU in turns. Both VMs can't use the single passed-through GPU at once, and the host has 15 GiB of RAM. Needed before the Milestone 2 packaged-Windows test | **Done**: a Windows PC (RTX 4070 Ti SUPER, 32 GB RAM) |
+| 2 | **UE5 playable slice** (thin; current, §5b) | `ue5/TownChess` C++ project: WebSocket protocol client, board mirror from the FEN, piece actors, click-to-select with legal-move markers, White and Black seat cameras, promotion picker, game end. Uses benchmark-quality art | A full game against the server-hosted AI and against a browser opponent, from either seat; reconnect works; **a packaged Win64 build launches the core sidecar, plays a full CPU game, and survives killing either process** |
 | 2b | **Art and feel spike** (alongside 2) | One hand, one piece, one mask prototype under Lumen, on Windows. Pick the art sources (outsourcing or not). Minimum-spec GPU target | Screenshots and per-element ms costs; an art capacity plan |
 | 3 | **Physical interaction** | Hand rig abstraction (placeholder → final), IK reach/grip/lift/carry/place/release, captures set aside, piece and table sounds, animation gated on server acceptance | Every move type (castling, en passant, promotion, capture) animates correctly from both seats; a rejected move plays back |
 | 4 | **Vertical slice: "This is TownChess"** | One original character ("The Annotator", `docs/CHARACTERS.md`) with idle, think and react behaviour; one environment art pass; analysis cart v1 (a physical object: move list, opening, ECO); commentary v1 (data-driven lines on `GameEvents`, cooldowns, subtitles); LOW/MED/HIGH/CINEMATIC presets; **fair-play rules for the cart (no engine evaluation in online rated games)** | A cold playtest of one full game "feels like TownChess"; performance measured against the baseline |
@@ -202,7 +204,7 @@ All were fixed with regression tests, except the two documented as deviations:
 The blocker was prototype keys such as `toString` passing time-control validation: NaN clocks and a 1 ms timer loop,
 which one client could use to burn server CPU.
 
-Next: Milestone 2, after the Windows host decision.
+Next: Milestone 2 (§5b).
 
 ## 5b. Milestone 2: UE5 playable client (status 2026-10-03)
 

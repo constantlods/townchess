@@ -155,3 +155,27 @@ critique agent) and for a GitHub agent to keep the repo updated.
 - **Windows build host** (the gate before Milestone 2).
 - **Character "The Annotator":** approve the name and mask concept; decide on voice casting and the animation source.
   See the open questions in CHARACTERS.md.
+
+---
+
+# Session Summary — 2026-10-03 (Milestone 2 progress)
+
+## What was done
+
+| Commit | Content |
+| --- | --- |
+| 3265f43 | Local core (sidecar), tested; UE5 client sources |
+| 7550fa0, 364fc67 | `packages/engine` and `packages/learning` foundation; BUG-001..004 fixed |
+| 079c1bf | UE client compiles and plays real games against the core. Fixes: a garbage-collection crash and leaked piece meshes |
+| c9496f0 | The local core's identity survives restarts; packaged core bundle |
+| 0ec56ec | Gameplay loop proven on Linux: ROADMAP.md §5b evidence table |
+| b490b30, 45653ef, a9d36a2 | e2e tool takes the render machine from the environment; the sidecar test launches like the UE client; immediate persistence |
+| bf5b9ed | Windows setup log and the build, content and packaging scripts |
+
+## Where things stand
+
+- Milestone 2 is in progress. The gameplay loop is proven on Linux.
+- The Windows dev PC has VS 2022 17.14 and Node 24. UE 5.8.3 is installing.
+- The packaged Windows build, and real mouse and HUD checks, are pending.
+- 407 tests pass and the typecheck is clean.
+
