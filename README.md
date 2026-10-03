@@ -39,6 +39,17 @@ Production (single process serving the built client and the WebSocket endpoint):
 npm run start          # builds the client, then serves it + /ws on PORT (default 8787)
 ```
 
+UE5 client (`ue5/TownChess`; needs Node 22+ and a repo checkout for the dev-mode local core):
+
+```bash
+npm ci && npm run bundle:core                                # core bundle for packaged builds (verified on stock Node)
+# build TownChessEditor with UBT, build the level (ue5/TownChess/Scripts/build_level.py), then run:
+UnrealEditor ue5/TownChess/TownChess.uproject -game          # offline: starts the local core, menu → play The Annotator
+UnrealEditor ue5/TownChess/TownChess.uproject -game -tcserver=ws://host:8787/ws   # online
+ue5/tools/run_client.sh cpu <out> -tcauto=cpu:novice:w:untimed                    # automated game + checks
+node tools/e2e-ue-browser.mjs special|mate|stalemate|draw                          # UE vs browser via one server
+```
+
 UE5 benchmark (render VM; see `ue5/`):
 
 ```bash

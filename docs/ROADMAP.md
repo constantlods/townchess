@@ -4,7 +4,9 @@ Written 2026-10-03 from a full audit of `feature/photorealistic-renderer`, then 
 adversarial review by a critique agent. It replaces the earlier phase list from the rendering spec. Each milestone
 lists its scope, how we'll know it's done, and what is deliberately not in it.
 
-**Status:** Milestone 1 (core foundation) is complete; see §5. Milestone 2 is gated on a decision by the owner (§4).
+**Status:** Milestone 1 is complete (§5). Milestone 2 is **in progress**: the full gameplay loop is proven on Linux
+(§5b). The Windows packaged build is the remaining item. Windows host decided by the owner: a Windows PC with an RTX
+4070 Ti SUPER and 32 GB RAM.
 
 ## 1. Audit: what actually exists
 
@@ -201,6 +203,41 @@ The blocker was prototype keys such as `toString` passing time-control validatio
 which one client could use to burn server CPU.
 
 Next: Milestone 2, after the Windows host decision.
+
+## 5b. Milestone 2: UE5 playable client (status 2026-10-03)
+
+Built: `ue5/TownChess`, a C++ protocol v2 client. All chess decisions come from the core. It has:
+- `UTCCoreClient`: protocol, saved identity, reconnect and rejoin;
+- `UTCLocalCore`: local core launcher;
+- `ATCBoard`: renders from the FEN, animates only accepted moves from their `effects`, re-syncs to the FEN, shows
+  legal-move markers from the core;
+- a per-seat camera, a canvas HUD, and props mirrored for the Black seat;
+- the level built by script from the benchmark scene.
+
+Evidence: real games played in the UE client by the in-game driver (`ue5/TownChess/Scripts/autotest.py`), which uses
+the same board and HUD entry points as the mouse and checks the board against the authority after every change.
+
+| Definition-of-done item | Result | Run |
+| --- | --- | --- |
+| Launch, local core start, handshake, authoritative state | Pass | Every run |
+| Rejection test: illegal move refused, **not animated**, board and history unchanged | Pass | CPU and clock runs |
+| Full game against the server-hosted engine | Pass: 66 plies to checkmate, board in sync after every ply (69/69) | `cpu` |
+| UE ↔ server ↔ browser: en passant, capture with underpromotion (cxb8=N), castling both sides, checks, resignation | Pass (15/15) | `e2e-ue-browser special` |
+| UE ↔ server ↔ browser: checkmate | Pass (9/9) | `mate` |
+| UE ↔ server ↔ browser: stalemate (Loyd's 10-mover) | Pass (13/13) | `stalemate` |
+| Draw offer received and accepted through the HUD | Pass (6/6) | `draw` |
+| Clocks count down; flag fall → timeout | Pass: 5,019 ms elapsed / 5,019 ms shown (10/10) | `clock` |
+| Kill the UE client (SIGKILL) → no orphan core → relaunch, rejoin, board/turn/clocks rebuilt → game finished | Pass (19/19) | `reconnect_test.sh` |
+| Packaged core bundle on stock Node (no tsx, no repo) | Pass | `npm run bundle:core` |
+| **Packaged Win64 build, DX12, Job Object, antivirus behaviour** | **Not done**: blocked on SSH access to the Windows PC (port 22 filtered) | — |
+| **Real mouse picking and on-screen HUD** | **Not verified headless.** Under Xvfb the Vulkan swapchain never presents. To be verified on Windows | — |
+
+Bugs found and fixed while testing:
+- **Garbage-collection crash:** marker assets were cached in static raw pointers.
+- **Leaked piece meshes:** a board rebuild promoted child components instead of destroying them.
+- **Lost local identity:** the local core's identity was keyed by an ephemeral port, so a restarted game came back as a
+  stranger.
+- **tsx loader resolution:** fixed with a file URL.
 
 ## 6. Explicitly not built yet (project-wide)
 

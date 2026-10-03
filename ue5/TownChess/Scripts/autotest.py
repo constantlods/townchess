@@ -33,6 +33,7 @@ MOVES = [m for m in arg("TCMoves", "").split(",") if m]
 MAX_PLIES = int(arg("TCMaxPlies", "300"))
 ACCEPT_DRAW = arg("TCAcceptDraw", "") == "1"
 KILL_AT_PLY = int(arg("TCKillAtPly", "0"))  # simulate a hard crash (SIGKILL) once the game reaches this ply
+IDLE_AFTER_PLY = int(arg("TCIdleAfterPly", "0"))  # stop moving from this ply on (clock / flag-fall test)
 os.makedirs(OUT, exist_ok=True)
 
 R = {"test": TEST, "checks": [], "pass": None, "moves": [], "features": {}, "screens": []}
@@ -141,6 +142,15 @@ def finish(ok):
 
 
 def tick(_dt):
+    try:
+        _tick(_dt)
+    except Exception as e:  # a driver bug must fail the run, not loop forever
+        import traceback
+        check("driver error", False, f"{e}: {traceback.format_exc()[-400:]}")
+        finish(False)
+
+
+def _tick(_dt):
     S["frames"] += 1
     now = time.time()
     flush_shot()
@@ -158,6 +168,27 @@ def tick(_dt):
     if not core or not board:
         return
     st = core.get_state()
+
+    if TEST == "observe":
+        # real-input test support: publish where every square is on screen; the mouse is driven from outside (xdotool)
+        if core.has_game() and st.status == "active" and not board.is_animating() and now - S.get("squares_at", 0) > 2:
+            pc = unreal.GameplayStatics.get_player_controller(w, 0)
+            pos = {}
+            for f in "abcdefgh":
+                for r in "12345678":
+                    ok, xy = unreal.GameplayStatics.project_world_to_screen(pc, board.square_world(f + r) + unreal.Vector(0, 0, board.surface_z() - board.get_actor_location().z), False)
+                    if ok:
+                        pos[f + r] = [round(xy.x), round(xy.y)]
+            state = {"squares": pos, "fen": st.fen, "plies": len(st.history), "turn": st.turn, "selected": board.get_selected(),
+                     "awaiting": board.is_awaiting_core(), "status": st.status, "buttons": list(pc.get_hud().get_visible_buttons())}
+            with open(os.path.join(OUT, "observe.json"), "w") as f:
+                json.dump(state, f)
+            S["squares_at"] = now
+        elif not core.has_game():
+            pc = unreal.GameplayStatics.get_player_controller(w, 0)
+            with open(os.path.join(OUT, "observe.json"), "w") as f:
+                json.dump({"menu": True, "buttons": list(pc.get_hud().get_visible_buttons())}, f)
+        return
 
     if S["phase"] == "boot":
         if core.has_game() and st.status == "waiting" and not S.get("code_written"):
@@ -200,7 +231,8 @@ def tick(_dt):
         check("reconnected game resumed with history", len(st.history) > 0, f"ply {len(st.history)}")
         check("board rebuilt from authoritative state after reconnect", board.is_in_sync())
         check("turn restored", st.turn in ("w", "b"), st.turn)
-        check("clocks restored", (not st.is_timed()) or (st.white_clock_ms > 0 and st.black_clock_ms > 0), f"{st.white_clock_ms:.0f}/{st.black_clock_ms:.0f}")
+        timed = st.initial_ms > 0  # FTCGameState::IsTimed is C++-only
+        check("clocks restored", (not timed) or (0 < st.white_clock_ms <= st.initial_ms and 0 < st.black_clock_ms <= st.initial_ms), f"{st.white_clock_ms:.0f}/{st.black_clock_ms:.0f} of {st.initial_ms:.0f}")
         S["phase"] = "play"
         return
 
@@ -242,6 +274,17 @@ def tick(_dt):
             S["wait_until"] = now + 1.0
             return
         if not core.is_my_turn():
+            return
+        if IDLE_AFTER_PLY and len(st.history) >= IDLE_AFTER_PLY:
+            # let our clock run: sample the displayed clock to prove it is counting down
+            ms = core.get_display_clock_ms(core.get_my_color())
+            if "idle_clock_start" not in S:
+                S["idle_clock_start"] = (now, ms)
+            elif now - S["idle_clock_start"][0] > 5 and not S.get("clock_checked"):
+                dt = (now - S["idle_clock_start"][0]) * 1000
+                dropped = S["idle_clock_start"][1] - ms
+                check("our clock counts down while it is our move", abs(dropped - dt) < 1500, f"dropped {dropped:.0f} ms in {dt:.0f} ms")
+                S["clock_checked"] = True
             return
         if TEST == "script":
             if S["script_i"] >= len(MOVES):
