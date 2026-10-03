@@ -27,8 +27,10 @@ The machine-readable contract is in `docs/protocol/`, regenerated with `npm run 
 - `examples/*.json`: golden messages produced by the real `GameCore` and validated against the schema. Cases include
   castling, en passant, capture with promotion, checkmate and rejection.
 
-The server tests validate **every message the server sends** against `ServerMessageSchema`. A compile-time check keeps
-the schema and the TypeScript `GameStateDTO` identical.
+The server tests validate **every message their WebSocket test clients receive** against `ServerMessageSchema`.
+Room-level tests use stub transports, so their messages aren't schema-checked at runtime. All room and hub messages
+are typed as `ServerMessage` at compile time, and a compile-time check keeps the schema and the TypeScript
+`GameStateDTO` identical.
 
 New in v2:
 
@@ -36,7 +38,8 @@ New in v2:
 | --- | --- | --- |
 | Handshake | `WELCOME.protocolVersion` | Clients refuse versions they don't know |
 | Game start | `CREATE_AI_GAME {level, color, timeControl}` | Play the house engine through the core: the path UE5 offline play uses (`timeControl: 'untimed'` allowed). Always unrated, and limited to one active game per player |
-| Draws | `CLAIM_DRAW {gameId, intended?}` | FIDE claims (claim policy) |
+| Draws | `CLAIM_DRAW {gameId, intended?}`; `drawPolicy` on `CREATE_AI_GAME` / `CREATE_PRIVATE` | FIDE claims, for games created with the `claim` policy (matchmade games use `automatic`) |
+| Events | `state.eventSeq` | Act on `lastEvents` only once per sequence number |
 | Moves for clients | `state.legalMoves` | UCI moves for the side to move. Clients highlight moves without any rules code. Public information: it's derivable from the FEN |
 | Animation | `moveHistory[].effects` | Ordered physical effects (captures, every piece that moves, promotion swaps), so castling, en passant and promotion animate without rules knowledge |
 | Results | `state.termination` | Precise reason, matching PGN `[Termination]` |
@@ -60,13 +63,17 @@ New in v2:
 | Concurrent sockets per IP | 20 | `LIMITS.socketsPerIp` |
 | New identities per IP | 10 per minute | `LIMITS.newIdentitiesPerIpPerMinute` |
 | Active games per player (human or AI) | 1 | `activeGame` map |
-| Engine searches | Worker pool, at most min(4, cores − 1) threads, queued | `AiPool` |
+| Active engine games per IP | 3 | `LIMITS.aiGamesPerIp` |
+| Engine queue (global) | 64 pending searches; then `ERROR busy` on `CREATE_AI_GAME` | `LIMITS.aiQueueMax` |
+| Engine searches | Worker pool, at most min(4, cores − 1) threads, queued. A failed search is retried once, then a legal move is played so the human never waits forever | `AiPool`, `Hub.aiToMove` |
+| Time-control keys | Own keys of `TIME_CONTROLS` only (`toString`/`__proto__` are rejected) | `timeControlOf` |
 
 Further protections:
 - **Error details** are logged on the server only. Clients get `ERROR server: internal error`.
 - **Origin allow-list:** set `HC_ALLOWED_ORIGINS=https://a,https://b`. Browsers must then match; native clients send
   no Origin and are allowed.
-- **Behind a reverse proxy:** set `HC_TRUST_PROXY=1` so per-IP limits use `X-Forwarded-For`.
+- **Behind a reverse proxy:** set `HC_TRUST_PROXY=1` so per-IP limits use the **rightmost** `X-Forwarded-For` entry,
+  the one our proxy appended. Entries further left come from the client and can be spoofed.
 - **TLS** is terminated at the reverse proxy (Caddy, nginx and similar). The Node server speaks plain `ws://` and must
   not be exposed directly to the internet.
 

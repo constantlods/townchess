@@ -131,8 +131,10 @@ export interface GameStateDTO {
   opening: OpeningSummary | null;
   /** Whether the current position is itself a named book position. */
   inBook: boolean;
-  /** Deterministic events produced by the last state change (see events.ts). */
+  /** Deterministic events produced by the last event-bearing change (see events.ts). */
   lastEvents: GameEventDTO[];
+  /** Increases whenever lastEvents changes. A client must act on lastEvents only when eventSeq is new to it. */
+  eventSeq: number;
   /** Deadline (server epoch ms) for the side to move to make its first move, or null once both have moved. */
   firstMoveDeadline: number | null;
 }

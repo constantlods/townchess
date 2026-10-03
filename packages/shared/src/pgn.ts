@@ -20,8 +20,10 @@ export interface PgnGame {
   timeControl?: string;
 }
 
-export function resultToken(status: GameStatus, winner: Color | null): PgnGame['result'] {
+export function resultToken(status: GameStatus, winner: Color | null, termination: Termination | null = null): PgnGame['result'] {
   if (status === 'waiting' || status === 'active' || status === 'aborted') return '*';
+  // a table abandoned before it started (no loser) has no result
+  if (status === 'abandoned' && winner === null && termination === 'abandoned') return '*';
   if (winner === 'w') return '1-0';
   if (winner === 'b') return '0-1';
   return '1/2-1/2';

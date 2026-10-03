@@ -76,6 +76,7 @@
     "opening": null,
     "inBook": false,
     "lastEvents": [],
+    "eventSeq": 0,
     "firstMoveDeadline": 1791028829000
   }
 }

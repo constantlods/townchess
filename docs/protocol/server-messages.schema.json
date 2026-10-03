@@ -900,6 +900,11 @@
                 "additionalProperties": false
               }
             },
+            "eventSeq": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "firstMoveDeadline": {
               "type": [
                 "number",
@@ -933,6 +938,7 @@
             "opening",
             "inBook",
             "lastEvents",
+            "eventSeq",
             "firstMoveDeadline"
           ],
           "additionalProperties": false
@@ -1672,6 +1678,11 @@
                 "additionalProperties": false
               }
             },
+            "eventSeq": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "firstMoveDeadline": {
               "type": [
                 "number",
@@ -1705,6 +1716,7 @@
             "opening",
             "inBook",
             "lastEvents",
+            "eventSeq",
             "firstMoveDeadline"
           ],
           "additionalProperties": false
@@ -2481,6 +2493,11 @@
                 "additionalProperties": false
               }
             },
+            "eventSeq": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "firstMoveDeadline": {
               "type": [
                 "number",
@@ -2514,6 +2531,7 @@
             "opening",
             "inBook",
             "lastEvents",
+            "eventSeq",
             "firstMoveDeadline"
           ],
           "additionalProperties": false

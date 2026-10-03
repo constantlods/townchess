@@ -33,7 +33,7 @@ export const ClientMessage = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('FIND_MATCH'), timeControl: z.string().max(10), rated: z.boolean() }),
   z.object({ type: z.literal('CANCEL_MATCH') }),
-  z.object({ type: z.literal('CREATE_PRIVATE'), timeControl: z.string().max(10) }),
+  z.object({ type: z.literal('CREATE_PRIVATE'), timeControl: z.string().max(10), drawPolicy: z.enum(['automatic', 'claim']).optional() }),
   /** Play the house engine through the core (offline UE play uses a local core the same way). Never rated. */
   z.object({
     type: z.literal('CREATE_AI_GAME'),
@@ -41,6 +41,8 @@ export const ClientMessage = z.discriminatedUnion('type', [
     color: z.enum(['w', 'b', 'random']),
     /** A key of TIME_CONTROLS, or 'untimed'. */
     timeControl: z.string().max(10),
+    /** Threefold/fifty handling (see docs/CHESS.md). Default 'automatic'. */
+    drawPolicy: z.enum(['automatic', 'claim']).optional(),
   }),
   z.object({ type: z.literal('JOIN_GAME'), gameId: z.string().regex(/^GAME-[0-9A-F]{6}$/) }),
   z.object({ type: z.literal('LEAVE_GAME'), gameId: z.string() }),
@@ -120,6 +122,7 @@ export const GameStateSchema = z.object({
   opening: z.object({ eco: z.string(), name: z.string(), family: z.string(), variation: z.string().nullable(), subvariation: z.string().nullable(), ply: z.number().int(), transposed: z.boolean() }).nullable(),
   inBook: z.boolean(),
   lastEvents: z.array(GameEventSchema),
+  eventSeq: z.number().int().nonnegative(),
   firstMoveDeadline: z.number().nullable(),
 });
 

@@ -190,9 +190,17 @@ describe('events', () => {
 
 describe('position key and PGN', () => {
   it('ignores an en passant square when the capture is illegal', () => {
-    // black pawn d4 is pinned on the 4th rank by the rook h4 against the king a4; after e2e4 ep is impossible
-    const k = positionKey('8/8/8/8/k2p3R/8/4P3/4K3 w - - 0 1');
-    expect(k.endsWith('w - -')).toBe(true);
+    // After e2-e4, dxe3 e.p. would empty the 4th rank and expose the king on a4 to the rook on h4: illegal.
+    const g = new GameCore({ timeControl: null, startFen: '8/8/8/8/k2p3R/8/4P3/4K3 w - - 0 1' });
+    g.start(0);
+    expect(g.move('w', { from: 'e2', to: 'e4' }, 1).ok).toBe(true);
+    expect(g.fen.split(' ')[3]).not.toBe('e3'); // whatever chess.js prints...
+    expect(positionKey(g.fen)).toBe(positionKey('8/8/8/8/k2pP2R/8/8/4K3 b - - 0 1')); // ...the key has no ep square
+    // and where the capture IS legal, the ep square is part of the key
+    const legal = new GameCore({ timeControl: null, startFen: '4k3/8/8/8/3p4/8/4P3/4K3 w - - 0 1' });
+    legal.start(0);
+    legal.move('w', { from: 'e2', to: 'e4' }, 1);
+    expect(positionKey(legal.fen).endsWith(' e3')).toBe(true);
   });
 
   it('round-trips PGN with opening and termination tags', () => {
@@ -202,5 +210,53 @@ describe('position key and PGN', () => {
     expect(pgn).toContain('[Termination "normal"]');
     expect(pgn).toContain('1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7# 1-0');
     expect(parsePgn(pgn).moves.map((m) => m.san)).toEqual(g.history.map((h) => h.san));
+  });
+});
+
+describe('critique regressions', () => {
+  it('rejects non-finite time controls', () => {
+    expect(() => new GameCore({ timeControl: { initialMs: NaN, incrementMs: 0 } })).toThrow('invalid time control');
+    expect(() => new GameCore({ timeControl: undefined as never })).not.toThrow(); // undefined = untimed
+  });
+
+  it('eventSeq: events are delivered once; a decline clears them', () => {
+    const g = new GameCore({ timeControl: null });
+    g.start(0);
+    g.move('w', uci('e2e4'), 1);
+    const seq = g.eventSeq;
+    expect(g.snapshot(2).eventSeq).toBe(seq); // a snapshot alone never advances the sequence
+    g.offerDraw('b', 3);
+    expect(g.eventSeq).toBe(seq + 1);
+    g.declineDraw('w');
+    expect(g.lastEvents).toEqual([]);
+    expect(g.eventSeq).toBe(seq + 2);
+  });
+
+  it('a claim ends the game with only the claim event (no replay of the previous move)', () => {
+    const { g } = play(['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1', 'f6g8'], { timeControl: null, drawPolicy: 'claim' });
+    expect(g.claimDraw('w', 99)).toBeNull();
+    expect(g.lastEvents).toEqual([{ type: 'draw_repetition', ply: 8, color: 'w' }]);
+  });
+
+  it('a claim after the flag fell ends the game on time, not as a draw', () => {
+    const g = new GameCore({ timeControl: { initialMs: 1000, incrementMs: 0 }, firstMoveMs: null, drawPolicy: 'claim' });
+    g.start(0);
+    expect(g.claimDraw('w', 5000)).toBe('time expired');
+    expect([g.status, g.winner]).toEqual(['timeout', 'b']);
+  });
+
+  it('gambit_offered fires for the offer only, not for acceptance or decline', () => {
+    const accepted = play(['e2e4', 'e7e5', 'f2f4', 'e5f4']);
+    expect(accepted.g.opening?.name).toMatch(/King's Gambit Accepted/);
+    expect(accepted.types).not.toContain('gambit_offered');
+    const declined = play(['d2d4', 'd7d5', 'c2c4', 'e7e6']);
+    expect(declined.g.opening?.name).toMatch(/Queen's Gambit Declined/);
+    expect(declined.types).not.toContain('gambit_offered');
+    expect(play(['d2d4', 'd7d5', 'c2c4']).types).toContain('gambit_offered');
+  });
+
+  it('PGN result of a table abandoned before it started is "*"', () => {
+    expect(resultToken('abandoned', null, 'abandoned')).toBe('*');
+    expect(resultToken('abandoned', null, 'abandoned_vs_insufficient')).toBe('1/2-1/2');
   });
 });

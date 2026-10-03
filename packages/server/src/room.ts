@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { GameCore, isFinished, otherColor, type Color, type GameStateDTO, type Promotion, type TimeControl, type MoveInput } from '@hc/shared';
+import { GameCore, isFinished, otherColor, type Color, type DrawPolicy, type GameStateDTO, type Promotion, type ServerMessage, type TimeControl, type MoveInput } from '@hc/shared';
 import type { PlayerStore } from './players.js';
 
 export const DISCONNECT_GRACE_MS = 60_000;
@@ -9,9 +9,9 @@ export const FIRST_MOVE_MS = 30_000;
 
 export interface RoomEvents {
   /** Broadcast to both seats (and anyone else in the room). */
-  broadcast(room: GameRoom, msg: object): void;
+  broadcast(room: GameRoom, msg: ServerMessage): void;
   /** Send to one player. */
-  send(playerId: string, msg: object): void;
+  send(playerId: string, msg: ServerMessage): void;
   finished(room: GameRoom): void;
   /** A seat played by the engine must move now (the hub schedules the search off the event loop). */
   aiToMove?(room: GameRoom): void;
@@ -26,6 +26,7 @@ export interface RoomOptions {
   isPrivate?: boolean;
   /** null = untimed. */
   timeControl: TimeControl | null;
+  drawPolicy: DrawPolicy;
 }
 
 /**
@@ -49,6 +50,8 @@ export class GameRoom {
   now: () => number = () => performance.now();
   /** Wall time for display fields; injectable for tests. */
   wallNow: () => number = () => Date.now();
+  /** Disconnect grace period; overridable in tests. */
+  graceMs = DISCONNECT_GRACE_MS;
 
   constructor(
     public id: string,
@@ -62,7 +65,7 @@ export class GameRoom {
   ) {
     this.isPrivate = opts.isPrivate ?? false;
     this.untimed = opts.timeControl === null;
-    this.core = new GameCore({ timeControl: this.untimed ? null : tc, firstMoveMs: FIRST_MOVE_MS });
+    this.core = new GameCore({ timeControl: this.untimed ? null : tc, firstMoveMs: FIRST_MOVE_MS, drawPolicy: opts.drawPolicy ?? 'automatic' });
   }
 
   get status() { return this.core.status; }
@@ -125,6 +128,7 @@ export class GameRoom {
       },
       inBook: snap.inBook,
       lastEvents: snap.lastEvents,
+      eventSeq: snap.eventSeq,
       firstMoveDeadline: snap.firstMoveDeadline === null ? null : wall + (snap.firstMoveDeadline - now),
     };
   }
@@ -132,6 +136,15 @@ export class GameRoom {
   private update(reason: string) {
     this.touch();
     this.ev.broadcast(this, { type: 'GAME_STATE_UPDATED', state: this.dto(), reason });
+  }
+
+  /**
+   * Any request can end the game as a side effect (a flag that fell before the request arrived, an expired first-move
+   * window). Call after every core action so such endings are always broadcast, rated and released.
+   */
+  private settle(statusBefore: string, reason: string): boolean {
+    if (isFinished(this.status) && !isFinished(statusBefore as never)) { this.onFinished(reason); return true; }
+    return false;
   }
 
   /** Validate and apply a move. Returns null on success or a rejection reason. */
@@ -142,8 +155,7 @@ export class GameRoom {
     const statusBefore = this.status;
     const r = this.core.move(color, { from, to, promotion }, this.now());
     if (!r.ok) {
-      // the attempt itself may have ended the game (flag fall, abort): report that to everyone
-      if (isFinished(this.status) && !isFinished(statusBefore)) this.onFinished(this.status);
+      this.settle(statusBefore, this.status); // the attempt itself may have ended the game (flag fall, abort)
       return r.reason;
     }
     if (isFinished(this.status)) this.onFinished('move');
@@ -196,14 +208,18 @@ export class GameRoom {
 
   resign(playerId: string) {
     const c = this.colorOf(playerId);
-    if (c && this.core.resign(c, this.now())) this.onFinished('resign');
+    if (!c) return;
+    const before = this.status;
+    if (this.core.resign(c, this.now())) this.onFinished('resign');
+    else this.settle(before, 'timeout');
   }
 
   offerDraw(playerId: string) {
     const c = this.colorOf(playerId);
     if (!c) return;
+    const before = this.status;
     const r = this.core.offerDraw(c, this.now());
-    if (r === 'agreed') { this.onFinished('draw'); return; }
+    if (this.settle(before, r === 'agreed' ? 'draw' : 'timeout')) return;
     if (r === 'offered') {
       this.ev.broadcast(this, { type: 'DRAW_OFFER', gameId: this.id, by: c });
       this.update('draw_offer');
@@ -212,7 +228,10 @@ export class GameRoom {
 
   acceptDraw(playerId: string) {
     const c = this.colorOf(playerId);
-    if (c && this.core.acceptDraw(c, this.now())) this.onFinished('draw');
+    if (!c) return;
+    const before = this.status;
+    const accepted = this.core.acceptDraw(c, this.now());
+    this.settle(before, accepted ? 'draw' : 'timeout');
   }
 
   declineDraw(playerId: string) {
@@ -224,8 +243,9 @@ export class GameRoom {
   claimDraw(playerId: string, intended?: MoveInput): string | null {
     const c = this.colorOf(playerId);
     if (!c) return 'not a player in this game';
+    const before = this.status;
     const err = this.core.claimDraw(c, this.now(), intended);
-    if (err === null) this.onFinished('draw_claim');
+    this.settle(before, err === null ? 'draw_claim' : 'timeout'); // a late claim can find the flag already fallen
     return err;
   }
 
@@ -253,11 +273,11 @@ export class GameRoom {
       if (this.status === 'waiting') { this.core.abandon(null, this.now()); this.onFinished('abandoned'); return; }
       this.core.abandon(c, this.now());
       this.onFinished('abandoned');
-    }, DISCONNECT_GRACE_MS);
+    }, this.graceMs);
     t.unref?.();
     this.disconnected.set(c, t);
     const other = this.playerOf(otherColor(c));
-    if (other) this.ev.send(other, { type: 'OPPONENT_DISCONNECTED', gameId: this.id, graceMs: DISCONNECT_GRACE_MS });
+    if (other) this.ev.send(other, { type: 'OPPONENT_DISCONNECTED', gameId: this.id, graceMs: this.graceMs });
     this.update('disconnect');
   }
 

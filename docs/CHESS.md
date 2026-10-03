@@ -16,7 +16,10 @@ Every rule below is backed by tests. **123 FIDE fixture cases** live in `package
 They cite FIDE Laws of Chess articles and were written and checked independently of our code by a dedicated rules
 agent. They run twice:
 - against chess.js directly (`fide-cases.validate.test.ts`), which proves the fixtures themselves are right;
-- against `GameCore` (`fide-cases.core.test.ts`), which proves our implementation.
+- against `GameCore` (`fide-cases.core.test.ts`), which checks our implementation.
+
+**Flag-fall cases:** when the flagged side is to move, they go through a timed `GameCore.checkFlag`. Otherwise only
+the material decision (`canPossiblyMate`) can be exercised.
 
 | Rule | FIDE | Where | Notes |
 | --- | --- | --- | --- |
@@ -28,7 +31,7 @@ agent. They run twice:
 | Dead position by material | 5.2.2 | `material.ts` `isDeadByMaterial` | Ends the game immediately (`draw_insufficient` / `insufficient_material`) |
 | Draw by agreement | 9.1 | `GameCore.offerDraw/acceptDraw` | An offer is allowed at any time (online convention, more permissive than 9.1.2.1) |
 | Threefold repetition | 9.2 | `GameCore` + `positionKey` | Policy `automatic` (default) or `claim` |
-| Claim with an intended move | 9.2.1.1, 9.3.1 | `GameCore.claimDraw(color, now, intended)` | The intended move is not played |
+| Claim with an intended move | 9.2.1.1, 9.3.1 | `GameCore.claimDraw(color, now, intended)` | The intended move is not played. **Deviation from 9.5.3:** an incorrect claim is simply rejected; it neither forces the intended move nor gives the opponent extra time |
 | Fifty-move rule | 9.3 | `GameCore` | Same policy as threefold |
 | Fivefold repetition, seventy-five moves | 9.6.1, 9.6.2 | `GameCore` | Always automatic. Checkmate on the 150th half-move takes precedence |
 | Flag fall | 6.9 | `GameCore.checkFlag` + `canPossiblyMate` | Loss, unless the opponent cannot mate by any legal sequence → draw (`timeout_vs_insufficient`) |
@@ -55,8 +58,9 @@ counts `positionKey`s itself.
 - Bishops all on one colour can only if the opponent owns a pawn, a knight, or a bishop on the other colour. **They
   can't against K+R or K+Q.**
 
-The bold exclusions come from exhaustive enumeration of every K+X vs K+Y placement. No mate exists for N vs Q
-(1.13M positions), B vs R or B vs Q (1.90M each).
+The bold exclusions come from exhaustive enumeration of every **single-piece** K+X vs K+Y placement. No mate
+exists for N vs Q (1.13M positions), B vs R or B vs Q (1.90M each). Multi-piece cases (for example B vs R+R) follow the
+same classes as lichess/scalachess, but are not proven by enumeration.
 
 ### Draw policy
 
@@ -95,12 +99,13 @@ The bold exclusions come from exhaustive enumeration of every K+X vs K+Y placeme
 - **Recognition is by position, not move order**, so transpositions are recognised.
   - Example: 1.Nf3 Nf6 2.c4 e6 3.d4 reaches the same named position as 1.d4 Nf6 2.c4 e6 3.Nf3.
   - `transposed: true` marks a game that reached the position by a different move order.
-- **What's reported:** the deepest named position the game has reached. It stays named after the game leaves book, and
-  `inBook` says whether the current position is itself in the book.
+- **What's reported:** the most recent named position the game has reached. It stays named after the game leaves
+  book, and `inBook` says whether the current position is itself in the book.
 - **Name splitting:** names split into `family` / `variation` / `subvariation` ("Sicilian Defense" / "Najdorf
   Variation" / "English Attack").
-- **Gambits:** the name contains "Gambit". That produces a `gambit_offered` event when the game first enters a gambit
-  family.
+- **Gambits:** the name contains "Gambit". That produces a `gambit_offered` event when a new gambit is *offered*.
+  Lichess names acceptance and decline lines separately ("King's Gambit Accepted", "Queen's Gambit Declined"); those
+  don't fire the event again.
 
 ## Game record
 
@@ -123,5 +128,9 @@ The bold exclusions come from exhaustive enumeration of every K+X vs K+Y placeme
 - **Draws:** `draw_offered`, `draw_claimable`, and every termination.
 
 Commentary (`content/characters/*.json`), the analysis cart and agents consume these.
+
+**Exactly once:** every state carries `eventSeq`, which increases only when `lastEvents` changes. Clients must act on
+events only when `eventSeq` is new to them. Non-move updates (disconnects, a declined offer, rematch offers) re-send
+the state, not new events.
 
 Engine judgements (`blunder`, `brilliant` and so on) are a separate later layer (Milestone 5).

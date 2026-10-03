@@ -18,7 +18,11 @@ const cases: Case[] = JSON.parse(fs.readFileSync(new URL('./fixtures/fide-cases.
  * a reachability search, which the core does not run on the move path. These cases must keep failing until it does
  * (the test flips if they start passing, so the list cannot go stale).
  */
-const KNOWN_LIMITATIONS = new Set(['dead-locked-pawn-wall', 'dead-locked-wall-with-trapped-bishop', 'timeout-locked-wall-draw']);
+const KNOWN_LIMITATIONS: Record<string, string> = {
+  'dead-locked-pawn-wall': 'deadPosition',
+  'dead-locked-wall-with-trapped-bishop': 'deadPosition',
+  'timeout-locked-wall-draw': 'timeoutResult',
+};
 
 /**
  * Plays the setup moves through GameCore. If a dead position ends the game early (FIDE 5.2.2 ends it immediately,
@@ -52,13 +56,13 @@ function check(c: Case): string[] {
   const bad: string[] = [];
   // move legality is a property of the position, independent of whether a dead position already ended the game
   const legal = new Set(rules.allLegalMoves().map((m) => m.from + m.to + (m.promotion ?? '')));
+  for (const m of (e.legal as string[] | undefined) ?? []) if (!legal.has(m)) bad.push(`expected legal ${m}`);
+  for (const m of (e.illegal as string[] | undefined) ?? []) if (legal.has(m)) bad.push(`expected illegal ${m}`);
   if (endedEarly) {
-    // only position facts remain meaningful once the game is over
+    // the game already ended by FIDE 5.2.2; only position facts remain meaningful
     if ('inCheck' in e && e.inCheck !== rules.inCheck()) bad.push(`inCheck: expected ${e.inCheck}`);
     return bad;
   }
-  for (const m of (e.legal as string[] | undefined) ?? []) if (!legal.has(m)) bad.push(`expected legal ${m}`);
-  for (const m of (e.illegal as string[] | undefined) ?? []) if (legal.has(m)) bad.push(`expected illegal ${m}`);
   const eq = (k: string, actual: unknown) => { if (k in e && e[k] !== actual) bad.push(`${k}: expected ${e[k]} got ${actual}`); };
   eq('inCheck', g.rules.inCheck());
   eq('checkmate', g.status === 'checkmate');
@@ -71,8 +75,18 @@ function check(c: Case): string[] {
   eq('seventyFiveMoveDraw', g.status === 'draw_seventyfive');
   if ('deadPosition' in e) eq('deadPosition', isDeadByMaterial(g.rules.pieces()));
   if (e.timeoutResult) {
-    const winnerCanMate = canPossiblyMate(g.rules.pieces(), otherColor(e.timeoutResult.flagged));
-    const actual = winnerCanMate ? 'win' : 'draw';
+    const { flagged } = e.timeoutResult;
+    let actual: string;
+    if (g.status === 'active' && g.turn === flagged) {
+      // the real path: a timed GameCore in this position whose side to move runs out of time
+      const t = new GameCore({ startFen: g.fen, timeControl: { initialMs: 1000, incrementMs: 0 }, firstMoveMs: null });
+      t.start(0);
+      t.checkFlag(5000);
+      actual = t.status === 'timeout' ? 'win' : t.termination === 'timeout_vs_insufficient' ? 'draw' : `unexpected ${t.status}`;
+    } else {
+      // flag of the side not to move (or game over): only the material decision can be exercised
+      actual = canPossiblyMate(g.rules.pieces(), otherColor(flagged)) ? 'win' : 'draw';
+    }
     if (actual !== e.timeoutResult.result) bad.push(`timeoutResult: expected ${e.timeoutResult.result} got ${actual}`);
   }
   return bad;
@@ -82,8 +96,12 @@ describe('FIDE fixture catalogue against GameCore', () => {
   for (const c of cases) {
     it(`${c.category}: ${c.id} (${c.fide})`, () => {
       const bad = check(c);
-      if (KNOWN_LIMITATIONS.has(c.id)) expect(bad.length, 'known limitation now passes: remove it from KNOWN_LIMITATIONS').toBeGreaterThan(0);
-      else expect(bad).toEqual([]);
+      const known = KNOWN_LIMITATIONS[c.id];
+      if (known) {
+        // exactly the documented failure, nothing else
+        expect(bad.length, 'known limitation now passes: remove it from KNOWN_LIMITATIONS').toBeGreaterThan(0);
+        expect(bad.every((b) => b.startsWith(known)), `unexpected failures: ${bad.join('; ')}`).toBe(true);
+      } else expect(bad).toEqual([]);
     });
   }
 });

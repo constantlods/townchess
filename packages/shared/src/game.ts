@@ -50,6 +50,8 @@ export interface CoreSnapshot {
   /** Legal moves for the side to move as UCI strings (empty when finished). */
   legalMoves: string[];
   lastEvents: GameEvent[];
+  /** Increases every time lastEvents is replaced; clients process events only once per sequence number. */
+  eventSeq: number;
   /** Same timebase as `now`. null when there is no pending first move. */
   firstMoveDeadline: number | null;
 }
@@ -74,20 +76,27 @@ export class GameCore {
   opening: OpeningInfo | null = null;
   inBook = false;
   lastEvents: GameEvent[] = [];
+  /** See CoreSnapshot.eventSeq. Non-move state updates (disconnects, offers declined...) never re-deliver events. */
+  eventSeq = 0;
   private repetitions = new Map<string, number>();
   private balances: number[] = [];
-  /** Shadow chess.js instance for event detection (attackers, mate) without touching the rules wrapper. */
-  private shadow: Chess;
 
   constructor(opts: GameCoreOptions) {
     this.startFen = opts.startFen ?? START_FEN;
     this.rules = new ChessRules(this.startFen);
-    this.shadow = new Chess(this.startFen);
     this.clock = opts.timeControl ? new ChessClock(opts.timeControl) : null;
     this.drawPolicy = opts.drawPolicy ?? 'automatic';
     this.firstMoveMs = this.clock ? (opts.firstMoveMs === undefined ? 30_000 : opts.firstMoveMs) : null;
-    this.repetitions.set(positionKey(this.shadow), 1);
+    this.repetitions.set(positionKey(this.board), 1);
     this.balances.push(this.balance());
+  }
+
+  /** Read-only chess.js view of the one and only position (owned by `rules`). */
+  private get board(): Chess { return this.rules.chessView; }
+
+  private setEvents(events: GameEvent[]) {
+    this.lastEvents = events;
+    this.eventSeq++;
   }
 
   get turn(): Color { return this.rules.turn; }
@@ -100,8 +109,8 @@ export class GameCore {
     if (this.firstMoveMs === null) this.clock?.start(this.rules.turn, now);
     else this.firstMoveDeadline = now + this.firstMoveMs;
     // a custom start position can already be over (mate, stalemate, dead by material)
-    if (this.shadow.isCheckmate()) this.finish('checkmate', otherColor(this.turn), now, 'checkmate', 'checkmate');
-    else if (this.shadow.isStalemate()) this.finish('stalemate', null, now, 'stalemate', 'stalemate');
+    if (this.board.isCheckmate()) this.finish('checkmate', otherColor(this.turn), now, 'checkmate', 'checkmate');
+    else if (this.board.isStalemate()) this.finish('stalemate', null, now, 'stalemate', 'stalemate');
     else if (isDeadByMaterial(this.rules.pieces())) this.finish('draw_insufficient', null, now, 'draw_insufficient', 'insufficient_material');
   }
 
@@ -126,7 +135,6 @@ export class GameCore {
     }
     const record = this.rules.tryMove(input);
     if (!record) return { ok: false, reason: 'illegal move', events: [] };
-    this.shadow.move({ from: record.from, to: record.to, promotion: record.promotion });
     this.history.push(record);
     if (this.clock) {
       if (this.firstMoveDeadline !== null) {
@@ -140,7 +148,7 @@ export class GameCore {
     }
     this.drawOfferBy = null;
 
-    const key = positionKey(this.shadow);
+    const key = positionKey(this.board);
     this.repetitions.set(key, (this.repetitions.get(key) ?? 0) + 1);
     this.balances.push(this.balance());
 
@@ -155,32 +163,33 @@ export class GameCore {
     }
 
     const events = moveEvents({
-      record, ply: this.ply, after: this.shadow, openingBefore, openingAfter: this.opening,
+      record, ply: this.ply, after: this.board, openingBefore, openingAfter: this.opening,
       balanceTwoPliesAgo: this.balances[Math.max(0, this.balances.length - 3)], balanceNow: this.balances[this.balances.length - 1],
     });
-    this.lastEvents = events;
+    this.setEvents(events);
     this.resolveAfterMove(color, now);
     return { ok: true, record, events: this.lastEvents };
   }
 
   /** Position-driven endings, in FIDE precedence: mate/stalemate end the game before any draw rule applies. */
   private resolveAfterMove(mover: Color, now: number): void {
-    if (this.shadow.isCheckmate()) return this.finish('checkmate', mover, now, null, 'checkmate');
-    if (this.shadow.isStalemate()) return this.finish('stalemate', null, now, null, 'stalemate');
-    if (isDeadByMaterial(this.rules.pieces())) return this.finish('draw_insufficient', null, now, 'draw_insufficient', 'insufficient_material');
-    if (this.repetitionCount() >= 5) return this.finish('draw_fivefold', null, now, 'draw_fivefold', 'fivefold_repetition');
-    if (this.halfmoveClock() >= 150) return this.finish('draw_seventyfive', null, now, 'draw_seventyfive', 'seventy_five_move');
+    if (this.board.isCheckmate()) return this.finish('checkmate', mover, now, null, 'checkmate');
+    if (this.board.isStalemate()) return this.finish('stalemate', null, now, null, 'stalemate');
+    if (isDeadByMaterial(this.rules.pieces())) return this.finish('draw_insufficient', null, now, 'draw_insufficient', 'insufficient_material', null, true);
+    if (this.repetitionCount() >= 5) return this.finish('draw_fivefold', null, now, 'draw_fivefold', 'fivefold_repetition', null, true);
+    if (this.halfmoveClock() >= 150) return this.finish('draw_seventyfive', null, now, 'draw_seventyfive', 'seventy_five_move', null, true);
     const claim = this.claimableDraw();
-    if (claim && this.drawPolicy === 'automatic') return this.finishClaim(claim, now);
-    if (claim) this.lastEvents = [...this.lastEvents, { type: 'draw_claimable', ply: this.ply, color: this.turn }];
+    if (claim && this.drawPolicy === 'automatic') return this.finishClaim(claim, now, true);
+    if (claim) this.setEvents([...this.lastEvents, { type: 'draw_claimable', ply: this.ply, color: this.turn }]);
   }
 
-  private finishClaim(claim: 'threefold' | 'fifty', now: number) {
-    if (claim === 'threefold') this.finish('draw_repetition', null, now, 'draw_repetition', 'threefold_repetition');
-    else this.finish('draw_fifty', null, now, 'draw_fifty', 'fifty_move');
+  /** `byMove`: the draw arose from the move just played (its events stay); otherwise it is a claim (an action). */
+  private finishClaim(claim: 'threefold' | 'fifty', now: number, byMove: boolean, claimant: Color | null = null) {
+    if (claim === 'threefold') this.finish('draw_repetition', null, now, 'draw_repetition', 'threefold_repetition', claimant, byMove);
+    else this.finish('draw_fifty', null, now, 'draw_fifty', 'fifty_move', claimant, byMove);
   }
 
-  repetitionCount(): number { return this.repetitions.get(positionKey(this.shadow)) ?? 0; }
+  repetitionCount(): number { return this.repetitions.get(positionKey(this.board)) ?? 0; }
   halfmoveClock(): number { return Number(this.rules.fen.split(' ')[4]); }
 
   claimableDraw(): 'threefold' | 'fifty' | null {
@@ -194,6 +203,8 @@ export class GameCore {
    * FIDE 9.2/9.3 claim by the side to move. Without `intended`, the current position must qualify. With an intended
    * move (9.2.1.1 / 9.3.1), the claim is valid if that move would produce a threefold position or complete fifty
    * moves; the move itself is not played (the game ends as drawn). An invalid claim changes nothing.
+   * Deviation from FIDE 9.5.3, documented in docs/CHESS.md: an incorrect claim with an intended move does not force
+   * that move to be played and gives no time bonus to the opponent; it is simply rejected.
    */
   claimDraw(color: Color, now: number, intended?: MoveInput): string | null {
     if (this.status !== 'active') return 'game is not active';
@@ -202,18 +213,18 @@ export class GameCore {
     if (!intended) {
       const claim = this.claimableDraw();
       if (!claim) return 'no draw to claim';
-      this.finishClaim(claim, now);
+      this.finishClaim(claim, now, false, color);
       return null;
     }
-    const probe = new Chess(this.shadow.fen());
+    const probe = new Chess(this.board.fen());
     try {
       probe.move({ from: intended.from, to: intended.to, promotion: intended.promotion });
     } catch {
       return 'intended move is illegal';
     }
     const key = positionKey(probe);
-    if ((this.repetitions.get(key) ?? 0) + 1 >= 3) { this.finishClaim('threefold', now); return null; }
-    if (Number(probe.fen().split(' ')[4]) >= 100) { this.finishClaim('fifty', now); return null; }
+    if ((this.repetitions.get(key) ?? 0) + 1 >= 3) { this.finishClaim('threefold', now, false, color); return null; }
+    if (Number(probe.fen().split(' ')[4]) >= 100) { this.finishClaim('fifty', now, false, color); return null; }
     return 'no draw to claim';
   }
 
@@ -233,6 +244,7 @@ export class GameCore {
 
   resign(color: Color, now: number): boolean {
     if (this.status !== 'active') return false;
+    if (this.checkFlag(now)) return false; // the flag fell first: the game is already over
     this.finish('resigned', otherColor(color), now, 'resign', 'resignation', color);
     return true;
   }
@@ -240,14 +252,16 @@ export class GameCore {
   /** Returns 'agreed' if this completes a pending offer by the other side. */
   offerDraw(color: Color, now: number): 'offered' | 'agreed' | null {
     if (this.status !== 'active') return null;
+    if (this.checkFlag(now)) return null;
     if (this.drawOfferBy && this.drawOfferBy !== color) { this.finish('draw_agreed', null, now, 'draw_agreed', 'agreement'); return 'agreed'; }
     this.drawOfferBy = color;
-    this.lastEvents = [{ type: 'draw_offered', ply: this.ply, color }];
+    this.setEvents([{ type: 'draw_offered', ply: this.ply, color }]);
     return 'offered';
   }
 
   acceptDraw(color: Color, now: number): boolean {
     if (this.status !== 'active' || !this.drawOfferBy || this.drawOfferBy === color) return false;
+    if (this.checkFlag(now)) return false;
     this.finish('draw_agreed', null, now, 'draw_agreed', 'agreement');
     return true;
   }
@@ -255,6 +269,7 @@ export class GameCore {
   declineDraw(color: Color): boolean {
     if (this.status !== 'active' || !this.drawOfferBy || this.drawOfferBy === color) return false;
     this.drawOfferBy = null;
+    this.setEvents([]);
     return true;
   }
 
@@ -270,7 +285,11 @@ export class GameCore {
     else this.finish('abandoned', null, now, 'abandoned', 'abandoned_vs_insufficient', loser);
   }
 
-  private finish(status: GameStatus, winner: Color | null, now: number, event: GameEvent['type'] | null, termination: Termination, actor: Color | null = null): void {
+  /**
+   * End the game. `byMove`: the ending was caused by the move just played, so its terminal event is appended to that
+   * move's events; otherwise (resign, timeout, claim, agreement, abort...) the terminal event stands alone.
+   */
+  private finish(status: GameStatus, winner: Color | null, now: number, event: GameEvent['type'] | null, termination: Termination, actor: Color | null = null, byMove = false): void {
     if (isFinished(this.status)) return;
     this.clock?.stop(now);
     this.status = status;
@@ -278,11 +297,9 @@ export class GameCore {
     this.termination = termination;
     this.drawOfferBy = null;
     this.firstMoveDeadline = null;
-    if (!event) return; // checkmate/stalemate are already in the move's events
+    if (!event) return; // checkmate/stalemate after a move are already in that move's events
     const terminal: GameEvent = { type: event, ply: this.ply, color: actor };
-    // position-driven draws belong to the move that caused them; actions (resign, timeout, ...) stand alone
-    const positional = event.startsWith('draw_') && event !== 'draw_agreed';
-    this.lastEvents = positional ? [...this.lastEvents, terminal] : [terminal];
+    this.setEvents(byMove ? [...this.lastEvents, terminal] : [terminal]);
   }
 
   legalMovesUci(): string[] {
@@ -306,6 +323,7 @@ export class GameCore {
       claimableDraw: this.drawPolicy === 'claim' ? this.claimableDraw() : null,
       legalMoves: this.legalMovesUci(),
       lastEvents: this.lastEvents,
+      eventSeq: this.eventSeq,
       firstMoveDeadline: this.firstMoveDeadline,
     };
   }

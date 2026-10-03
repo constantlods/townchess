@@ -37,6 +37,9 @@ function attackersOf(chess: Chess, square: string, by: Color): string[] {
   return (chess as unknown as { attackers(sq: string, c: Color): string[] }).attackers(square, by);
 }
 
+/** "Queen's Gambit Declined: Slav" -> "Queen's Gambit" */
+const gambitRoot = (name: string) => name.replace(/^(.*?\bgambit\b).*$/i, '$1');
+
 export interface MoveEventInput {
   record: MoveRecord;
   ply: number;
@@ -76,7 +79,11 @@ export function moveEvents(i: MoveEventInput): GameEvent[] {
   if (oa && oa.name !== ob?.name) {
     const opening = { eco: oa.eco, name: oa.name, family: oa.family, variation: oa.variation };
     ev.push({ type: 'opening_identified', ...base, opening });
-    if (isGambit(oa) && !(ob && isGambit(ob) && ob.family === oa.family)) ev.push({ type: 'gambit_offered', ...base, opening });
+    // Only the offer: "King's Gambit" yes; "King's Gambit Accepted" / "Queen's Gambit Declined" are replies to an offer
+    // already announced (Lichess makes them separate families, so comparing families is not enough).
+    if (isGambit(oa) && !/\b(accepted|declined)\b/i.test(oa.name) && gambitRoot(oa.name) !== (ob && isGambit(ob) ? gambitRoot(ob.name) : null)) {
+      ev.push({ type: 'gambit_offered', ...base, opening });
+    }
   }
 
   const mover = r.color === 'w' ? 1 : -1;

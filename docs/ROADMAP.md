@@ -186,11 +186,19 @@ risks Windows-only surprises piling up.
 | Engine "ratings" removed (uncalibrated) | Done | `docs/AI.md` |
 | UE C++ build spike | Done | Risk 3 retired |
 
-**Tests: 290 automated tests**, run three times in a row with no failures:
+**Tests: 305 automated tests**, run three times in a row with no failures (after the critique code-review fixes):
 - 123 FIDE cases against chess.js and the same 123 against `GameCore`;
 - core, shared and server tests.
 
 The two-browser online test and the offline AI test pass (run by hand).
+
+**Critique code review of Milestone 1** (second pass by the critique agent): 1 blocker, 6 major and 9 minor findings.
+All were fixed with regression tests, except the two documented as deviations:
+- **FIDE 9.5.3:** an incorrect claim with an intended move is rejected, without forcing the move or adding time.
+- **Multi-piece material classes:** they follow lichess/scalachess but aren't proven by enumeration.
+
+The blocker was prototype keys such as `toString` passing time-control validation: NaN clocks and a 1 ms timer loop,
+which one client could use to burn server CPU.
 
 Next: Milestone 2, after the Windows host decision.
 

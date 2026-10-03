@@ -34,7 +34,7 @@ function stateAfter(moves: string[], startFen?: string): GameStateDTO {
     createdAt: epoch - 60_000, updatedAt: epoch, disconnected: [], termination: s.termination, drawPolicy: 'automatic',
     claimableDraw: s.claimableDraw, legalMoves: s.legalMoves,
     opening: s.opening && { eco: s.opening.eco, name: s.opening.name, family: s.opening.family, variation: s.opening.variation, subvariation: s.opening.subvariation, ply: s.opening.ply, transposed: s.opening.transposed },
-    inBook: s.inBook, lastEvents: s.lastEvents, firstMoveDeadline: s.firstMoveDeadline === null ? null : epoch + 29_000,
+    inBook: s.inBook, lastEvents: s.lastEvents, eventSeq: s.eventSeq, firstMoveDeadline: s.firstMoveDeadline === null ? null : epoch + 29_000,
   };
 }
 

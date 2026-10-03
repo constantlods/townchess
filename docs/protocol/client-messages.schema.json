@@ -117,6 +117,13 @@
         "timeControl": {
           "type": "string",
           "maxLength": 10
+        },
+        "drawPolicy": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "claim"
+          ]
         }
       },
       "required": [
@@ -151,6 +158,13 @@
         "timeControl": {
           "type": "string",
           "maxLength": 10
+        },
+        "drawPolicy": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "claim"
+          ]
         }
       },
       "required": [

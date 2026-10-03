@@ -7,7 +7,10 @@ import { GameRoom, isAiSeat, newGameId, type RoomEvents } from './room.js';
 import { AiPool } from './aiPool.js';
 
 /** Abuse limits. Per IP: concurrent sockets and new identities per minute. AI games: one active per player. */
-export const LIMITS = { socketsPerIp: 20, newIdentitiesPerIpPerMinute: 10 };
+export const LIMITS = { socketsPerIp: 20, newIdentitiesPerIpPerMinute: 10, aiGamesPerIp: 3, aiQueueMax: 64 };
+
+/** Own-property lookup: `'toString' in TIME_CONTROLS` must not count as a time control. */
+const timeControlOf = (key: string): TimeControl | undefined => (Object.hasOwn(TIME_CONTROLS, key) ? TIME_CONTROLS[key] : undefined);
 const UNTIMED: TimeControl = { initialMs: 0, incrementMs: 0 };
 
 interface Conn { ws: WebSocket; ip: string; playerId: string | null; alive: boolean; msgCount: number; windowStart: number }
@@ -62,10 +65,10 @@ export class Hub implements RoomEvents {
   }
 
   // ── RoomEvents ──
-  broadcast(room: GameRoom, msg: object) {
+  broadcast(room: GameRoom, msg: ServerMessage) {
     for (const id of [room.white, room.black]) if (id) this.send(id, msg);
   }
-  send(playerId: string, msg: object) {
+  send(playerId: string, msg: ServerMessage) {
     const c = this.socketOf.get(playerId);
     if (c && c.ws.readyState === WebSocket.OPEN) c.ws.send(JSON.stringify(msg));
   }
@@ -80,7 +83,9 @@ export class Hub implements RoomEvents {
   }
 
   private onConnection(ws: WebSocket, req: IncomingMessage) {
-    const fwd = this.trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '';
+    // With a trusted proxy, the *rightmost* X-Forwarded-For entry is the one our proxy appended; anything to its left
+    // was supplied by the client and is spoofable.
+    const fwd = this.trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',').map((x) => x.trim()).filter(Boolean).pop() ?? '' : '';
     const ip = fwd || req.socket.remoteAddress || 'unknown';
     const open = this.socketsByIp.get(ip) ?? 0;
     if (open >= LIMITS.socketsPerIp) { ws.close(4029, 'too many connections'); return; }
@@ -126,6 +131,12 @@ export class Hub implements RoomEvents {
       }
       const { player, token } = this.players.authenticate(m.token, m.username);
       if (m.cosmetics) this.players.setCosmetics(player.id, m.cosmetics);
+      // switching identity on an open socket: the identity it carried before is now disconnected
+      if (c.playerId && c.playerId !== player.id && this.socketOf.get(c.playerId) === c) {
+        this.socketOf.delete(c.playerId);
+        const g = this.activeGame.get(c.playerId);
+        if (g) this.rooms.get(g)?.disconnect(c.playerId);
+      }
       const prev = this.socketOf.get(player.id);
       if (prev && prev !== c) { prev.playerId = null; prev.ws.close(4000, 'replaced'); }
       c.playerId = player.id;
@@ -141,7 +152,7 @@ export class Hub implements RoomEvents {
       case 'PING': this.reply(c, { type: 'PONG', t: m.t, serverTime: Date.now() }); break;
       case 'SET_COSMETICS': this.players.setCosmetics(pid, m.cosmetics); break;
       case 'FIND_MATCH': {
-        if (!TIME_CONTROLS[m.timeControl]) { this.reply(c, { type: 'ERROR', code: 'tc', message: 'unknown time control' }); break; }
+        if (!timeControlOf(m.timeControl)) { this.reply(c, { type: 'ERROR', code: 'tc', message: 'unknown time control' }); break; }
         if (this.activeGame.has(pid)) { this.rejoin(pid, this.activeGame.get(pid)!); break; }
         this.queue = this.queue.filter((q) => q.playerId !== pid);
         this.queue.push({ playerId: pid, tc: m.timeControl, rated: m.rated, since: Date.now() });
@@ -154,18 +165,24 @@ export class Hub implements RoomEvents {
         this.reply(c, { type: 'MATCH_CANCELLED' });
         break;
       case 'CREATE_PRIVATE': {
-        if (!TIME_CONTROLS[m.timeControl]) break;
-        const r = this.createRoom(TIME_CONTROLS[m.timeControl], false, pid, null, true);
+        const tc = timeControlOf(m.timeControl);
+        if (!tc) { this.reply(c, { type: 'ERROR', code: 'tc', message: 'unknown time control' }); break; }
+        if (this.activeGame.has(pid)) { this.reply(c, { type: 'ERROR', code: 'busy', message: 'Finish or leave your current game first.' }); break; }
+        const r = this.createRoom(tc, false, pid, null, true, m.drawPolicy);
         this.reply(c, { type: 'GAME_JOINED', color: 'w', state: r.dto() });
         break;
       }
       case 'CREATE_AI_GAME': {
-        const tc = m.timeControl === 'untimed' ? null : TIME_CONTROLS[m.timeControl];
+        const tc = m.timeControl === 'untimed' ? null : timeControlOf(m.timeControl);
         if (tc === undefined) { this.reply(c, { type: 'ERROR', code: 'tc', message: 'unknown time control' }); break; }
         if (this.activeGame.has(pid)) { this.reply(c, { type: 'ERROR', code: 'busy', message: 'Finish or leave your current game first.' }); break; }
+        if (this.aiGamesForIp(c.ip) >= LIMITS.aiGamesPerIp || this.ai.pending >= LIMITS.aiQueueMax) {
+          this.reply(c, { type: 'ERROR', code: 'busy', message: 'The engine is busy. Try again shortly.' });
+          break;
+        }
         const human = m.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : m.color;
         const bot = `ai:${m.level}`;
-        const r = this.createRoom(tc, false, human === 'w' ? pid : bot, human === 'w' ? bot : pid);
+        const r = this.createRoom(tc, false, human === 'w' ? pid : bot, human === 'w' ? bot : pid, false, m.drawPolicy);
         this.reply(c, { type: 'GAME_JOINED', color: human, state: r.dto() });
         break;
       }
@@ -212,9 +229,9 @@ export class Hub implements RoomEvents {
           this.reply(c, { type: 'ERROR', code: 'busy', message: 'Your opponent is already at another table.' });
           break;
         }
-        const nr = room?.rematch(pid, (w, b) => this.createRoom(room.untimed ? null : room.tc, room.rated, w, b));
+        const nr = room?.rematch(pid, (w, b) => this.createRoom(room.untimed ? null : room.tc, room.rated, w, b, false, room.core.drawPolicy));
         if (nr) {
-          for (const id of [nr.white!, nr.black!]) if (!isAiSeat(id)) this.send(id, { type: 'GAME_JOINED', color: nr.colorOf(id), state: nr.dto() });
+          for (const id of [nr.white!, nr.black!]) if (!isAiSeat(id)) this.send(id, { type: 'GAME_JOINED', color: nr.colorOf(id)!, state: nr.dto() });
         }
         break;
       }
@@ -224,16 +241,18 @@ export class Hub implements RoomEvents {
   private rejoin(pid: string, gameId: string) {
     const r = this.rooms.get(gameId);
     if (!r) { this.activeGame.delete(pid); return; }
+    const color = r.colorOf(pid);
+    if (!color) { this.activeGame.delete(pid); return; }
     r.reconnect(pid);
-    this.send(pid, { type: 'GAME_JOINED', color: r.colorOf(pid), state: r.dto() });
+    this.send(pid, { type: 'GAME_JOINED', color, state: r.dto() });
   }
 
   /** `tc` null = untimed. Engine seats (ai:*) are never tracked as active players and games with them are never rated. */
-  createRoom(tc: TimeControl | null, rated: boolean, white: string, black: string | null, isPrivate = false): GameRoom {
+  createRoom(tc: TimeControl | null, rated: boolean, white: string, black: string | null, isPrivate = false, drawPolicy: 'automatic' | 'claim' = 'automatic'): GameRoom {
     let id = newGameId();
     while (this.rooms.has(id)) id = newGameId();
     const withAi = isAiSeat(white) || isAiSeat(black);
-    const r = new GameRoom(id, tc ?? UNTIMED, rated && !withAi, white, black, this.players, this, { isPrivate, timeControl: tc });
+    const r = new GameRoom(id, tc ?? UNTIMED, rated && !withAi, white, black, this.players, this, { isPrivate, timeControl: tc, drawPolicy });
     this.rooms.set(id, r);
     if (!isAiSeat(white)) this.activeGame.set(white, id);
     if (black && !isAiSeat(black)) this.activeGame.set(black, id);
@@ -241,8 +260,19 @@ export class Hub implements RoomEvents {
     return r;
   }
 
+  /** Active engine games whose human player is connected from `ip` (per-IP engine quota). */
+  private aiGamesForIp(ip: string): number {
+    let n = 0;
+    for (const r of this.rooms.values()) {
+      if (r.status !== 'active' || !(isAiSeat(r.white) || isAiSeat(r.black))) continue;
+      const human = isAiSeat(r.white) ? r.black : r.white;
+      if (human && this.socketOf.get(human)?.ip === ip) n++;
+    }
+    return n;
+  }
+
   /** RoomEvents: search for the engine seat off the event loop, then submit through the same validation as a human. */
-  aiToMove(room: GameRoom) {
+  aiToMove(room: GameRoom, attempt = 1) {
     const ply = room.core.ply;
     const fen = room.core.fen;
     const aiId = room.playerOf(room.core.turn)!;
@@ -253,8 +283,16 @@ export class Hub implements RoomEvents {
       const wait = Math.max(0, this.aiMinThinkMs - (Date.now() - started));
       setTimeout(() => {
         if (room.status !== 'active' || room.core.ply !== ply) return; // game moved on (resign, flag, abort)
-        if (!mv) { console.error(`[hub] engine returned no move in ${room.id} at ply ${ply}: ${fen}`); return; }
-        const err = room.move(aiId, mv.from, mv.to, mv.promotion as never, ply);
+        let move = mv;
+        if (!move) {
+          console.error(`[hub] engine returned no move in ${room.id} at ply ${ply} (attempt ${attempt}): ${fen}`);
+          if (attempt < 2) { this.aiToMove(room, attempt + 1); return; }
+          // never leave a human waiting forever: fall back to any legal move
+          const any = room.core.legalMovesUci()[0];
+          if (!any) return;
+          move = { from: any.slice(0, 2), to: any.slice(2, 4), promotion: any[4] };
+        }
+        const err = room.move(aiId, move.from, move.to, move.promotion as never, ply);
         if (err) console.error(`[hub] engine move rejected in ${room.id}: ${err}`);
       }, wait).unref();
     });

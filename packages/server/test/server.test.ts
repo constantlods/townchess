@@ -208,7 +208,6 @@ describe('server clock', () => {
 describe('protocol v2', () => {
   it('WELCOME carries the protocol version; state carries legal moves, effects, opening and events', async () => {
     const { white, black, gameId } = await pair();
-    expect(white.inbox.length + black.inbox.length).toBeGreaterThanOrEqual(0);
     white.send({ type: 'MOVE', gameId, seq: 1, from: 'e2', to: 'e4', ply: 0 });
     await white.next('MOVE_ACCEPTED');
     black.send({ type: 'MOVE', gameId, seq: 1, from: 'c7', to: 'c5', ply: 1 });
@@ -273,7 +272,7 @@ describe('protocol v2', () => {
     expect(room.history.at(-1)!.effects.at(-1)).toEqual({ kind: 'promote', square: 'g8', color: 'w', from: 'p', to: 'n' });
   });
 
-  it('limits new identities per IP and never leaks error details', async () => {
+  it('limits new identities per IP', async () => {
     const clients: Client[] = [];
     let limited = false;
     for (let i = 0; i < 12 && !limited; i++) {
@@ -286,5 +285,131 @@ describe('protocol v2', () => {
     }
     expect(limited).toBe(true);
     for (const c of clients) c.close();
+  });
+});
+
+describe('critique regressions (server)', () => {
+  const stubEvents = () => {
+    const sent: { type: string; reason?: string }[] = [];
+    let finished = 0;
+    return {
+      sent, finishedCount: () => finished,
+      ev: { broadcast: (_r: unknown, m: { type: string; reason?: string }) => sent.push(m), send: () => {}, finished: () => { finished++; } },
+    };
+  };
+
+  it('rejects prototype keys as time controls (no NaN clocks)', async () => {
+    const c = new Client(url);
+    await c.open();
+    await c.hello('PROTO');
+    for (const key of ['toString', '__proto__', 'valueOf']) {
+      c.send({ type: 'CREATE_AI_GAME', level: 'novice', color: 'w', timeControl: key });
+      expect((await c.next('ERROR')).code).toBe('tc');
+      c.send({ type: 'FIND_MATCH', timeControl: key, rated: false });
+      expect((await c.next('ERROR')).code).toBe('tc');
+    }
+    expect(hub.rooms.size).toBe(0);
+  });
+
+  it('a draw claim after the flag fell finishes, broadcasts and releases the game', () => {
+    const store = new PlayerStore(null);
+    const a = store.authenticate(undefined, 'A').player, b = store.authenticate(undefined, 'B').player;
+    const s = stubEvents();
+    const room = new GameRoom('GAME-00000C', { initialMs: 1000, incrementMs: 0 }, true, a.id, b.id, store, s.ev as never, { timeControl: { initialMs: 1000, incrementMs: 0 }, drawPolicy: 'claim' });
+    let t = 0;
+    room.now = () => t;
+    room.start();
+    room.move(a.id, 'e2', 'e4', undefined, 0);
+    room.move(b.id, 'e7', 'e5', undefined, 1);
+    t = 10_000; // White's flag has fallen, the timer has not fired yet
+    expect(room.claimDraw(a.id)).toBe('time expired');
+    expect([room.status, room.core.winner]).toEqual(['timeout', 'b']);
+    expect(s.finishedCount()).toBe(1);
+    expect(s.sent.at(-1)).toMatchObject({ type: 'GAME_STATE_UPDATED' });
+    expect(store.get(b.id)!.wins).toBe(1);
+  });
+
+  it('non-move updates do not re-deliver events (eventSeq unchanged)', async () => {
+    const { white, black, gameId } = await pair();
+    white.send({ type: 'MOVE', gameId, seq: 1, from: 'e2', to: 'e4', ply: 0 });
+    const afterMove = await black.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 1);
+    black.close();
+    const disc = await white.next('GAME_STATE_UPDATED', (m) => m.reason === 'disconnect');
+    expect(disc.state.eventSeq).toBe(afterMove.state.eventSeq);
+  });
+
+  it('never leaks error details to the client', async () => {
+    const c = new Client(url);
+    await c.open();
+    await c.hello('LEAK');
+    players.setCosmetics = () => { throw new Error('SECRET-INTERNAL-DETAIL /etc/passwd'); };
+    c.send({ type: 'SET_COSMETICS', cosmetics: { hands: 'bare', gloves: 'none', sleeves: 'none', accessories: 'none' } });
+    const err = await c.next('ERROR');
+    expect(err).toEqual({ type: 'ERROR', code: 'server', message: 'internal error' });
+  });
+
+  it('releases the per-IP socket count when sockets close', async () => {
+    const socks: Client[] = [];
+    for (let i = 0; i < 20; i++) { const c = new Client(url); socks.push(c); await c.open(); }
+    for (const c of socks) c.close();
+    await new Promise((r) => setTimeout(r, 200));
+    const again = new Client(url);
+    await again.open();
+    expect((await again.hello('AGAIN')).type).toBe('WELCOME');
+  });
+
+  it('uses the rightmost X-Forwarded-For entry behind a trusted proxy', async () => {
+    const srv = http.createServer();
+    const h = new Hub(srv, new PlayerStore(null), '/ws', { trustProxy: true });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const u = `ws://127.0.0.1:${(srv.address() as AddressInfo).port}/ws`;
+    let limited = false;
+    for (let i = 0; i < 12 && !limited; i++) {
+      // a client trying to spoof a fresh address on every connection
+      const ws = new WebSocket(u, { headers: { 'x-forwarded-for': `10.0.0.${i}, 203.0.113.7` } });
+      await new Promise((r) => ws.once('open', r));
+      ws.send(JSON.stringify({ type: 'HELLO', username: `X${i}xx` }));
+      const m = JSON.parse(String(await new Promise((r) => ws.once('message', r)))) as ServerMessage;
+      if (m.type === 'ERROR' && m.code === 'rate') limited = true;
+      ws.close();
+    }
+    h.close(); srv.close();
+    expect(limited).toBe(true);
+  });
+
+  it('rematch against the engine starts a new game with colours swapped', async () => {
+    const c = new Client(url);
+    await c.open();
+    await c.hello('REMATCH');
+    c.send({ type: 'CREATE_AI_GAME', level: 'novice', color: 'w', timeControl: 'untimed' });
+    const j = await c.next('GAME_JOINED');
+    c.send({ type: 'RESIGN', gameId: j.state.id });
+    await c.next('GAME_STATE_UPDATED', (m) => m.state.status === 'resigned');
+    c.send({ type: 'REMATCH', gameId: j.state.id });
+    const nj = await c.next('GAME_JOINED', (m) => m.state.id !== j.state.id);
+    expect(nj.color).toBe('b');
+    expect(nj.state.white?.ai?.level).toBe('novice');
+  });
+
+  it('disconnect grace expiry abandons the game for the absent player', async () => {
+    const { white, black, gameId } = await pair();
+    hub.rooms.get(gameId)!.graceMs = 100;
+    white.send({ type: 'MOVE', gameId, seq: 1, from: 'e2', to: 'e4', ply: 0 });
+    await black.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 1);
+    black.close();
+    const end = await white.next('GAME_STATE_UPDATED', (m) => m.state.status === 'abandoned');
+    expect([end.state.winner, end.state.termination]).toEqual(['w', 'abandoned']);
+  });
+
+  it('engine failure falls back to a legal move instead of stalling', async () => {
+    hub.ai.search = async () => null;
+    const c = new Client(url);
+    await c.open();
+    await c.hello('FALLBACK');
+    c.send({ type: 'CREATE_AI_GAME', level: 'warden', color: 'w', timeControl: 'untimed' });
+    const j = await c.next('GAME_JOINED');
+    c.send({ type: 'MOVE', gameId: j.state.id, seq: 1, from: 'e2', to: 'e4', ply: 0 });
+    const u = await c.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 2, 10_000);
+    expect(u.state.moveHistory[1].color).toBe('b');
   });
 });

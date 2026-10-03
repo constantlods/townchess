@@ -121,5 +121,4 @@ export class LocalSession implements Session {
 
   /** Legal destinations for UI hints (presentation only). */
   legalFrom(sq: Square) { return this.core.rules.legalMovesFrom(sq); }
-  get rulesView() { return this.core.rules; }
 }

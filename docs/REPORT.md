@@ -160,7 +160,7 @@ npm run start          # production: builds the client and serves it plus /ws on
 - **Audit and roadmap.** [ROADMAP.md](ROADMAP.md), revised after an adversarial review by a critique agent.
 - **Milestone 1, core foundation: complete.** The item-by-item table is in ROADMAP.md §5.
 - **Tests and builds.**
-  - 290 automated tests, run three times in a row with no failures.
+  - 305 automated tests, run three times in a row with no failures.
   - Typecheck of all four packages is clean.
   - The client build passes.
   - Both end-to-end scripts (online and offline) pass.

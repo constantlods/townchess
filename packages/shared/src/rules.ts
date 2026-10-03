@@ -39,6 +39,14 @@ export class ChessRules {
     return new ChessRules(this.chess.fen());
   }
 
+  /**
+   * The underlying chess.js instance, for read-only queries (attackers, mate, legal moves) by GameCore. Mutating it
+   * directly would bypass the wrapper; only ChessRules itself moves pieces.
+   */
+  get chessView(): Chess {
+    return this.chess;
+  }
+
   get fen(): string {
     return this.chess.fen();
   }

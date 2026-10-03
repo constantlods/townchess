@@ -32,12 +32,17 @@ export class AiPool {
       if (job && job.id === msg.id) job.resolve(msg.move);
       this.pump();
     });
-    w.on('error', (e) => {
-      console.error('[ai] engine worker failed', e);
-      slot.busy?.resolve(null);
+    const lost = (why: unknown) => {
+      if (!this.workers.includes(slot)) return;
+      console.error('[ai] engine worker lost', why);
+      const job = slot.busy;
+      slot.busy = null;
       this.workers = this.workers.filter((s) => s !== slot);
+      job?.resolve(null);
       this.pump();
-    });
+    };
+    w.on('error', lost);
+    w.on('exit', (code) => { if (!this.closing) lost(`exit ${code}`); });
     w.unref();
     this.workers.push(slot);
     return slot;
@@ -56,7 +61,10 @@ export class AiPool {
 
   get pending() { return this.queue.length + this.workers.filter((s) => s.busy).length; }
 
+  private closing = false;
+
   close() {
+    this.closing = true;
     for (const s of this.workers) void s.w.terminate();
     this.workers = [];
     for (const j of this.queue) j.resolve(null);
