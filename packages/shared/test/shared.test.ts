@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ChessRules, ChessClock, formatClock, parseClientMessage } from '../src/index';
+import { ChessRules, ChessClock, GameCore, canPossiblyMate, formatClock, parseClientMessage } from '../src/index';
 
 describe('ChessRules', () => {
   it('accepts legal and rejects illegal moves', () => {
@@ -10,11 +10,11 @@ describe('ChessRules', () => {
     expect(r.turn).toBe('b');
   });
 
-  it('detects checkmate with the right winner', () => {
-    const r = ChessRules.fromHistory([
-      { from: 'f2', to: 'f3' }, { from: 'e7', to: 'e5' }, { from: 'g2', to: 'g4' }, { from: 'd8', to: 'h4' },
-    ]);
-    expect(r.positionStatus()).toEqual({ status: 'checkmate', winner: 'b' });
+  it('detects checkmate with the right winner (via GameCore)', () => {
+    const g = new GameCore({ timeControl: null });
+    g.start(0);
+    for (const [c, from, to] of [['w', 'f2', 'f3'], ['b', 'e7', 'e5'], ['w', 'g2', 'g4'], ['b', 'd8', 'h4']] as const) g.move(c, { from, to }, 1);
+    expect([g.status, g.winner]).toEqual(['checkmate', 'b']);
   });
 
   it('reports castling, en passant and promotion flags', () => {
@@ -28,8 +28,8 @@ describe('ChessRules', () => {
   });
 
   it('knows mating material', () => {
-    expect(new ChessRules('4k3/8/8/8/8/8/8/4KN2 w - - 0 1').hasMatingMaterial('w')).toBe(false);
-    expect(new ChessRules('4k3/8/8/8/8/8/8/4KR2 w - - 0 1').hasMatingMaterial('w')).toBe(true);
+    expect(canPossiblyMate(new ChessRules('4k3/8/8/8/8/8/8/4KN2 w - - 0 1').pieces(), 'w')).toBe(false);
+    expect(canPossiblyMate(new ChessRules('4k3/8/8/8/8/8/8/4KR2 w - - 0 1').pieces(), 'w')).toBe(true);
   });
 });
 

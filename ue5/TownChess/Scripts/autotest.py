@@ -1,0 +1,312 @@
+"""In-game automation for the TownChess UE5 client (runs inside an uncooked -game session).
+
+    UnrealEditor TownChess.uproject -game -RenderOffscreen -tcauto=cpu:novice:w:untimed \
+        -ExecCmds="py <abs>/Scripts/autotest.py" -TCTest=cpu -TCOut=<dir>
+
+Drives the real client through the same entry points the mouse uses (ATCBoard.click_square, HUD buttons) and checks,
+after every authoritative change, that the board shows exactly the core's position. Results go to the log as
+`[TCTEST] ...` lines and to <TCOut>/result.json.
+
+Scenarios (-TCTest=):
+  cpu        rejection test, then a full game against the core's engine (move policy prefers special moves)
+  script     plays the moves listed in -TCMoves=uci,uci,... for our side (the other side is a scripted browser or the
+             engine), checking sync after every move; used for the special-rules game against a browser opponent
+  reconnect  joins the active game after a restart and verifies the rebuilt board, turn and clocks, then plays on
+"""
+import json
+import os
+import time
+
+import unreal
+
+
+def arg(name, default=""):
+    for tok in unreal.SystemLibrary.get_command_line().split():
+        if tok.lower().startswith(f"-{name.lower()}="):
+            return tok.split("=", 1)[1]
+    return default
+
+
+TEST = arg("TCTest", "cpu")
+OUT = arg("TCOut", "/tmp/tctest")
+MOVES = [m for m in arg("TCMoves", "").split(",") if m]
+MAX_PLIES = int(arg("TCMaxPlies", "300"))
+ACCEPT_DRAW = arg("TCAcceptDraw", "") == "1"
+KILL_AT_PLY = int(arg("TCKillAtPly", "0"))  # simulate a hard crash (SIGKILL) once the game reaches this ply
+IDLE_AFTER_PLY = int(arg("TCIdleAfterPly", "0"))  # stop moving from this ply on (clock / flag-fall test)
+os.makedirs(OUT, exist_ok=True)
+
+R = {"test": TEST, "checks": [], "pass": None, "moves": [], "features": {}, "screens": []}
+S = {"phase": "boot", "t0": time.time(), "wait_until": 0.0, "last_len": -1, "anim_before": 0, "frames": 0,
+     "deadline": time.time() + float(arg("TCTimeout", "900")), "shots": 0, "script_i": 0, "rej_before": 0}
+
+
+def log(msg):
+    unreal.log(f"[TCTEST] {msg}")
+
+
+def check(name, ok, detail=""):
+    R["checks"].append({"name": name, "ok": bool(ok), "detail": str(detail)})
+    log(f"{'PASS' if ok else 'FAIL'} {name} {detail}")
+    return ok
+
+
+def world():
+    for pcm in unreal.ObjectIterator(unreal.PlayerCameraManager):
+        try:
+            if pcm.get_world() is not None:
+                return pcm.get_world(), pcm
+        except Exception:
+            pass
+    return None, None
+
+
+def objs():
+    w, pcm = world()
+    if not w:
+        return None, None, None, None
+    # game-instance subsystems are plain UObjects: take the live instance (skip the class default object)
+    core = next((o for o in unreal.ObjectIterator(unreal.TCCoreClient) if not o.get_name().startswith("Default__")), None)
+    board = unreal.GameplayStatics.get_actor_of_class(w, unreal.TCBoard)
+    return w, pcm, core, board
+
+
+def screenshot(tag):
+    """-RenderOffscreen never reads the viewport back; render the player view through the level's ShotCapture."""
+    try:
+        w, pcm, _, _ = objs()
+        caps = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.SceneCapture2D)
+        if not caps:
+            return
+        cap = caps[0]
+        rt = unreal.RenderingLibrary.create_render_target2d(w, 1920, 1080, unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB)
+        cap.set_actor_location_and_rotation(pcm.get_camera_location(), pcm.get_camera_rotation(), False, True)
+        cc = cap.capture_component2d
+        cc.set_editor_property("fov_angle", pcm.get_fov_angle())
+        cc.set_editor_property("texture_target", rt)
+        cc.set_editor_property("capture_every_frame", True)
+        S["pending_shot"] = (w, rt, f"{S['shots']:02d}-{tag}.png", time.time() + 1.5)
+        S["shots"] += 1
+    except Exception as e:
+        log(f"screenshot failed: {e}")
+
+
+def flush_shot():
+    p = S.get("pending_shot")
+    if p and time.time() >= p[3]:
+        w, rt, name, _ = p
+        unreal.RenderingLibrary.export_render_target(w, rt, OUT, name)
+        R["screens"].append(name)
+        S["pending_shot"] = None
+
+
+PRIORITY = ("promotion", "castle", "en_passant", "check", "capture")
+
+
+def choose(core, board):
+    """Pick a move for our side from the core's legal moves; prefer moves that exercise special rules."""
+    st = core.get_state()
+    legal = list(st.legal_moves)
+    layout = board.get_shown_layout()
+    mine = core.get_my_color()
+
+    def score(m):
+        frm, to = m[:2], m[2:4]
+        code = layout.get(frm, "")
+        s = 0
+        if len(m) == 5:
+            s += 100
+        if code.endswith("k") and abs(ord(frm[0]) - ord(to[0])) == 2:
+            s += 80
+        if code.endswith("p") and frm[0] != to[0] and to not in layout:
+            s += 70  # en passant
+        if to in layout and not layout[to].startswith(mine):
+            s += 20
+        return s
+    legal.sort(key=lambda m: (-score(m), m))
+    return legal[0] if legal else None
+
+
+def note_features(st):
+    for e in st.last_events:
+        R["features"][e.type] = R["features"].get(e.type, 0) + 1
+
+
+def finish(ok):
+    R["pass"] = bool(ok) and all(c["ok"] for c in R["checks"])
+    with open(os.path.join(OUT, "result.json"), "w") as f:
+        json.dump(R, f, indent=2)
+    log(f"RESULT {'PASS' if R['pass'] else 'FAIL'} ({sum(c['ok'] for c in R['checks'])}/{len(R['checks'])} checks)")
+    S["phase"] = "quit"
+    S["wait_until"] = time.time() + 2.0
+
+
+def tick(_dt):
+    try:
+        _tick(_dt)
+    except Exception as e:  # a driver bug must fail the run, not loop forever
+        import traceback
+        check("driver error", False, f"{e}: {traceback.format_exc()[-400:]}")
+        finish(False)
+
+
+def _tick(_dt):
+    S["frames"] += 1
+    now = time.time()
+    flush_shot()
+    if now < S["wait_until"]:
+        return
+    if S["phase"] == "quit":
+        if not S.get("pending_shot"):
+            unreal.SystemLibrary.execute_console_command(None, "quit")
+        return
+    if now > S["deadline"]:
+        check("scenario finished before timeout", False, S["phase"])
+        finish(False)
+        return
+    w, pcm, core, board = objs()
+    if not core or not board:
+        return
+    st = core.get_state()
+
+    if TEST == "observe":
+        # real-input test support: publish where every square is on screen; the mouse is driven from outside (xdotool)
+        if core.has_game() and st.status == "active" and not board.is_animating() and now - S.get("squares_at", 0) > 2:
+            pc = unreal.GameplayStatics.get_player_controller(w, 0)
+            pos = {}
+            for f in "abcdefgh":
+                for r in "12345678":
+                    ok, xy = unreal.GameplayStatics.project_world_to_screen(pc, board.square_world(f + r) + unreal.Vector(0, 0, board.surface_z() - board.get_actor_location().z), False)
+                    if ok:
+                        pos[f + r] = [round(xy.x), round(xy.y)]
+            state = {"squares": pos, "fen": st.fen, "plies": len(st.history), "turn": st.turn, "selected": board.get_selected(),
+                     "awaiting": board.is_awaiting_core(), "status": st.status, "buttons": list(pc.get_hud().get_visible_buttons())}
+            with open(os.path.join(OUT, "observe.json"), "w") as f:
+                json.dump(state, f)
+            S["squares_at"] = now
+        elif not core.has_game():
+            pc = unreal.GameplayStatics.get_player_controller(w, 0)
+            with open(os.path.join(OUT, "observe.json"), "w") as f:
+                json.dump({"menu": True, "buttons": list(pc.get_hud().get_visible_buttons())}, f)
+        return
+
+    if S["phase"] == "boot":
+        if core.has_game() and st.status == "waiting" and not S.get("code_written"):
+            # private table: publish the code so the opponent (browser) can join
+            with open(os.path.join(OUT, "code.txt"), "w") as f:
+                f.write(st.id)
+            S["code_written"] = True
+            log(f"table code {st.id}")
+        if core.has_game() and st.status == "active" and not board.is_animating():
+            check("connected, authenticated and joined a game", True, f"{st.id} as {core.get_my_color()}")
+            check("board built from authoritative FEN", board.is_in_sync(), st.fen)
+            screenshot("start")
+            S["phase"] = "reject" if TEST == "cpu" else ("verify_reconnect" if TEST == "reconnect" else "play")
+            S["wait_until"] = now + 1.0
+        return
+
+    if S["phase"] == "reject":
+        # illegal request straight to the core (the board UI never offers it): must be refused, board unchanged
+        if not core.is_my_turn():
+            return
+        S["layout_before"] = dict(board.get_shown_layout())
+        S["anim_before"] = board.get_animated_moves()
+        S["rej_before"] = core.get_rejected_count()
+        S["len_before"] = len(st.history)
+        frm, to = ("e2", "e5") if core.get_my_color() == "w" else ("e7", "e4")
+        core.submit_move(frm, to, "")
+        S["phase"] = "reject_wait"
+        S["wait_until"] = now + 1.5
+        return
+
+    if S["phase"] == "reject_wait":
+        check("illegal move rejected by the core", core.get_rejected_count() == S["rej_before"] + 1, core.get_last_rejection())
+        check("rejected move was not animated", board.get_animated_moves() == S["anim_before"])
+        check("board unchanged after rejection", dict(board.get_shown_layout()) == S["layout_before"] and board.is_in_sync())
+        check("history unchanged after rejection", len(core.get_state().history) == S["len_before"])
+        S["phase"] = "play"
+        return
+
+    if S["phase"] == "verify_reconnect":
+        check("reconnected game resumed with history", len(st.history) > 0, f"ply {len(st.history)}")
+        check("board rebuilt from authoritative state after reconnect", board.is_in_sync())
+        check("turn restored", st.turn in ("w", "b"), st.turn)
+        timed = st.initial_ms > 0  # FTCGameState::IsTimed is C++-only
+        check("clocks restored", (not timed) or (0 < st.white_clock_ms <= st.initial_ms and 0 < st.black_clock_ms <= st.initial_ms), f"{st.white_clock_ms:.0f}/{st.black_clock_ms:.0f} of {st.initial_ms:.0f}")
+        S["phase"] = "play"
+        return
+
+    if S["phase"] == "play":
+        if board.is_animating() or board.is_awaiting_core():
+            return
+        if len(st.history) != S["last_len"]:
+            # a new authoritative position has been shown: it must match exactly
+            if S["last_len"] >= 0:
+                check(f"ply {len(st.history)} board in sync", board.is_in_sync(), st.history[-1].san if st.history else "")
+            S["last_len"] = len(st.history)
+            note_features(st)
+            if len(st.history) in (10, 30):
+                screenshot(f"ply{len(st.history)}")
+            if KILL_AT_PLY and len(st.history) >= KILL_AT_PLY:
+                R["killed_at_ply"] = len(st.history)
+                R["killed_fen"] = st.fen
+                with open(os.path.join(OUT, "result.json"), "w") as f:
+                    json.dump(R, f, indent=2)
+                log(f"KILLING the client at ply {len(st.history)} (simulated crash)")
+                import signal
+                os.kill(os.getpid(), signal.SIGKILL)
+        if st.status not in ("active", "waiting"):
+            check("game reached a result", True, f"{st.status} / {st.termination} winner={st.winner or '-'}")
+            R["moves"] = [m.san for m in st.history]
+            screenshot("end")
+            S["phase"] = "done"
+            S["wait_until"] = now + 2.5
+            return
+        if len(st.history) >= MAX_PLIES:
+            check("game within ply budget", False, len(st.history))
+            finish(False)
+            return
+        if ACCEPT_DRAW and st.draw_offer_by and st.draw_offer_by != core.get_my_color():
+            # through the same HUD button a player clicks
+            hud = unreal.GameplayStatics.get_player_controller(w, 0).get_hud()
+            hud.press_button("accept")
+            check("draw offer received and accepted through the HUD", True, f"offered by {st.draw_offer_by}")
+            S["wait_until"] = now + 1.0
+            return
+        if not core.is_my_turn():
+            return
+        if IDLE_AFTER_PLY and len(st.history) >= IDLE_AFTER_PLY:
+            # let our clock run: sample the displayed clock to prove it is counting down
+            ms = core.get_display_clock_ms(core.get_my_color())
+            if "idle_clock_start" not in S:
+                S["idle_clock_start"] = (now, ms)
+            elif now - S["idle_clock_start"][0] > 5 and not S.get("clock_checked"):
+                dt = (now - S["idle_clock_start"][0]) * 1000
+                dropped = S["idle_clock_start"][1] - ms
+                check("our clock counts down while it is our move", abs(dropped - dt) < 1500, f"dropped {dropped:.0f} ms in {dt:.0f} ms")
+                S["clock_checked"] = True
+            return
+        if TEST == "script":
+            if S["script_i"] >= len(MOVES):
+                return  # our scripted moves are done; wait for the opponent to end the game
+            mv = MOVES[S["script_i"]]
+            S["script_i"] += 1
+        else:
+            mv = choose(core, board)
+        if not mv:
+            return
+        r1 = board.click_square(mv[:2])
+        r2 = board.click_square(mv[2:4])
+        if r2 == unreal.TCClickResult.NEEDS_PROMOTION:
+            board.choose_promotion(mv[4] if len(mv) == 5 else "q")
+        elif r2 != unreal.TCClickResult.SUBMITTED:
+            check(f"click {mv} accepted by the board UI", False, f"{r1} {r2}")
+        S["anim_before"] = board.get_animated_moves()
+        return
+
+    if S["phase"] == "done":
+        finish(True)
+
+
+unreal.register_slate_post_tick_callback(tick)
+log(f"armed: test={TEST} out={OUT} moves={len(MOVES)}")

@@ -1,0 +1,21 @@
+{
+  "type": "WELCOME",
+  "protocolVersion": 2,
+  "token": "<opaque-48-hex>",
+  "player": {
+    "id": "P-EXAMPLE01",
+    "username": "PATIENT_07",
+    "rating": 1204,
+    "cosmetics": {
+      "hands": "dirty",
+      "gloves": "none",
+      "sleeves": "jacket",
+      "accessories": "strap"
+    },
+    "gamesPlayed": 3,
+    "wins": 1,
+    "losses": 1,
+    "draws": 1
+  },
+  "activeGameId": null
+}

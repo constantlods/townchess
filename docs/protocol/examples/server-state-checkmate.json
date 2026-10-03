@@ -1,0 +1,231 @@
+{
+  "type": "GAME_STATE_UPDATED",
+  "reason": "move",
+  "state": {
+    "id": "GAME-0A1B2C",
+    "white": {
+      "id": "P-EXAMPLE01",
+      "username": "PATIENT_07",
+      "rating": 1204,
+      "cosmetics": {
+        "hands": "dirty",
+        "gloves": "none",
+        "sleeves": "jacket",
+        "accessories": "strap"
+      }
+    },
+    "black": {
+      "id": "ai:warden",
+      "username": "UNKNOWN_13",
+      "rating": null,
+      "cosmetics": {
+        "hands": "dirty",
+        "gloves": "none",
+        "sleeves": "jacket",
+        "accessories": "strap"
+      },
+      "ai": {
+        "level": "warden"
+      }
+    },
+    "fen": "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4",
+    "moveHistory": [
+      {
+        "from": "e2",
+        "to": "e4",
+        "san": "e4",
+        "color": "w",
+        "piece": "p",
+        "flags": "b",
+        "fenAfter": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "w",
+            "from": "e2",
+            "to": "e4"
+          }
+        ],
+        "clockAfterMs": 300000
+      },
+      {
+        "from": "e7",
+        "to": "e5",
+        "san": "e5",
+        "color": "b",
+        "piece": "p",
+        "flags": "b",
+        "fenAfter": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "b",
+            "from": "e7",
+            "to": "e5"
+          }
+        ],
+        "clockAfterMs": 300000
+      },
+      {
+        "from": "f1",
+        "to": "c4",
+        "san": "Bc4",
+        "color": "w",
+        "piece": "b",
+        "flags": "n",
+        "fenAfter": "rnbqkbnr/pppp1ppp/8/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "b",
+            "color": "w",
+            "from": "f1",
+            "to": "c4"
+          }
+        ],
+        "clockAfterMs": 299000
+      },
+      {
+        "from": "b8",
+        "to": "c6",
+        "san": "Nc6",
+        "color": "b",
+        "piece": "n",
+        "flags": "n",
+        "fenAfter": "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "n",
+            "color": "b",
+            "from": "b8",
+            "to": "c6"
+          }
+        ],
+        "clockAfterMs": 299000
+      },
+      {
+        "from": "d1",
+        "to": "h5",
+        "san": "Qh5",
+        "color": "w",
+        "piece": "q",
+        "flags": "n",
+        "fenAfter": "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "q",
+            "color": "w",
+            "from": "d1",
+            "to": "h5"
+          }
+        ],
+        "clockAfterMs": 298000
+      },
+      {
+        "from": "g8",
+        "to": "f6",
+        "san": "Nf6",
+        "color": "b",
+        "piece": "n",
+        "flags": "n",
+        "fenAfter": "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+        "effects": [
+          {
+            "kind": "move",
+            "piece": "n",
+            "color": "b",
+            "from": "g8",
+            "to": "f6"
+          }
+        ],
+        "clockAfterMs": 298000
+      },
+      {
+        "from": "h5",
+        "to": "f7",
+        "san": "Qxf7#",
+        "color": "w",
+        "piece": "q",
+        "captured": "p",
+        "flags": "c",
+        "fenAfter": "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4",
+        "effects": [
+          {
+            "kind": "capture",
+            "square": "f7",
+            "piece": "p",
+            "color": "b"
+          },
+          {
+            "kind": "move",
+            "piece": "q",
+            "color": "w",
+            "from": "h5",
+            "to": "f7"
+          }
+        ],
+        "clockAfterMs": 297000
+      }
+    ],
+    "turn": "b",
+    "whiteClockMs": 297000,
+    "blackClockMs": 298000,
+    "clockSampledAt": 1791028800000,
+    "status": "checkmate",
+    "winner": "w",
+    "rated": false,
+    "timeControl": {
+      "initialMs": 300000,
+      "incrementMs": 0
+    },
+    "drawOfferBy": null,
+    "rematchOfferBy": null,
+    "createdAt": 1791028740000,
+    "updatedAt": 1791028800000,
+    "disconnected": [],
+    "termination": "checkmate",
+    "drawPolicy": "automatic",
+    "claimableDraw": null,
+    "legalMoves": [],
+    "opening": {
+      "eco": "C23",
+      "name": "Bishop's Opening",
+      "family": "Bishop's Opening",
+      "variation": null,
+      "subvariation": null,
+      "ply": 3,
+      "transposed": false
+    },
+    "inBook": false,
+    "lastEvents": [
+      {
+        "type": "move",
+        "ply": 7,
+        "color": "w",
+        "san": "Qxf7#",
+        "piece": "q"
+      },
+      {
+        "type": "capture",
+        "ply": 7,
+        "color": "w",
+        "san": "Qxf7#",
+        "piece": "q",
+        "captured": "p"
+      },
+      {
+        "type": "checkmate",
+        "ply": 7,
+        "color": "w",
+        "san": "Qxf7#",
+        "piece": "q"
+      }
+    ],
+    "eventSeq": 7,
+    "firstMoveDeadline": null
+  }
+}

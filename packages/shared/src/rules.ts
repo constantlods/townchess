@@ -1,5 +1,5 @@
 import { Chess, type Move } from 'chess.js';
-import type { Color, GameStatus, MoveRecord, PieceType, Promotion, Square } from './types.js';
+import type { Color, MoveEffect, MoveRecord, PieceType, Promotion, Square } from './types.js';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -23,7 +23,7 @@ export class ChessRules {
   private chess: Chess;
 
   constructor(fen: string = START_FEN) {
-    this.chess = new Chess(fen);
+    this.chess = new Chess(sanitizeCastling(fen));
   }
 
   static fromHistory(moves: MoveInput[], startFen = START_FEN): ChessRules {
@@ -34,10 +34,17 @@ export class ChessRules {
     return r;
   }
 
+  /** Copy of the current position (history is not carried over; GameCore tracks history and repetitions). */
   clone(): ChessRules {
-    const r = new ChessRules();
-    r.chess.loadPgn(this.chess.pgn());
-    return r;
+    return new ChessRules(this.chess.fen());
+  }
+
+  /**
+   * The underlying chess.js instance, for read-only queries (attackers, mate, legal moves) by GameCore. Mutating it
+   * directly would bypass the wrapper; only ChessRules itself moves pieces.
+   */
+  get chessView(): Chess {
+    return this.chess;
   }
 
   get fen(): string {
@@ -75,11 +82,17 @@ export class ChessRules {
     return this.legalMovesFrom(from).some((m) => m.to === to && !!m.promotion);
   }
 
-  /** Attempts a move. Returns a MoveRecord, or null if illegal. Never throws. */
+  /**
+   * Attempts a move. Returns a MoveRecord, or null if illegal. Never throws.
+   * A promotion move must name its piece: there is no silent promotion to a queen.
+   */
   tryMove(input: MoveInput): MoveRecord | null {
+    const promoting = this.isPromotionMove(input.from, input.to);
+    if (!input.promotion && promoting) return null;
+    if (input.promotion && !promoting) return null; // a promotion piece on a non-promotion move is malformed
     let m: Move;
     try {
-      m = this.chess.move({ from: input.from, to: input.to, promotion: input.promotion ?? 'q' });
+      m = this.chess.move({ from: input.from, to: input.to, promotion: input.promotion });
     } catch {
       return null;
     }
@@ -93,6 +106,7 @@ export class ChessRules {
       captured: m.captured,
       flags: m.flags,
       fenAfter: this.chess.fen(),
+      effects: moveEffects(m),
     };
   }
 
@@ -108,27 +122,51 @@ export class ChessRules {
     return this.pieces().find((p) => p.type === 'k' && p.color === color)?.square ?? null;
   }
 
-  /** Status derived purely from the position (not clocks, resignations, or agreements). */
-  positionStatus(): { status: GameStatus; winner: Color | null } {
-    const c = this.chess;
-    if (c.isCheckmate()) return { status: 'checkmate', winner: c.turn() === 'w' ? 'b' : 'w' };
-    if (c.isStalemate()) return { status: 'stalemate', winner: null };
-    if (c.isInsufficientMaterial()) return { status: 'draw_insufficient', winner: null };
-    if (c.isThreefoldRepetition()) return { status: 'draw_repetition', winner: null };
-    if (c.isDrawByFiftyMoves()) return { status: 'draw_fifty', winner: null };
-    return { status: 'active', winner: null };
-  }
-
-  /** True if `color` has enough material to theoretically mate (used for timeout-vs-insufficient). */
-  hasMatingMaterial(color: Color): boolean {
-    const mine = this.pieces().filter((p) => p.color === color && p.type !== 'k');
-    if (mine.some((p) => p.type === 'p' || p.type === 'r' || p.type === 'q')) return true;
-    const minors = mine.filter((p) => p.type === 'n' || p.type === 'b').length;
-    return minors >= 2;
-  }
 }
 
 export const otherColor = (c: Color): Color => (c === 'w' ? 'b' : 'w');
 export const FILES = 'abcdefgh';
 export const squareToFR = (sq: Square): [number, number] => [FILES.indexOf(sq[0]), Number(sq[1]) - 1];
 export const frToSquare = (f: number, r: number): Square => `${FILES[f]}${r + 1}`;
+
+/** Physical effects of a chess.js move, in order: capture, every piece movement, promotion swap. */
+export function moveEffects(m: Move): MoveEffect[] {
+  const color = m.color as Color;
+  const enemy = otherColor(color);
+  const out: MoveEffect[] = [];
+  if (m.flags.includes('e')) out.push({ kind: 'capture', square: `${m.to[0]}${m.from[1]}`, piece: 'p', color: enemy });
+  else if (m.captured) out.push({ kind: 'capture', square: m.to, piece: m.captured as PieceType, color: enemy });
+  out.push({ kind: 'move', piece: m.piece as PieceType, color, from: m.from, to: m.to });
+  if (m.flags.includes('k') || m.flags.includes('q')) {
+    const rank = m.from[1];
+    const kingside = m.flags.includes('k');
+    out.push({ kind: 'move', piece: 'r', color, from: `${kingside ? 'h' : 'a'}${rank}`, to: `${kingside ? 'f' : 'd'}${rank}` });
+  }
+  if (m.promotion) out.push({ kind: 'promote', square: m.to, color, from: 'p', to: m.promotion as Promotion });
+  return out;
+}
+
+/**
+ * FIDE 3.8.2: castling rights exist only while the king and that rook stand on their original squares. chess.js
+ * trusts the FEN's castling field, so impossible rights are stripped here (regression BUG-001).
+ */
+export function sanitizeCastling(fen: string): string {
+  const parts = fen.trim().split(/\s+/);
+  if (parts.length < 3 || parts[2] === '-') return fen;
+  const board: Record<string, string> = {};
+  parts[0].split('/').forEach((row, i) => {
+    let file = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) { file += Number(ch); continue; }
+      board[`${FILES[file]}${8 - i}`] = ch;
+      file++;
+    }
+  });
+  const ok: Record<string, boolean> = {
+    K: board.e1 === 'K' && board.h1 === 'R', Q: board.e1 === 'K' && board.a1 === 'R',
+    k: board.e8 === 'k' && board.h8 === 'r', q: board.e8 === 'k' && board.a8 === 'r',
+  };
+  const rights = [...parts[2]].filter((c) => ok[c]).join('') || '-';
+  parts[2] = rights;
+  return parts.join(' ');
+}
