@@ -1,12 +1,14 @@
 // End-to-end: TownChess UE5 client (in the render VM) vs the browser client, both through one authoritative server.
 // The UE side plays White with the in-game driver (ue5/TownChess/Scripts/autotest.py, scenario "script"); this script
 // joins its private table in headless Chromium and plays Black's scripted replies, then optionally resigns/offers a draw.
-// Usage: node tools/e2e-ue-browser.mjs <scenario>    scenarios: special | mate | stalemate | draw
+// Usage: TC_VM=user@host TC_WEB=http://host:8787 node tools/e2e-ue-browser.mjs <scenario>   (special|mate|stalemate|draw)
 import { chromium } from 'playwright-core';
 import { execFileSync, spawn } from 'node:child_process';
 
-const VM = process.env.TC_VM ?? 'ue@192.168.0.223';
-const WEB = process.env.TC_WEB ?? 'http://192.168.0.223:8787';
+// Where the UE client runs (ssh target) and where its server serves the web client. No defaults: environment-specific.
+const VM = process.env.TC_VM;   // e.g. user@render-vm
+const WEB = process.env.TC_WEB; // e.g. http://render-vm:8787
+if (!VM || !WEB) { console.error('set TC_VM (ssh target of the render machine) and TC_WEB (its web client URL)'); process.exit(2); }
 const SCEN = {
   special: { white: 'e2e4 e4e5 e5d6 d6c7 c7b8n g1f3 f1e2 e1g1 g1h2 h2g1 d2d4 f3h2', black: 'g8f6 d7d5 e7e6 d8d7 a8b8 f8d6 e8g8 d6h2 f6g4 d7d6 d6h2', end: 'resign' },
   mate: { white: 'e2e4 f1c4 d1h5 h5f7', black: 'e7e5 b8c6 g8f6', end: null },

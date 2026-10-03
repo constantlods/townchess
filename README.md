@@ -47,7 +47,7 @@ npm ci && npm run bundle:core                                # core bundle for p
 UnrealEditor ue5/TownChess/TownChess.uproject -game          # offline: starts the local core, menu → play The Annotator
 UnrealEditor ue5/TownChess/TownChess.uproject -game -tcserver=ws://host:8787/ws   # online
 ue5/tools/run_client.sh cpu <out> -tcauto=cpu:novice:w:untimed                    # automated game + checks
-node tools/e2e-ue-browser.mjs special|mate|stalemate|draw                          # UE vs browser via one server
+TC_VM=user@host TC_WEB=http://host:8787 node tools/e2e-ue-browser.mjs special|mate|stalemate|draw                          # UE vs browser via one server
 ```
 
 UE5 benchmark (render VM; see `ue5/`):
