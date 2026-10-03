@@ -4,3 +4,6 @@ dist
 shots/
 server-data/
 *.log
+
+# Claude Code agent worktrees
+.claude/
