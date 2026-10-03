@@ -92,9 +92,10 @@ describe('FIDE draws', () => {
   });
 
   it('seventy-five moves is automatic, but checkmate on that move takes precedence', () => {
-    const quiet = play(['h1h2'], { timeControl: null, startFen: '7k/8/8/8/8/8/8/K6R w - - 149 100' });
+    // claim policy: under the default automatic policy a clock of 149 is already a fifty-move draw at start
+    const quiet = play(['h1h2'], { timeControl: null, drawPolicy: 'claim', startFen: '7k/8/8/8/8/8/8/K6R w - - 149 100' });
     expect(quiet.g.status).toBe('draw_seventyfive');
-    const mate = play(['a1a8'], { timeControl: null, startFen: '7k/8/6K1/8/8/8/8/R7 w - - 149 100' });
+    const mate = play(['a1a8'], { timeControl: null, drawPolicy: 'claim', startFen: '7k/8/6K1/8/8/8/8/R7 w - - 149 100' });
     expect(mate.g.status).toBe('checkmate');
   });
 

@@ -124,7 +124,9 @@ export function search(fen: string, opt: SearchOptions): { from: string; to: str
       let alpha = -Infinity;
       for (const { m } of scored) {
         c.move(m);
-        const v = -negamax(d - 1, -Infinity, -alpha + 1, 1);
+        // With noise, every candidate needs an exact score (a narrowed window makes all non-best moves look alike, so
+        // the noise window would admit blunders such as allowing mate in one: regression BUG-004).
+        const v = opt.noise > 0 ? -negamax(d - 1, -Infinity, Infinity, 1) : -negamax(d - 1, -Infinity, -alpha + 1, 1);
         c.undo();
         results.push({ m, v });
         if (v > alpha) alpha = v;

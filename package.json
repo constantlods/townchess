@@ -7,7 +7,8 @@
     "packages/shared",
     "packages/engine",
     "packages/server",
-    "packages/client"
+    "packages/client",
+    "packages/learning"
   ],
   "scripts": {
     "dev": "npm run dev -w @hc/client",
@@ -15,7 +16,7 @@
     "build": "npm run build -w @hc/client",
     "start": "npm run build && npm run start -w @hc/server",
     "start:server": "npm run start -w @hc/server",
-    "typecheck": "tsc -p packages/shared && tsc -p packages/engine && tsc -p packages/server && tsc -p packages/client",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/engine && tsc -p packages/server && tsc -p packages/client && tsc -p packages/learning",
     "test": "vitest run",
     "shots": "node tools/screenshots.mjs",
     "e2e:online": "node tools/e2e-online.mjs",

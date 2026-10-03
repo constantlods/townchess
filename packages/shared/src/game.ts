@@ -136,6 +136,9 @@ export class GameCore {
     if (this.board.isCheckmate()) this.finish('checkmate', otherColor(this.turn), now, 'checkmate', 'checkmate');
     else if (this.board.isStalemate()) this.finish('stalemate', null, now, 'stalemate', 'stalemate');
     else if (isDeadByMaterial(this.rules.pieces())) this.finish('draw_insufficient', null, now, 'draw_insufficient', 'insufficient_material');
+    // a custom start position may already be past the move-count limits (regression BUG-003)
+    else if (this.halfmoveClock() >= 150) this.finish('draw_seventyfive', null, now, 'draw_seventyfive', 'seventy_five_move');
+    else if (this.halfmoveClock() >= 100 && this.drawPolicy === 'automatic') this.finish('draw_fifty', null, now, 'draw_fifty', 'fifty_move');
   }
 
   /** Abort if the first-move window ran out. Returns true if the game was aborted here. */

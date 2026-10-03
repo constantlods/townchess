@@ -23,7 +23,7 @@ export class ChessRules {
   private chess: Chess;
 
   constructor(fen: string = START_FEN) {
-    this.chess = new Chess(fen);
+    this.chess = new Chess(sanitizeCastling(fen));
   }
 
   static fromHistory(moves: MoveInput[], startFen = START_FEN): ChessRules {
@@ -87,7 +87,9 @@ export class ChessRules {
    * A promotion move must name its piece: there is no silent promotion to a queen.
    */
   tryMove(input: MoveInput): MoveRecord | null {
-    if (!input.promotion && this.isPromotionMove(input.from, input.to)) return null;
+    const promoting = this.isPromotionMove(input.from, input.to);
+    if (!input.promotion && promoting) return null;
+    if (input.promotion && !promoting) return null; // a promotion piece on a non-promotion move is malformed
     let m: Move;
     try {
       m = this.chess.move({ from: input.from, to: input.to, promotion: input.promotion });
@@ -142,4 +144,29 @@ export function moveEffects(m: Move): MoveEffect[] {
   }
   if (m.promotion) out.push({ kind: 'promote', square: m.to, color, from: 'p', to: m.promotion as Promotion });
   return out;
+}
+
+/**
+ * FIDE 3.8.2: castling rights exist only while the king and that rook stand on their original squares. chess.js
+ * trusts the FEN's castling field, so impossible rights are stripped here (regression BUG-001).
+ */
+export function sanitizeCastling(fen: string): string {
+  const parts = fen.trim().split(/\s+/);
+  if (parts.length < 3 || parts[2] === '-') return fen;
+  const board: Record<string, string> = {};
+  parts[0].split('/').forEach((row, i) => {
+    let file = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) { file += Number(ch); continue; }
+      board[`${FILES[file]}${8 - i}`] = ch;
+      file++;
+    }
+  });
+  const ok: Record<string, boolean> = {
+    K: board.e1 === 'K' && board.h1 === 'R', Q: board.e1 === 'K' && board.a1 === 'R',
+    k: board.e8 === 'k' && board.h8 === 'r', q: board.e8 === 'k' && board.a8 === 'r',
+  };
+  const rights = [...parts[2]].filter((c) => ok[c]).join('') || '-';
+  parts[2] = rights;
+  return parts.join(' ');
 }
