@@ -220,6 +220,20 @@ def import_model(name):
             a.set_editor_property("flip_green_channel", True)
             setup_texture(a, "normal")
             EAL.save_loaded_asset(a)
+    # Curve objects in some FBX files (e.g. the lamp's wires) import as meshes with no polygons; they fail the cook
+    # ("Bad MeshDescription"), so they are deleted instead of placed.
+    kept = []
+    for sm in meshes:
+        try:
+            empty = sm.get_num_triangles(0) == 0
+        except Exception:
+            empty = False
+        if empty:
+            log("dropping empty mesh", sm.get_path_name())
+            EAL.delete_asset(sm.get_path_name())
+        else:
+            kept.append(sm)
+    meshes = kept
     for sm in meshes:
         ns = sm.get_editor_property("nanite_settings")
         ns.enabled = True
