@@ -889,7 +889,7 @@ def build():
             EAL.save_loaded_asset(sm)
         clip = EAS.spawn_actor_from_class(unreal.TCClipboard, unreal.Vector(CART[0] - 4, CART[1] - 6, 86.2), unreal.Rotator(0, 0, -100))
         clip.set_actor_label("GameRecordClipboard")
-        clip.board.set_static_mesh(board_mesh[0])
+        clip.get_editor_property("board").set_static_mesh(board_mesh[0])
         setp(clip, "paper_material", paper_material())
         hand, form = import_font("PatrickHand-Regular.ttf", "F_TC_Hand"), import_font("CourierPrime-Bold.ttf", "F_TC_Form")
         if hand:
