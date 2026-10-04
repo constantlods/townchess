@@ -934,8 +934,10 @@ def build():
     if not EAL.does_asset_exist(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}"):
         mhn = "MH_Opponent" if EAL.does_asset_exist("/Game/TownChess/MetaHumans/Built/MH_Opponent/BP_MH_Opponent") else None
 
-    # 1. The caged patient: Blender cage mask over the face
-    opp, smc = spawn_opponent("caged", mhn)
+    # 1. The caged patient: Blender cage mask over the face, stained off-white shirt
+    mi_gown_early = make_mi(master, "MI_PatientShirt", {"BaseColor": None}, tint=(0.42, 0.4, 0.34), rough=0.9, grime_color=(0.45, 0.36, 0.24),
+                            scalars={"GrimeTiling": 1.6, "GrimeThreshold": 0.32, "GrimeContrast": 1.8, "GrimeStreaks": 0.6})
+    opp, smc = spawn_opponent("caged", mhn, outfit_mi=mi_gown_early)
     if smc and "head" in SEATED:
         cage = import_prop("cage_mask")
         if cage:
@@ -945,12 +947,12 @@ def build():
             attach_static("CageMask", cage[0], smc, "head", *head_relative(off), "TC_Opponent_caged")
 
     # 2. The Annotator: slate-green coat, tan oversleeves, linen coif, two-leaf riveted plate, ledger and pencil
-    mi_coat = surface_material(master, "rough_linen", name="MI_AnnotatorCoat", tiling=8.0, tint=(0.243, 0.29, 0.263),
-                               scalars={"GrimeTiling": 1.2, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
-    mi_duck = surface_material(master, "rough_linen", name="MI_Oversleeve", tiling=6.0, tint=(0.62, 0.52, 0.38),
-                               grime_color=(0.35, 0.33, 0.32), scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.5, "GrimeContrast": 2.5})
-    mi_coif = surface_material(master, "rough_linen", name="MI_Coif", tiling=7.0, tint=(0.5, 0.47, 0.42),
-                               scalars={"GrimeTiling": 1.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
+    # flat cloth colours (the linen scan's yellow cast turned slate green into lime) + our grime layer for wear
+    cloth = {"GrimeTiling": 2.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0, "MicroRough": 0.1}
+    mi_coat = make_mi(master, "MI_AnnotatorCoat", {"BaseColor": None}, tint=(0.05, 0.07, 0.06), rough=0.85, scalars=cloth)   # ~#3E4A43 in sRGB
+    mi_duck = make_mi(master, "MI_Oversleeve", {"BaseColor": None}, tint=(0.36, 0.27, 0.16), rough=0.9, grime_color=(0.35, 0.33, 0.32), scalars=cloth)
+    mi_coif = make_mi(master, "MI_Coif", {"BaseColor": None}, tint=(0.22, 0.2, 0.17), rough=0.95, scalars=cloth)
+
     # hand-formed steel with light patina (the spec's mask is maintained, not rusted through): plain metal + grime layer
     mi_steel = make_mi(master, "MI_MaskSteel", {"BaseColor": None}, metal=1.0, rough=0.42, tint=(0.56, 0.56, 0.57),
                        grime_color=(0.45, 0.38, 0.3), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.5,
