@@ -505,7 +505,7 @@ def head_relative(offset):
     return unreal.Vector(*rel_t), unreal.Quat(*rel_q).rotator()
 
 
-def build_seated_pose(skel_mesh, base_anim, dest, name):
+def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False):
     """Authors a single-frame seated pose for the UE5 mannequin.
 
     Starts from MM_Idle frame 0, infers the bone hierarchy from local vs component transforms, applies
@@ -532,6 +532,16 @@ def build_seated_pose(skel_mesh, base_anim, dest, name):
             if e < err - 1e-6:
                 best, err = p, e
         parent[b] = best if err < 1.0 else None
+
+    if own_proportions:
+        # Poses come from the mannequin's idle (same joint orientations as the MetaHuman body skeleton); bone lengths
+        # come from the target mesh's reference pose so its proportions are kept.
+        ref = unreal.AnimPoseExtensions.get_reference_pose(skel_mesh.get_editor_property("skeleton"))
+        ref_names = {str(n) for n in unreal.AnimPoseExtensions.get_bone_names(ref)}
+        for b in names:
+            if b in ref_names:
+                loc[b] = (_xf(unreal.AnimPoseExtensions.get_bone_pose(ref, b, unreal.AnimPoseSpaces.LOCAL))[0], loc[b][1])
+        names = [b for b in names if b in ref_names]
 
     order = []
     seen = set()
@@ -836,24 +846,36 @@ def build():
     # ---- Opponent (template mannequin as a stand-in until MetaHuman): seated across the table, facing the player.
     manny = unreal.load_asset("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
     idle = unreal.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
-    if manny and idle:
+    # MetaHuman opponent, built by ue5/TownChess/Scripts/mh_opponent.py (needs MetaHuman Creator and an Epic login
+    # once for the cloud steps); the template mannequin stands in where it has not been built.
+    mh_bp = unreal.load_asset("/Game/TownChess/MetaHumans/Built/MH_Opponent/BP_MH_Opponent") if GAMEPLAY else None
+    mh_body = unreal.load_asset("/Game/TownChess/MetaHumans/Built/MH_Opponent/Body/SKM_MH_Opponent_BodyMesh") if mh_bp else None
+    if idle and (mh_body or manny):
         seated = None
         try:
-            seated = build_seated_pose(manny, idle, f"{ROOT}/Anims", "A_TC_Seated")
+            seated = build_seated_pose(mh_body or manny, idle, f"{ROOT}/Anims", "A_TC_Seated_MH" if mh_body else "A_TC_Seated",
+                                       own_proportions=bool(mh_body))
         except Exception:
             log("WARNING seated pose failed\n" + traceback.format_exc())
-        opp = EAS.spawn_actor_from_object(manny, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> faces -X
+        if mh_body:
+            opp = EAS.spawn_actor_from_class(mh_bp.generated_class(), unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
+            comps = opp.get_components_by_class(unreal.SkeletalMeshComponent)
+            log("metahuman components", [(c.get_name(), c.skeletal_mesh_asset.get_name() if c.skeletal_mesh_asset else None) for c in comps])
+            smc = next((c for c in comps if c.skeletal_mesh_asset == mh_body), comps[0])
+        else:
+            opp = EAS.spawn_actor_from_object(manny, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> faces -X
+            smc = opp.skeletal_mesh_component
         opp.set_actor_label("Opponent")
         tag(opp)
-        smc = opp.skeletal_mesh_component
         setp(smc, "animation_mode", unreal.AnimationMode.ANIMATION_SINGLE_NODE)
         data = unreal.SingleAnimationPlayData()
         setp(data, "anim_to_play", seated or idle)
         setp(data, "saved_looping", True)
         setp(data, "saved_playing", True)
         setp(smc, "animation_data", data)
-        for i in range(smc.get_num_materials()):
-            smc.set_material(i, mi_cloth)
+        if not mh_body:
+            for i in range(smc.get_num_materials()):
+                smc.set_material(i, mi_cloth)
         mask = import_prop("cage_mask")
         if mask:
             mask[0].set_material(0, mi_rust)
