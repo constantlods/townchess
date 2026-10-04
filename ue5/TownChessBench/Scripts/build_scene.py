@@ -883,8 +883,13 @@ def build():
             m = EAS.spawn_actor_from_object(mask[0], unreal.Vector(90, 0, 150), unreal.Rotator(0, 0, 0))
             m.set_actor_label("CageMask")
             m.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)  # a Static actor cannot attach to the animated body
-            m.attach_to_component(smc, "head", unreal.AttachmentRule.SNAP_TO_TARGET, unreal.AttachmentRule.SNAP_TO_TARGET,
-                                  unreal.AttachmentRule.KEEP_WORLD, False)
+            R = unreal.AttachmentRule
+            try:
+                m.attach_to_component(smc, "head", R.SNAP_TO_TARGET, R.SNAP_TO_TARGET, R.KEEP_WORLD, False)
+            except TypeError as e:
+                # blueprint-owned components can fail Python's object conversion here; attach the component instead
+                log("attach_to_component on the actor failed:", type(smc).__name__, isinstance(smc, unreal.SceneComponent), e)
+                m.root_component.k2_attach_to_component(smc, "head", R.SNAP_TO_TARGET, R.SNAP_TO_TARGET, R.KEEP_WORLD, False)
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,2.5,9").split(",")]  # forward (+Y), up (+Z) from the head bone
             if "head" in SEATED:
                 rl, rr = head_relative(off)
