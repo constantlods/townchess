@@ -613,7 +613,8 @@ POSES = {
              "upperarm_l": (52, 0), "upperarm_r": (52, 0), "lowerarm_l": (50, 0), "lowerarm_r": (50, 0)},
     # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
     # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
-    "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0)},
+    "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0),
+               "hand_l": (0, 0, float(os.environ.get("TC_HAND_ROLL", 75))), "hand_r": (0, 0, -float(os.environ.get("TC_HAND_ROLL", 75)))},
     "clasp": {"spine_01": (12, 0), "spine_03": (18, 0), "neck_01": (-6, 0), "head": (10, 0),
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
               "hand_l": (0, -15), "hand_r": (0, 15)},
@@ -672,8 +673,10 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
     X, Z = (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)
     deltas = {"thigh_l": _axis(X, 90), "thigh_r": _axis(X, 90), "calf_l": _axis(X, -90), "calf_r": _axis(X, -90)}
-    for bone, (ax, az) in POSES[pose_name].items():  # component-space rotation applied to each bone's orientation, top-down
-        deltas[bone] = _qmul(_axis(Z, az), _axis(X, ax))
+    Y = (0.0, 1.0, 0.0)
+    for bone, rot in POSES[pose_name].items():  # component-space rotation applied to each bone's orientation, top-down
+        ax, az, ay = (tuple(rot) + (0.0,))[:3]
+        deltas[bone] = _qmul(_axis(Y, ay), _qmul(_axis(Z, az), _axis(X, ax)))  # ay: roll about the forward axis
     pelvis_drop = float(os.environ.get("TC_PELVIS_DROP", 47.0)) + (6.0 if pose_name == "clasp" else 0.0)  # he sits low, bowed in
 
     def solve(deltas):
@@ -700,7 +703,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         return new_w, new_l
 
     new_w, new_l = solve(deltas)
-    ARM_TARGETS = {"clasp": {"hand": (3.0, 15.0, -13.0), "elbow_z": -31.0, "elbow_x": 19.0},
+    ARM_TARGETS = {"clasp": {"hand": (3.0, 18.0, -21.0), "elbow_z": -31.0, "elbow_x": 19.0},  # hands under the chin, cage visible
                    "player": {"hand": (24.0, 60.0, -31.0), "elbow_z": -36.0, "elbow_x": 24.0}}  # head sits ~34 cm over the table
     if pose_name in ARM_TARGETS and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
         # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
@@ -965,7 +968,7 @@ def build():
         for i, sl in enumerate(sm.static_materials):
             sm.set_material(i, bulb_mat if "bulb" in str(sl.material_slot_name).lower() else mi_brass)
         EAL.save_loaded_asset(sm)
-    LAMP_BASE, LAMP_YAW = (12.0, -62.0), 101.0
+    LAMP_BASE, LAMP_YAW = (24.0, -56.0), 101.0
     lamp_actors, llo, lhi = place_model(lamp, (LAMP_BASE[0], LAMP_BASE[1], 0), yaw=LAMP_YAW, label="Lamp", sit_on=top)
     tag(lamp_actors)
     yr = math.radians(LAMP_YAW)
@@ -1279,7 +1282,7 @@ def build():
 
     # ---- Camera: seated eye height, natural focal length, focus on the board.
     eye = (-87.0, 0.0, top + 42.0)
-    PITCH = -21.0  # the reference's pitch: the player's own hands show at the bottom; the bowed opponent keeps his head in frame
+    PITCH = -19.0  # the reference's pitch: the player's own hands show at the bottom; the bowed opponent keeps his head in frame
     cam = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(*eye), unreal.Rotator(0, PITCH, 0))
     cam.set_actor_label("PlayerEye")
     tag(cam, "TC_Camera_White")
