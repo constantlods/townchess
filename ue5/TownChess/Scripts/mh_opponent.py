@@ -138,6 +138,9 @@ def run():
                 raise RuntimeError("build produced no blueprint")
             log("build done")
         EAL.save_loaded_asset(ch)
+        if "build" in STAGES:
+            unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)  # the build output is new, unsaved packages
+            log("saved build output")
     finally:
         if sub.is_object_added_for_editing(ch):
             sub.remove_object_to_edit(ch)
