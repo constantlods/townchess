@@ -722,7 +722,8 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         for side, sx in (("l", 1.0), ("r", -1.0)):
             # which way is "this arm's side": the upper arm's x sign in the seated torso
             sign = 1.0 if new_w[f"upperarm_{side}"][0][0] > head[0] else -1.0
-            target = (head[0] + sign * 4.0, head[1] + 16.0, head[2] - 14.0)   # hands just in front of the chin
+            target = (head[0] + sign * 3.0, head[1] + 15.0, head[2] - 13.0)   # hands just in front of the chin
+            elbow_z = head[2] - 31.0  # elbows on the table: the table top is ~31 cm under the seated head
             score_best = None
             for ux in range(20, 101, 8):
                 for uz in range(-60, 61, 10):
@@ -730,7 +731,9 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
                         for lz in range(-80, 81, 10):
                             o = chain(side, ux, uz, lx, lz)
                             e, h = o[f"lowerarm_{side}"][0], o[f"hand_{side}"][0]
-                            err = sum((h[i] - target[i]) ** 2 for i in range(3)) + 0.5 * (e[2] - (table_z + 4)) ** 2
+                            err = sum((h[i] - target[i]) ** 2 for i in range(3)) + 0.5 * (e[2] - elbow_z) ** 2
+                            if (h[0] - head[0]) * sign < -1.0:   # hands meet, they do not cross
+                                err += 300
                             if e[1] < head[1] + 6:   # elbows forward of the chest, on the table
                                 err += 400
                             if score_best is None or err < score_best:
@@ -1301,8 +1304,8 @@ def build():
     s = ppv.settings
     for k, v in {
         "auto_exposure_method": unreal.AutoExposureMethod.AEM_HISTOGRAM,
-        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 7.4)),
-        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 7.4)),
+        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 7.8)),
+        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 7.8)),
         "bloom_intensity": 0.3, "vignette_intensity": 0.65, "film_grain_intensity": 0.15,
         "lumen_final_gather_quality": 2.0, "lumen_reflection_quality": 1.0,
         "lumen_scene_lighting_quality": 1.0, "lumen_scene_detail": 1.5,
