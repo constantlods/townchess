@@ -8,3 +8,4 @@ server-data/
 # Claude Code agent worktrees
 .claude/
 tools/.cache/
+tools/sim/out*/

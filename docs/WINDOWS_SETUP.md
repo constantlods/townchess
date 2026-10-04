@@ -25,7 +25,18 @@ machine's address and account are deliberately not recorded here: the repository
 | 5 | Visual Studio Community 2022 17.14 via winget, with the components UE 5.8 lists in `Engine/Config/Windows/Windows_SDK.json`: game dev with C++, desktop C++, .NET desktop, Windows 11 SDK 10.0.22621, Clang, UE IDE/debugger integration, MSVC 14.44 x64 and ATL. Installed silently with `--norestart` | Agent (approved) | UE C++ compilation and Windows packaging | Visual Studio Installer → Uninstall, or `winget uninstall Microsoft.VisualStudio.2022.Community` |
 | 6 | Update attempt (`setup.exe update --quiet --norestart`). It exited 87 (an argument-quoting error) and changed nothing. Not needed: winget had already installed the latest 17.14.41 (September 2026) | Agent | The MSVC folder is named `14.44.35207`, which UE 5.8 bans. The actual `cl.exe` is 19.44.35229 (product 14.44.35229), which includes the 14.44.35211 fix; servicing updates kept the old folder name | — |
 | 7 | Unreal Engine 5.8.3 through the Epic Games Launcher | Owner | Prebuilt engine; needs the owner's Epic sign-in | Remove it in the Launcher |
+| 9 | Visual C++ redistributable 14.50 (from UE's own `Engine\Extras\Redist\en-us\vc_redist.x64.exe`), so the packaged game's launcher stub stops reporting a missing runtime | Owner | UE 5.8 requires 14.50+; the PC had 14.44 registered | Settings > Apps > Microsoft Visual C++ v14 Redistributable (x64) > Uninstall |
+| 10 | MetaHuman Creator plugin enabled in `TownChess.uproject`; MetaHuman Creator Core Data (about 6 GB of presets, grooms, clothing, texture models) installed through the Epic Games Launcher | Owner (launcher), agent (project file) | The MetaHuman opponent | Launcher > Library > 5.8 > Options > untick Core Data; remove the plugin line from the .uproject |
+| 11 | Signed in to Epic inside the editor for MetaHuman cloud auto-rigging and texture synthesis | Owner | Required by MetaHuman Creator's cloud steps; a headless editor over SSH cannot complete this login | Sign out in the editor / revoke at epicgames.com > Account > Apps |
+| 12 | Owner's reference image placed at `C:\TownChess\reference picture.png`; screenshots in `C:\TownChess\shots` | Owner / agent | Visual comparison loop | Delete the files |
+| 13 | A copy of the project, `ue5\TownChess 5.8 - 2 5.8\`, was created by the launcher when the owner opened the project; the MetaHuman built there was copied into the real project | Launcher | — | Delete that folder after confirming with the owner |
 | 8 | Packaged builds written to `C:\TownChess\builds`, Poly Haven assets to `C:\TownChess\assets` (inside the workspace). Defender was only queried (`Get-MpComputerStatus`, `Get-MpThreatDetection`), never changed | Agent | Packaging and the antivirus check | Delete those folders |
+
+**Incident (2026-10-04):** while locating which project the open editor had loaded, the agent printed the editor's
+full command line, which contains a one-time Epic login exchange code (`-AUTH_PASSWORD`), and listed
+`%LOCALAPPDATA%\UnrealEngine\5.8\Saved\Logs` (outside the workspace). The code is in the local session transcript on
+the Proxmox side only; it is not in the repository or its history. Process queries are now limited to the executable
+path, never the command line.
 
 Nothing else on the system was changed. The PC is never rebooted, and no system settings, other users or security
 software were touched.

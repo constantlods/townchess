@@ -154,7 +154,8 @@ Every chess problem follows the same six steps, in this order. Skipping a step i
 - **Findings:** BUG-005 (`eventSeq` goes backwards after a journal restore), BUG-006 (fabricated `clockAfterMs` after
   restore), LIM-008 (lenient castling field: Shredder letters silently dropped) and LIM-009 (state a restore drops).
   The restore path skipping start-position checks was fixed by e819a2a before it was pinned. It is now a control test.
-- **Suite:** 446 tests (443 passed, 3 expected failures: BUG-005a, BUG-005b, BUG-006a).
+- **Suite:** 446 tests (443 passed, 3 expected failures: BUG-005a, BUG-005b, BUG-006a). Both bugs were fixed in
+  b072814; the three tests are now normal tests and the suite is 446/446.
 - **Timings (this machine):**
 
 | Run | Result | Wall time |

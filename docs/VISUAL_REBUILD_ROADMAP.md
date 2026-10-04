@@ -18,12 +18,15 @@ The critique that drives the passes is in [HOSTILE_VISUAL_REVIEW.md](HOSTILE_VIS
 | 05 pass 4 | Mask attachment fixed (movable); ebony tint on the black set; desaturated cloth; lamp spill on the opponent | Ebony against boxwood like the reference; the head was cropped at pitch -20 |
 | 06 pass 5 | Pitch -15 so the head and mask stay in frame | Composition matches the reference's layout: lamp at upper left, opponent between bed silhouettes, mug at right, gloves at the bottom corners |
 
+| 07 | MetaHuman opponent (default face) built with `Scripts/mh_opponent.py`; body and face as skeletal mesh actors, face linked to the body (leader pose) by ATCGameMode | A real person at the table; wrong face; underwear top; mask too high; arms hanging |
+| 09 | Opponent rebuilt from Epic's Walter preset (owner ran the cloud steps in the editor); mask lowered onto the face | The older face behind the cage reads well; the torso rendered as a hole (outfit meshes missing) |
+| 10 | Outfit meshes spawned as leader-pose followers | Older man in the cage mask, hands on the table (`10-metahuman-walter.png`) |
+
 ## Remaining gaps, ranked (what the next passes do)
 
-1. **The opponent is a mannequin.** The cage mask helps, but body, hands and cloth read as a wooden figure. This is
-   not closable procedurally. Plan: MetaHuman (free with UE; Creator runs in the editor and can be scripted in 5.8)
-   with a custom institutional outfit and the clasped-hands pose. **Needs the owner to sign in to Epic in the editor
-   on the build PC** (auto-rig and texture synthesis are cloud services).
+1. **The opponent's styling.** The T-shirt is clean white; it needs stained, drab institutional clothing, sleeves,
+   and the clasped-hands pose of the reference. Owner decision pending: the approved "Annotator" character concept
+   versus the current caged patient (which is also close to a well-known film look; see PROJECT_AUDIT.md).
 2. **Hands**: XR gloves with no forearms. MetaHuman arms with sleeves, first-person rendering, resting on the board
    frame. Same owner sign-in.
 3. **Board and table wear**: grime is there but too uniform; add blood and ring decals, edge wear, and replace the
