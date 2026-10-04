@@ -8,6 +8,7 @@
 #include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Engine/FontFace.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TCCoreClient.h"
@@ -47,9 +48,23 @@ ATCClipboard::ATCClipboard()
 	ReadLight->SetCastShadows(false);
 }
 
+static UFont* RuntimeFont(UObject* Outer, UFontFace* Face, int32 Size)
+{
+	if (!Face) return nullptr;
+	UFont* F = NewObject<UFont>(Outer);
+	F->FontCacheType = EFontCacheType::Runtime;
+	F->LegacyFontSize = Size;
+	FTypefaceEntry& E = F->GetMutableInternalCompositeFont().DefaultTypeface.Fonts.AddDefaulted_GetRef();
+	E.Name = TEXT("Regular");
+	E.Font = FFontData(Face);
+	return F;
+}
+
 void ATCClipboard::BeginPlay()
 {
 	Super::BeginPlay();
+	if (!HandFont) HandFont = RuntimeFont(this, HandFace, 32);
+	if (!FormFont) FormFont = RuntimeFont(this, FormFace, 28);
 	Rest = GetActorTransform();
 	Sheet = Cast<UCanvasRenderTarget2D>(UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(this, UCanvasRenderTarget2D::StaticClass(), SheetW, SheetH));
 	if (Sheet)

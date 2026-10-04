@@ -8,6 +8,7 @@
 class UCanvas;
 class UCanvasRenderTarget2D;
 class UFont;
+class UFontFace;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UPointLightComponent;
@@ -47,6 +48,9 @@ public:
 	/** Handwriting (moves) and form (printed headings) fonts; engine fonts are used when unset. */
 	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<UFont> HandFont;
 	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<UFont> FormFont;
+	/** Font faces (imported TTFs); runtime fonts are built from them when HandFont/FormFont are unset. */
+	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<UFontFace> HandFace;
+	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<UFontFace> FormFace;
 	/** Reading pose relative to the camera (cm): forward, right, up. */
 	UPROPERTY(EditAnywhere, Category = "TownChess") FVector RaisedOffset = FVector(57.f, 17.f, -2.f);
 	UPROPERTY(EditAnywhere, Category = "TownChess") float RaiseSeconds = 0.45f;

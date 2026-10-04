@@ -891,11 +891,12 @@ def build():
         clip.set_actor_label("GameRecordClipboard")
         clip.get_editor_property("board").set_static_mesh(board_mesh[0])
         setp(clip, "paper_material", paper_material())
-        hand, form = import_font("PatrickHand-Regular.ttf", "F_TC_Hand"), import_font("CourierPrime-Bold.ttf", "F_TC_Form")
-        if hand:
-            setp(clip, "hand_font", hand)
-        if form:
-            setp(clip, "form_font", form)
+        for prop, ttf, nm in (("hand_face", "PatrickHand-Regular.ttf", "F_TC_Hand"), ("form_face", "CourierPrime-Bold.ttf", "F_TC_Form")):
+            face = next((o for o in import_file(os.path.join(FONTS, ttf), f"{ROOT}/Fonts", nm + "_Face") if isinstance(o, unreal.FontFace)), None)
+            if face:
+                setp(clip, prop, face)  # ATCClipboard builds the runtime font (FontData is not exposed to Python)
+            else:
+                log("WARNING font face import failed", ttf)
         tag(clip)
     mug = import_prop("tin_mug")
     tag(place_model(mug, (38, 46, 0), yaw=-120, label="Mug", sit_on=top)[0])
