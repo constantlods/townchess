@@ -858,13 +858,20 @@ def build():
         except Exception:
             log("WARNING seated pose failed\n" + traceback.format_exc())
         if mh_body:
-            opp = EAS.spawn_actor_from_class(mh_bp.generated_class(), unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
-            comps = opp.get_components_by_class(unreal.SkeletalMeshComponent)
-            log("metahuman components", [(c.get_name(), c.skeletal_mesh_asset.get_name() if c.skeletal_mesh_asset else None) for c in comps])
-            def body_comp():  # blueprint components are replaced whenever the construction script re-runs
-                cs = opp.get_components_by_class(unreal.SkeletalMeshComponent)
-                return next((c for c in cs if c.skeletal_mesh_asset == mh_body), cs[0])
-            smc = body_comp()
+            # Body and face as plain skeletal mesh actors: the MetaHuman blueprint's construction script resets the
+            # body's animation, so our seated pose would not stick. ATCGameMode links the face to the body at start.
+            opp = EAS.spawn_actor_from_object(mh_body, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
+            smc = opp.skeletal_mesh_component
+            tag(opp, "TC_Body")
+            mh_face = unreal.load_asset("/Game/TownChess/MetaHumans/Built/MH_Opponent/Face/SKM_MH_Opponent_FaceMesh")
+            if mh_face:
+                face = EAS.spawn_actor_from_object(mh_face, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
+                face.set_actor_label("OpponentFace")
+                face.skeletal_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+                face.attach_to_actor(opp, "", unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD,
+                                     unreal.AttachmentRule.KEEP_WORLD, False)
+                tag(face, "TC_FollowBody")
+                tag(face)
         else:
             opp = EAS.spawn_actor_from_object(manny, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> faces -X
             smc = opp.skeletal_mesh_component
@@ -876,10 +883,6 @@ def build():
         setp(data, "saved_looping", True)
         setp(data, "saved_playing", True)
         setp(smc, "animation_data", data)
-        if mh_body:
-            smc = body_comp()
-            ad = smc.get_editor_property("animation_data")
-            log("metahuman body anim", smc.get_editor_property("animation_mode"), ad.anim_to_play.get_name() if ad.anim_to_play else None)
         if not mh_body:
             for i in range(smc.get_num_materials()):
                 smc.set_material(i, mi_cloth)
@@ -890,8 +893,6 @@ def build():
             m = EAS.spawn_actor_from_object(mask[0], unreal.Vector(90, 0, 150), unreal.Rotator(0, 0, 0))
             m.set_actor_label("CageMask")
             m.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)  # a Static actor cannot attach to the animated body
-            if mh_body:
-                smc = body_comp()
             R = unreal.AttachmentRule
             try:
                 m.attach_to_component(smc, "head", R.SNAP_TO_TARGET, R.SNAP_TO_TARGET, R.KEEP_WORLD, False)

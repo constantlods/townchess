@@ -4,6 +4,8 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Animation/SkeletalMeshActor.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "DynamicRHI.h"
@@ -57,6 +59,21 @@ FString ATCGameMode::GetServerLabel() const
 void ATCGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	// MetaHuman opponent: the level places the body (seated pose) and the face as separate skeletal mesh actors; the
+	// face follows the body's skeleton (leader pose), which is runtime state and so is linked here, not in the level.
+	ASkeletalMeshActor* Body = nullptr;
+	for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("TC_Body"))) Body = *It;
+	}
+	for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); Body && It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("TC_FollowBody")))
+		{
+			It->GetSkeletalMeshComponent()->SetLeaderPoseComponent(Body->GetSkeletalMeshComponent());
+			UE_LOG(LogTownChess, Log, TEXT("%s follows %s"), *It->GetName(), *Body->GetName());
+		}
+	}
 	FParse::Value(FCommandLine::Get(), TEXT("-tcserver="), ServerUrl);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcauto="), Auto);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcname="), Username);
