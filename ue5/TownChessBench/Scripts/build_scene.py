@@ -848,7 +848,9 @@ def build():
     idle = unreal.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
     # MetaHuman opponent, built by ue5/TownChess/Scripts/mh_opponent.py (needs MetaHuman Creator and an Epic login
     # once for the cloud steps); the template mannequin stands in where it has not been built.
-    mhn = os.environ.get("TC_MH_NAME", "MH_Opponent")
+    mhn = os.environ.get("TC_MH_NAME", "MH_Walter")
+    if not EAL.does_asset_exist(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}"):
+        mhn = "MH_Opponent"  # first build (default face) until the preset-based one exists
     mh_bp = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}") if GAMEPLAY else None
     mh_body = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh") if mh_bp else None
     if idle and (mh_body or manny):
