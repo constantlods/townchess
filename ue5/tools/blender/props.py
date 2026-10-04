@@ -199,7 +199,74 @@ def tin_mug():
     export("tin_mug.obj")
 
 
+def desk_lamp():
+    """Dome-shade desk lamp: weighted base, stem, forward arm, brass dome. The bulb centre is BULB (Blender metres,
+    arm along +X); build_scene puts the key spot light there."""
+    reset()
+    parts = []
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.085, depth=0.025, location=(0, 0, 0.0125))
+    parts.append(bpy.context.active_object)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.03, depth=0.012, location=(0, 0, 0.031))
+    parts.append(bpy.context.active_object)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.009, depth=0.36, location=(0, 0, 0.21))
+    parts.append(bpy.context.active_object)
+    # arm: a quarter bend from the stem top forward, then straight to the shade
+    bpy.ops.curve.primitive_bezier_curve_add()
+    arm = bpy.context.active_object
+    sp = arm.data.splines[0]
+    sp.bezier_points[0].co = (0, 0, 0.385)
+    sp.bezier_points[0].handle_right = (0, 0, 0.45)
+    sp.bezier_points[0].handle_left = (0, 0, 0.33)
+    sp.bezier_points[1].co = (0.2, 0, 0.43)
+    sp.bezier_points[1].handle_left = (0.08, 0, 0.47)
+    sp.bezier_points[1].handle_right = (0.26, 0, 0.41)
+    arm.data.bevel_depth = 0.008
+    arm.data.bevel_resolution = 4
+    bpy.ops.object.convert(target="MESH")
+    parts.append(bpy.context.active_object)
+    # dome shade: a hemisphere shell opening downwards, tilted towards the table
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=24, radius=0.11, location=(0.24, 0, 0.42))
+    shade = bpy.context.active_object
+    bm = bmesh.new()
+    bm.from_mesh(shade.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.01], context="VERTS")
+    bm.to_mesh(shade.data)
+    bm.free()
+    so = shade.modifiers.new("solid", "SOLIDIFY")
+    so.thickness = 0.002
+    apply_mods(shade)
+    shade.rotation_euler = (0, math.radians(18), 0)
+    parts.append(shade)
+    for o in parts:
+        material(o, "M_LampMetal")
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=0.03, location=(0.24, 0, 0.385))
+    bulb = bpy.context.active_object
+    material(bulb, "M_LampBulb")
+    parts.append(bulb)
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    lamp = bpy.context.active_object
+    lamp.name = "SM_DomeLamp"
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.shade_smooth()
+    export("dome_lamp.obj")
+
+
 def export(name):
+    # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
+    # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
+    for o in bpy.context.scene.objects:
+        if o.type == "MESH":
+            o.rotation_euler.x += math.radians(90)
+            o.select_set(True)
+            bpy.context.view_layer.objects.active = o
+            bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
     bpy.ops.object.select_all(action="SELECT")
     # OBJ: Debian's Blender ships without the FBX add-on. UE reads OBJ units as centimetres, Y up.
     bpy.ops.wm.obj_export(filepath=f"{OUT}/{name}", export_selected_objects=True, global_scale=100.0,
@@ -211,3 +278,4 @@ def export(name):
 
 cage_mask()
 tin_mug()
+desk_lamp()

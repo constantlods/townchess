@@ -274,7 +274,7 @@ def make_mi(master, name, textures, tiling=1.0, rough=1.0, metal=0.0, tint=None,
     return mi
 
 
-def surface_material(master, tex_name, **kw):
+def surface_material(master, tex_name, name=None, **kw):
     d = os.path.join(ASSETS, "textures", tex_name)
     dest = f"{ROOT}/Textures/{tex_name}"
     maps = {}
@@ -286,7 +286,7 @@ def surface_material(master, tex_name, **kw):
             maps["Normal"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "normal")
         elif stem.endswith("_arm"):
             maps["ARM"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "linear")
-    return make_mi(master, "MI_" + tex_name, maps, **kw)
+    return make_mi(master, name or "MI_" + tex_name, maps, **kw)
 
 
 def _value_noise(size, freq, seed, sx=1, sy=1):
@@ -489,6 +489,22 @@ def _xf(t):
     return ((t.translation.x, t.translation.y, t.translation.z), (r.x, r.y, r.z, r.w))
 
 
+SEATED = {}
+
+
+def head_relative(offset):
+    """Relative transform (location, rotator) on the 'head' bone that puts a prop authored face +Y / up +Z (mannequin
+    component space) at `offset` from the head bone, following the seated pose's head tilt."""
+    t1, q1, q0 = SEATED["head"]
+    tilt = _qmul(q1, _qinv(q0))
+    o = _qrot(tilt, offset)
+    want_t = (t1[0] + o[0], t1[1] + o[1], t1[2] + o[2])
+    iq = _qinv(q1)
+    rel_t = _qrot(iq, (want_t[0] - t1[0], want_t[1] - t1[1], want_t[2] - t1[2]))
+    rel_q = _qmul(iq, tilt)
+    return unreal.Vector(*rel_t), unreal.Quat(*rel_q).rotator()
+
+
 def build_seated_pose(skel_mesh, base_anim, dest, name):
     """Authors a single-frame seated pose for the UE5 mannequin.
 
@@ -560,6 +576,9 @@ def build_seated_pose(skel_mesh, base_anim, dest, name):
             d = (t_w[0] - tp[0], t_w[1] - tp[1], t_w[2] - tp[2])
             new_l[b] = (_qrot(iq, d), _qmul(iq, q_w))
         new_w[b] = (t_w, q_w)
+
+    # head in the seated pose (component space) and its idle orientation, for props attached to the head bone
+    SEATED["head"] = (new_w["head"][0], new_w["head"][1], wld["head"][1])
 
     path = f"{dest}/{name}"
     if EAL.does_asset_exist(path):
@@ -688,9 +707,9 @@ def build():
                                    scalars={"GrimeTiling": 0.7, "GrimeThreshold": 0.35, "GrimeContrast": 1.6, "GrimeStreaks": 0.7})
     mi_rust = surface_material(master, "rusty_metal_02", tiling=1.0, metal=1.0, tint=(0.5, 0.45, 0.4),
                                scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
-    mi_cloth = surface_material(master, "rough_linen", tiling=6.0, tint=(0.3, 0.28, 0.2), grime_color=(0.35, 0.25, 0.16),
+    mi_cloth = surface_material(master, "rough_linen", name="MI_OpponentCloth", tiling=6.0, tint=(0.3, 0.28, 0.2), grime_color=(0.35, 0.25, 0.16),
                                 scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "GrimeStreaks": 0.5})
-    mi_leather = surface_material(master, "brown_leather", tiling=4.0, tint=(0.38, 0.28, 0.2), rough=0.8,
+    mi_leather = surface_material(master, "brown_leather", name="MI_Gloves", tiling=4.0, tint=(0.38, 0.28, 0.2), rough=0.8,
                                   scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "MicroRough": 0.2})
     mi_ceiling = make_mi(master, "MI_ceiling", {"BaseColor": None}, tint=(0.22, 0.22, 0.2), rough=0.9)
     surface_material(master, "wood_table_worn", tiling=1.0)
@@ -711,9 +730,9 @@ def build():
 
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
-    assign(table, model_material(master, "wooden_table_02", "wooden_table_02", "MI_Table", grime_color=(0.3, 0.22, 0.15), tint=(0.42, 0.35, 0.29),
-                                 scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.32, "GrimeContrast": 2.0,
-                                          "GrimeStreaks": 0.5, "MicroRough": 0.2}))
+    assign(table, surface_material(master, "wood_table_worn", tiling=1.0, grime_color=(0.3, 0.22, 0.15), tint=(0.7, 0.6, 0.5),
+                                   scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.32, "GrimeContrast": 2.0,
+                                            "GrimeStreaks": 0.5, "MicroRough": 0.2}))
     tlo, thi = bounds_of(table)
     # Long side runs across the player's view (along Y). Poly Haven models are centred on their origin in XY.
     yaw = 90.0 if (thi[0] - tlo[0]) > (thi[1] - tlo[1]) else 0.0
@@ -761,11 +780,21 @@ def build():
         place_model(chess, (0, 0, 0), yaw=cyaw, label="Chess", sit_on=top)
 
     # ---- Props with intentional placement.
-    lamp = import_model("desk_lamp_arm_01")
-    # Upper-left of frame, arm reaching over the board's corner.
-    lamp_actors, llo, lhi = place_model(lamp, (18, -52, 0), yaw=40, label="Lamp", sit_on=top)
+    # Dome desk lamp (props.py): upper-left of frame, arm reaching towards the board; the key light sits at its bulb.
+    lamp = import_prop("dome_lamp")
+    mi_brass = surface_material(master, "rusty_metal_02", name="MI_Brass", tiling=1.5, metal=1.0, tint=(0.8, 0.6, 0.32), rough=0.7,
+                                scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0, "MicroRough": 0.15})
+    bulb_mat = emissive_material("M_TC_Bulb", (1.0, 0.62, 0.3), 60.0)
+    for sm in lamp:
+        for i, sl in enumerate(sm.static_materials):
+            sm.set_material(i, bulb_mat if "bulb" in str(sl.material_slot_name).lower() else mi_brass)
+        EAL.save_loaded_asset(sm)
+    LAMP_BASE, LAMP_YAW = (12.0, -62.0), 101.0
+    lamp_actors, llo, lhi = place_model(lamp, (LAMP_BASE[0], LAMP_BASE[1], 0), yaw=LAMP_YAW, label="Lamp", sit_on=top)
     tag(lamp_actors)
-    log("lamp bounds", llo, lhi)
+    yr = math.radians(LAMP_YAW)
+    lamp_bulb = (LAMP_BASE[0] + 24 * math.cos(yr), LAMP_BASE[1] + 24 * math.sin(yr), top + 38.5)
+    log("lamp bounds", llo, lhi, "bulb", lamp_bulb)
     clock = import_model("alarm_clock_01")
     if clock:  # this FBX currently imports without a static mesh; skip rather than fail
         place_model(clock, (-8, 46, 0), yaw=-150, label="Clock", sit_on=top)
@@ -833,12 +862,15 @@ def build():
             m.set_actor_label("CageMask")
             m.attach_to_component(smc, "head", unreal.AttachmentRule.SNAP_TO_TARGET, unreal.AttachmentRule.SNAP_TO_TARGET,
                                   unreal.AttachmentRule.KEEP_WORLD, False)
-            # head bone frame on the UE5 mannequin: X up the neck, Y towards the face (tuned by screenshot)
-            rel = [float(v) for v in os.environ.get("TC_MASK_XF", "8,1.5,0,0,0,0").split(",")]
-            m.root_component.set_relative_location(unreal.Vector(*rel[:3]), False, False)
-            m.root_component.set_relative_rotation(unreal.Rotator(*rel[3:]), False, False)
+            off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,2.5,9").split(",")]  # forward (+Y), up (+Z) from the head bone
+            if "head" in SEATED:
+                rl, rr = head_relative(off)
+                m.root_component.set_relative_location(rl, False, False)
+                m.root_component.set_relative_rotation(rr, False, False)
+                log("mask attached rel", rl, rr)
+            else:
+                log("WARNING no seated head transform; mask left at the bone origin")
             tag(m)
-            log("mask attached rel", rel)
     else:
         log("WARNING: mannequin not found")
 
@@ -849,7 +881,7 @@ def build():
             b = hm.get_bounds()
             log("hand", side, "bounds origin", b.origin, "extent", b.box_extent)
             # Fingers point along +Y in mesh space; yaw -90 points them at the board (+X).
-            h = EAS.spawn_actor_from_object(hm, unreal.Vector(-40, y * 1.45, top + 5), unreal.Rotator(0, 0, -90))
+            h = EAS.spawn_actor_from_object(hm, unreal.Vector(-26, y * 1.3, top + 5), unreal.Rotator(0, 0, -90))
             for i in range(h.skeletal_mesh_component.get_num_materials()):
                 h.skeletal_mesh_component.set_material(i, mi_leather)
             h.set_actor_label(f"Hand_{side}")
@@ -859,14 +891,15 @@ def build():
             log("WARNING: XR hand not found", side)
 
     # ---- Lighting: warm practical lamp (key), cool fluorescent fill, cool rim.
-    lamp_head = (-12, -58, top + 42)
+    lamp_head = (lamp_bulb[0], lamp_bulb[1], lamp_bulb[2] - 3)  # just under the bulb, inside the shade
     tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (10, -5, top)), 700, 2400, 600, 65, src=2.5, vol=1.2))
-    bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 2), 60, 2400, 60, src=2.0, shadows=False)
+    bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 9), 60, 2400, 60, src=2.0, shadows=False)  # lights the shade and base
     tag(bulb)
     rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 150, 5600, 120, 15, 900, vol=0.2)
     # cold window light from back-left (fill, 3-4 stops under the key) and a back-rim on the opponent's shoulder
     rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0)
     point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0)
+    rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 1800, 7000, 200, 40, 600, vol=1.5)
 
     sky = EAS.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 400), unreal.Rotator(0, 0, 0))
     setp(sky.light_component, "intensity", 0.02)
