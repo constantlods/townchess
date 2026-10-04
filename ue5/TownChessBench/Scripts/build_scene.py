@@ -614,7 +614,7 @@ POSES = {
     # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
     # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
     "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0),
-               "hand_l": (0, 0, float(os.environ.get("TC_HAND_ROLL", 75))), "hand_r": (0, 0, -float(os.environ.get("TC_HAND_ROLL", 75)))},
+               "hand_l": (0, 0, float(os.environ.get("TC_HAND_ROLL", -95))), "hand_r": (0, 0, -float(os.environ.get("TC_HAND_ROLL", -95)))},
     "clasp": {"spine_01": (12, 0), "spine_03": (18, 0), "neck_01": (-6, 0), "head": (10, 0),
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
               "hand_l": (0, -15), "hand_r": (0, 15)},
