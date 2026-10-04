@@ -71,6 +71,34 @@ def run():
             ss.skin = sp
             sub.commit_skin_settings(ch, ss)
             log("skin committed")
+        if "wardrobe" in STAGES:
+            col = ch.internal_collection
+            OPT = "/MetaHumanCharacter/Optional"
+            picks = [("Outfits", f"{OPT}/Clothing/WI_DefaultGarment"),
+                     ("Hair", f"{OPT}/Grooms/Bindings/Hair/WI_Hair_S_BuzzCut"),
+                     ("Eyebrows", f"{OPT}/Grooms/Bindings/Eyebrows/WI_Eyebrows_L_Scraggly"),
+                     ("Beard", f"{OPT}/Grooms/Bindings/Beards/WI_Beard_S_Stubble")]
+            keys = {}
+            for slot, path in picks:
+                wi = unreal.load_asset(path)
+                if not wi:
+                    log("WARNING missing wardrobe item", path)
+                    continue
+                key = col.try_add_item_from_wardrobe_item(slot, wi)
+                col.default_instance.try_add_slot_selection(unreal.MetaHumanPipelineSlotSelection(slot_name=slot, selected_item=key))
+                keys[slot] = key
+                log("wardrobe", slot, path.rsplit("/", 1)[1])
+            sub.assemble_for_preview(character=ch)
+            if "Outfits" in keys:
+                params = col.default_instance.get_instance_parameters(item_path=unreal.MetaHumanPaletteItemPath(item_key=keys["Outfits"]))
+                log("outfit params", [str(p.name) for p in params])
+                drab = {"shirt": unreal.LinearColor(0.16, 0.15, 0.11, 1), "pant": unreal.LinearColor(0.1, 0.095, 0.08, 1)}
+                for prm in params:
+                    n = str(prm.name).lower()
+                    for k, c in drab.items():
+                        if k in n and "color" in n:
+                            prm.set_color(value=c)
+                            log("set", prm.name)
         if "rig" in STAGES:
             r = unreal.MetaHumanCharacterAutoRiggingRequestParams()
             r.blocking, r.report_progress = True, False
@@ -89,7 +117,15 @@ def run():
             b.absolute_build_path = f"{PATH}/Built"
             b.common_folder_path = f"{PATH}/Common"
             b.enable_wardrobe_item_validation = False
-            sub.build_meta_human(character=ch, params=b)
+            try:
+                sub.build_meta_human(character=ch, params=b)
+            except RuntimeError as e:
+                # Epic's face control rig emits "Cannot break link" errors during assembly although the build succeeds
+                if "Cannot break link" not in str(e):
+                    raise
+                log("build finished with control-rig link warnings (harmless)")
+            if not EAL.does_asset_exist(f"{PATH}/Built/{NAME}/BP_{NAME}"):
+                raise RuntimeError("build produced no blueprint")
             log("build done")
         EAL.save_loaded_asset(ch)
     finally:
