@@ -142,7 +142,7 @@ def build_master_material(defaults):
     guv = expr(unreal.MaterialExpressionMultiply, -1200, -800)
     MEL.connect_material_expressions(uv, "", guv, "A")
     MEL.connect_material_expressions(scalar("GrimeTiling", 1.0, -1400, -760), "", guv, "B")
-    grime = tex_param("Grime", defaults.get("grime", defaults["white"]), unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, -1000, -900)
+    grime = tex_param("Grime", defaults["grime"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, -1000, -900)
     MEL.connect_material_expressions(guv, "", grime, "UVs")
     gmix = expr(unreal.MaterialExpressionLinearInterpolate, -800, -1000)  # macro blotches, broken up by streaks
     MEL.connect_material_expressions(grime, "R", gmix, "A")
@@ -180,7 +180,8 @@ def build_master_material(defaults):
 
     MEL.connect_material_property(arm, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
     # Roughness: ARM.G, or a separate roughness map (Poly Haven model textures) when UseRoughTex = 1
-    rtex = tex_param("RoughTex", defaults["white"], unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE, -900, 700)
+    # sampler types must match the textures' compression or the whole material fails to compile (renders the world grid)
+    rtex = tex_param("RoughTex", defaults["gray"], unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE, -900, 700)
     MEL.connect_material_expressions(uvm, "", rtex, "UVs")
     rsel = expr(unreal.MaterialExpressionLinearInterpolate, -650, 380)
     MEL.connect_material_expressions(arm, "G", rsel, "A")
@@ -643,6 +644,7 @@ def build():
         "normal": import_texture(os.path.join(tmp, "T_TC_FlatNormal.png"), f"{ROOT}/Textures", "T_TC_FlatNormal", "normal"),
         "arm": import_texture(os.path.join(tmp, "T_TC_DefaultARM.png"), f"{ROOT}/Textures", "T_TC_DefaultARM", "linear"),
     }
+    defaults["gray"] = import_texture(os.path.join(tmp, "T_TC_White.png"), f"{ROOT}/Textures", "T_TC_WhiteGray", "gray")
     grime_png(os.path.join(tmp, "T_TC_Grime.png"))
     defaults["grime"] = import_texture(os.path.join(tmp, "T_TC_Grime.png"), f"{ROOT}/Textures", "T_TC_Grime", "linear")
     master = build_master_material(defaults)
@@ -672,7 +674,7 @@ def build():
 
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
-    assign(table, model_material(master, "wooden_table_02", "wooden_table_02", "MI_Table", grime_color=(0.3, 0.22, 0.15),
+    assign(table, model_material(master, "wooden_table_02", "wooden_table_02", "MI_Table", grime_color=(0.3, 0.22, 0.15), tint=(0.55, 0.45, 0.38),
                                  scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.4, "GrimeContrast": 2.0,
                                           "GrimeStreaks": 0.5, "MicroRough": 0.2}))
     tlo, thi = bounds_of(table)
@@ -685,12 +687,12 @@ def build():
     # ---- Chess set: board + 32 pieces; rotate so White faces the player (-X).
     chess = import_model("chess_set")
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
-    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.55, 0.43, 0.3),
+    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.55, 0.43, 0.3), tint=(0.95, 0.85, 0.68), rough=0.75,
                            scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.5, "MicroRough": 0.25})
-    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(0.8, 0.7, 0.6),
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.7, "GrimeContrast": 2.0, "MicroRough": 0.3})
-    mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.42, 0.32, 0.22),
-                           scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.48, "GrimeContrast": 2.5, "MicroRough": 0.2})
+    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(0.6, 0.5, 0.4), rough=0.55,
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.75, "GrimeContrast": 2.0, "MicroRough": 0.15})
+    mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.42, 0.32, 0.22), tint=(0.85, 0.77, 0.62),
+                           scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.4, "GrimeContrast": 2.5, "MicroRough": 0.2})
     assign(chess, mi_pw, lambda n: "white" in n)
     assign(chess, mi_pb, lambda n: "black" in n)
     assign(chess, mi_cb, lambda n: "board" in n)
@@ -724,7 +726,7 @@ def build():
     # ---- Props with intentional placement.
     lamp = import_model("desk_lamp_arm_01")
     # Upper-left of frame, arm reaching over the board's corner.
-    lamp_actors, llo, lhi = place_model(lamp, (30, -52, 0), yaw=70, label="Lamp", sit_on=top)
+    lamp_actors, llo, lhi = place_model(lamp, (-8, -68, 0), yaw=30, label="Lamp", sit_on=top)
     tag(lamp_actors)
     log("lamp bounds", llo, lhi)
     clock = import_model("alarm_clock_01")
@@ -784,12 +786,14 @@ def build():
             log("WARNING: XR hand not found", side)
 
     # ---- Lighting: warm practical lamp (key), cool fluorescent fill, cool rim.
-    lamp_head = (24, -34, top + (lhi[2] - llo[2]) - 8)
-    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (4, 0, top)), 450, 2700, 600, 58, src=3.0, vol=1.6))
-    bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 2), 60, 2700, 120, src=2.0, shadows=False)
+    lamp_head = (-12, -58, top + 42)
+    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (10, -5, top)), 700, 2400, 600, 65, src=2.5, vol=1.2))
+    bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 2), 60, 2400, 60, src=2.0, shadows=False)
     tag(bulb)
-    rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 2200, 6200, 120, 15, 900, vol=0.2)
-    point("Rim", (170, 80, 190), 120, 7000, 400, src=8.0)
+    rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 150, 5600, 120, 15, 900, vol=0.2)
+    # cold window light from back-left (fill, 3-4 stops under the key) and a back-rim on the opponent's shoulder
+    rect("Window_Cold", (cx + L / 2 - 5, -150, 180), (0, 0, 180), 400, 7500, 60, 90, 700, vol=3.0)
+    point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0)
 
     sky = EAS.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 400), unreal.Rotator(0, 0, 0))
     setp(sky.light_component, "intensity", 0.02)
@@ -797,7 +801,7 @@ def build():
 
     fog = EAS.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
     fc = fog.component
-    setp(fc, "fog_density", 0.02)
+    setp(fc, "fog_density", 0.035)
     setp(fc, "fog_height_falloff", 0.002)
     setp(fc, "enable_volumetric_fog", True)
     setp(fc, "volumetric_fog_scattering_distribution", 0.7)
@@ -806,8 +810,9 @@ def build():
     fog.set_folder_path("Atmosphere")
 
     # ---- Camera: seated eye height, natural focal length, focus on the board.
-    eye = (-66.0, 0.0, top + 50.0)
-    cam = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(*eye), unreal.Rotator(0, -27, 0))
+    eye = (-87.0, 0.0, top + 42.0)
+    PITCH = -20.0
+    cam = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(*eye), unreal.Rotator(0, PITCH, 0))
     cam.set_actor_label("PlayerEye")
     tag(cam, "TC_Camera_White")
     cc = cam.get_cine_camera_component()
@@ -815,17 +820,17 @@ def build():
     setp(fb, "sensor_width", 36.0)
     setp(fb, "sensor_height", 20.25)
     setp(cc, "filmback", fb)
-    setp(cc, "current_focal_length", 24.0)
-    setp(cc, "current_aperture", 4.0)
+    setp(cc, "current_focal_length", 30.0)
+    setp(cc, "current_aperture", 2.8)
     fs = cc.get_editor_property("focus_settings")
     setp(fs, "focus_method", unreal.CameraFocusMethod.MANUAL)
-    setp(fs, "manual_focus_distance", 75.0)
+    setp(fs, "manual_focus_distance", 97.0)
     setp(cc, "focus_settings", fs)
     if not GAMEPLAY:
         setp(cam, "auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
     else:
         # Black's seat: the same framing from the other side of the table (the game picks the camera per seat)
-        cam_b = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(-eye[0], 0, eye[2]), unreal.Rotator(0, -27, 180))
+        cam_b = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(-eye[0], 0, eye[2]), unreal.Rotator(0, PITCH, 180))
         cam_b.set_actor_label("PlayerEyeBlack")
         tag(cam_b, "TC_Camera_Black")
         cb = cam_b.get_cine_camera_component()
@@ -836,7 +841,7 @@ def build():
 
     # Screenshot capture parked at the eye: -RenderOffscreen never reads the game viewport back, so the benchmark
     # driver switches this on to grab the player's view (Scripts/bench_game.py).
-    shot = EAS.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(*eye), unreal.Rotator(0, -27, 0))
+    shot = EAS.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(*eye), unreal.Rotator(0, PITCH, 0))
     shot.set_actor_label("ShotCapture")
     sc = shot.capture_component2d
     setp(sc, "capture_every_frame", False)
@@ -852,7 +857,7 @@ def build():
         "auto_exposure_method": unreal.AutoExposureMethod.AEM_HISTOGRAM,
         "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 8.5)),
         "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 8.5)),
-        "bloom_intensity": 0.25, "vignette_intensity": 0.45, "film_grain_intensity": 0.12,
+        "bloom_intensity": 0.3, "vignette_intensity": 0.65, "film_grain_intensity": 0.15,
         "lumen_final_gather_quality": 2.0, "lumen_reflection_quality": 1.0,
         "lumen_scene_lighting_quality": 1.0, "lumen_scene_detail": 1.5,
         "scene_fringe_intensity": 0.15,
