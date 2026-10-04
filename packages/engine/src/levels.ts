@@ -1,6 +1,8 @@
+import type { HouseLevelId } from '@hc/shared';
 import type { SearchOptions } from './search.js';
 
-export type AiLevel = 'novice' | 'patient' | 'warden';
+/** House-engine levels. League (Stockfish) levels are not played by this package: see @hc/shared aiLevels. */
+export type AiLevel = HouseLevelId;
 
 /**
  * House-engine strength presets. Labels only: these are NOT calibrated ratings (no Elo is claimed until a
@@ -12,4 +14,4 @@ export const AI_LEVELS: Record<AiLevel, SearchOptions & { label: string; descrip
   warden: { maxDepth: 5, timeMs: 2500, noise: 0, label: 'Warden', description: 'Deepest search, always its best move' },
 };
 
-export const isAiLevel = (v: string): v is AiLevel => v in AI_LEVELS;
+export const isAiLevel = (v: string): v is AiLevel => Object.hasOwn(AI_LEVELS, v);

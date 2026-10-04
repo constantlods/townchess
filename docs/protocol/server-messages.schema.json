@@ -121,6 +121,57 @@
             "string",
             "null"
           ]
+        },
+        "aiLevels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "enum": [
+                  "novice",
+                  "patient",
+                  "warden",
+                  "sf1350",
+                  "sf1600",
+                  "sf1900",
+                  "sf2200",
+                  "sf2500",
+                  "sfmax"
+                ]
+              },
+              "label": {
+                "type": "string"
+              },
+              "engine": {
+                "type": "string",
+                "enum": [
+                  "house",
+                  "uci"
+                ]
+              },
+              "uciElo": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "engine",
+              "uciElo"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [

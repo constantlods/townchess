@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { GameStateDTO } from './types.js';
+import { AI_LEVEL_IDS } from './aiLevels.js';
 
 /**
  * WebSocket protocol. Every message is JSON `{ type, ...payload }`.
@@ -34,10 +35,14 @@ export const ClientMessage = z.discriminatedUnion('type', [
   z.object({ type: z.literal('FIND_MATCH'), timeControl: z.string().max(10), rated: z.boolean() }),
   z.object({ type: z.literal('CANCEL_MATCH') }),
   z.object({ type: z.literal('CREATE_PRIVATE'), timeControl: z.string().max(10), drawPolicy: z.enum(['automatic', 'claim']).optional() }),
-  /** Play the house engine through the core (offline UE play uses a local core the same way). Never rated. */
+  /**
+   * Play an engine through the core (offline UE play uses a local core the same way). Never rated. `level` is a house
+   * level (novice/patient/warden) or a league level (sf1350..sfmax, a UCI engine such as Stockfish); a league level
+   * the core did not list in WELCOME.aiLevels is refused with ERROR code 'engine_unavailable'.
+   */
   z.object({
     type: z.literal('CREATE_AI_GAME'),
-    level: z.enum(['novice', 'patient', 'warden']),
+    level: z.enum(AI_LEVEL_IDS),
     color: z.enum(['w', 'b', 'random']),
     /** A key of TIME_CONTROLS, or 'untimed'. */
     timeControl: z.string().max(10),
@@ -127,8 +132,22 @@ export const GameStateSchema = z.object({
   firstMoveDeadline: z.number().nullable(),
 });
 
+/** One engine level this core can play now (WELCOME.aiLevels). Additive v2 field; see docs/NETWORKING.md. */
+export const AiLevelInfoSchema = z.object({
+  id: z.enum(AI_LEVEL_IDS),
+  label: z.string(),
+  engine: z.enum(['house', 'uci']),
+  uciElo: z.number().int().nullable(),
+});
+
 export const ServerMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('WELCOME'), protocolVersion: z.number().int(), token: z.string(), player: PlayerPublicSchema.extend({ gamesPlayed: z.number(), wins: z.number(), losses: z.number(), draws: z.number() }), activeGameId: z.string().nullable() }),
+  z.object({
+    type: z.literal('WELCOME'), protocolVersion: z.number().int(), token: z.string(),
+    player: PlayerPublicSchema.extend({ gamesPlayed: z.number(), wins: z.number(), losses: z.number(), draws: z.number() }),
+    activeGameId: z.string().nullable(),
+    /** Engine levels offered by this core, in menu order. Optional for older cores (treat absent as the three house levels). */
+    aiLevels: z.array(AiLevelInfoSchema).optional(),
+  }),
   z.object({ type: z.literal('QUEUED'), timeControl: z.string(), rated: z.boolean() }),
   z.object({ type: z.literal('MATCH_CANCELLED') }),
   z.object({ type: z.literal('GAME_JOINED'), color, state: GameStateSchema }),
