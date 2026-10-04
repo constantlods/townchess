@@ -1,7 +1,7 @@
 # Project audit (oversight agent, 2026-10-04)
 
 Scope: every request the owner made in the session (both directives, the chat messages, and the queued messages),
-checked against the branch `feature/photorealistic-renderer` at `0505eea`, the docs, and GitHub. Status values:
+checked against the branch `feature/photorealistic-renderer` at `1a55845`, the docs, and GitHub. Status values:
 **done-verified** (evidence re-checked by this audit), **done-unverified** (claimed in a commit/doc, no independent
 evidence), **in progress**, **not started**, **dropped**. Test suite re-run for this audit: **446/446 pass**
 (18 files, Linux).
@@ -19,7 +19,7 @@ evidence), **in progress**, **not started**, **dropped**. Test suite re-run for 
 | 7 | Owner can launch and play a full game interactively | not verified | ROADMAP §5b last row "Pending" | Owner hit the VC++ runtime check (fix: UE's `vc_redist.x64.exe`, 14.50). No record that the owner then played a game with the mouse |
 | 8 | Windows PC security rules + change record | partly | WINDOWS_SETUP.md rows 1-8 | Not recorded: VC++ 14.50 redistributable (owner, on our advice), MetaHuman plugin + MetaHuman Core Data install, Epic sign-in in the editor, reference image copied to `C:\TownChess`. See risk R1 |
 | 9 | Never commit secrets / personal data | done-verified (tree + history) | grep of tree and all history: no keys, tokens, `AUTH_PASSWORD`, signed URLs, Windows user or host names | History keeps `ue@192.168.0.223` (`079c1bf`, removed in `b490b30`) and `192.168.0.208` in PERFORMANCE.md: private LAN only, low risk. Merge `20fb5e8` is authored `root@Fpc.pve2` |
-| 10 | Big generated binaries not committed | done-verified | `ue5/TownChess/.gitignore` ignores `Content/`, `Saved/`; largest tracked file 3 MB (screenshot); `.git` 28 MB | `tools/.cache/` (178 MB Stockfish + tarball) is ignored only by an **uncommitted** `.gitignore` edit; `tools/sim/out*` not ignored |
+| 10 | Big generated binaries not committed | done-verified | `ue5/TownChess/.gitignore` ignores `Content/`, `Saved/`; largest tracked file 3 MB (screenshot); `.git` 28 MB `tools/.cache/` (178 MB Stockfish + tarball) is now ignored (`1a55845`). But `tools/sim/out/report.json`, a generated run output, was committed in `1a55845`; `tools/sim/out*` is not ignored |
 | 11 | Visual rebuild toward the reference, critique → render → compare loop, documented | in progress | HOSTILE_VISUAL_REVIEW.md, VISUAL_REBUILD_ROADMAP.md, passes 00-06 in `docs/screenshots/visual-loop/` | No capture or log entry since pass 5; MetaHuman passes (`c37fb39`..`0505eea`) are not in the loop log; VISUAL_REBUILD_ROADMAP gap #1 still says "opponent is a mannequin, needs owner sign-in" (stale) |
 | 12 | MetaHuman opponent wearing the cage mask | done-unverified | `9343527`..`0505eea`, `ue5/tools/win/metahuman.ps1` | No screenshot of the MetaHuman in the seat; no hostile review of it; no doc of the pipeline (owner steps, preset "Walter", licence) |
 | 13 | Multi-agent pipeline: critique, GitHub keeper, rules verifier, oversight | done (ad hoc) | critique reports in ROADMAP/HOSTILE review, `agents/rules-audit-2` merged, this file | Directive 2 also asked for gameplay, network and **performance** agents: no performance pass since Milestone 0. The GitHub keeper let the PR body go stale (§3) |
@@ -27,8 +27,8 @@ evidence), **in progress**, **not started**, **dropped**. Test suite re-run for 
 | 14b | Board flips by itself between games (colours swap on rematch) | partly | Server/core rematch swaps colours (REPORT.md); UE has a Rematch button (`TCGame.cpp`) | No test that the UE seat camera flips on rematch; not tracked as a UE item |
 | 14c | Move list + opening on an asylum clipboard on a cart beside the table, toggleable, instead of HUD text | not started, tracked only as "analysis cart v1" (ROADMAP M4) | ROADMAP §4 M4 | Clipboard/notepad look and toggle not written down |
 | 14d | A critique pass before 14c | not started | none | none tracked |
-| 14e | Simulations: historical games, openings, CPU vs CPU at different Elo, agent watching for bugs | in progress, **uncommitted** | `tools/sim/` (untracked: `simulate.ts`, `classics.ts`, `uci.ts`) | Not committed, not in a roadmap, results not reported. It runs headless in Node, not "CPUs in the game" in UE |
-| 14f | Install Stockfish (and similar) as league-level opponents in the game | in progress (referee only) | `tools/.cache/stockfish` (untracked), used by the simulator | No engine service in the game, no CPU levels backed by it, other engines (Lc0 etc.) not evaluated. GPL: must stay a separate process and ship its licence (AI.md) |
+| 14e | Simulations: historical games, openings, CPU vs CPU at different Elo, agent watching for bugs | in progress | `1a55845`: `tools/sim/` (Stockfish 19 as referee); committed report = 5 classic games, 0 anomalies | No CPU-vs-CPU Elo ladder run reported yet; not in the vitest suite or any roadmap; runs headless in Node, not "CPUs in the game" in UE; no standing watcher agent |
+| 14f | Install Stockfish (and similar) as league-level opponents in the game | in progress (referee only) | `tools/.cache/stockfish` (ignored), used by `tools/sim/` | No engine service in the game, no CPU levels backed by it, other engines (Lc0 etc.) not evaluated. GPL: must stay a separate process and ship its licence (AI.md) |
 | 15 | The Annotator approved as the first original character | in progress (design only) | CHARACTERS.md | The in-game opponent is an Epic preset MetaHuman with a cage mask, not the Annotator (riveted steel mask, ledger). See R3 |
 | 16 | Voice/animation pipeline, provider-agnostic, no spend | research done | VOICE_OPTIONS.md | No pipeline code; no commentary playback in UE |
 | 17 | Physical interaction (reach/grip/lift/place), M3 | not started | ROADMAP M3 | none |
@@ -47,9 +47,9 @@ evidence), **in progress**, **not started**, **dropped**. Test suite re-run for 
   current opponent (asylum patient, Epic "Walter" preset, wire cage mask from the reference sheet) are different
   characters. A cage-masked asylum inmate across a table is also close to a famous film character, which the
   owner's "no copying copyrighted horror characters" rule warns about. Needs an owner decision.
-- **R4 Uncommitted ignore rule.** The `tools/.cache/` line in `.gitignore` is only in the working tree. Another
-  checkout (for example the Windows PC) running `git add -A` would stage an 80 MB tarball and the Stockfish binary.
-  `tools/sim/out*` is not ignored at all.
+- **R4 Generated output committed.** `1a55845` committed `tools/sim/out/report.json` (a run artifact that will churn
+  on every run) and mixes MetaHuman and simulator changes in one commit. Ignore `tools/sim/out*/` and keep curated
+  results in a doc instead. (The `tools/.cache/` ignore rule landed in the same commit, so Stockfish is safe.)
 - **R5 `docs/reference/concept-reference.jpg` is public.** VISUAL_REBUILD_ROADMAP says the owner's reference is
   kept off the public repo, but an earlier concept reference is committed (`a4d49ec`). Its source/licence is not
   recorded.
@@ -71,8 +71,8 @@ evidence), **in progress**, **not started**, **dropped**. Test suite re-run for 
 
 ## 4. Next actions (priority order)
 
-1. Commit the `tools/.cache/` ignore rule and add `tools/sim/out*/` (R4); then commit `tools/sim/` with a short
-   report of its first run (classics, Elo ladder, anomalies).
+1. Ignore `tools/sim/out*/` (R4); run the CPU-vs-CPU Elo ladder (`--games 40`) and report the anomalies in a doc;
+   add a small seeded simulator run to CI or the test suite so the watcher actually runs on every change.
 2. Owner: launch the packaged build after the VC++ 14.50 fix and play one full game with the mouse; record the result
    in ROADMAP §5b (item 7). Add rows to WINDOWS_SETUP.md for the redistributable, MetaHuman plugin/Core Data and the
    editor sign-in (item 8).
