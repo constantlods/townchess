@@ -38,8 +38,8 @@ type Player = { id: string; kind: 'house'; opts: SearchOptions } | { id: string;
 const HOUSE: Player[] = [
   { id: 'house-1 (depth 1, noisy)', kind: 'house', opts: { maxDepth: 1, timeMs: 200, noise: 120, nodeLimit: 4000 } },
   { id: 'house-2 (novice)', kind: 'house', opts: { maxDepth: 2, timeMs: 400, noise: 60, nodeLimit: 15000 } },
-  { id: 'house-3 (patient)', kind: 'house', opts: { maxDepth: 3, timeMs: 1200, noise: 25, nodeLimit: 60000 } },
-  { id: 'house-4 (warden)', kind: 'house', opts: { maxDepth: 5, timeMs: 2500, noise: 0, nodeLimit: 250000 } },
+  { id: 'house-3 (patient)', kind: 'house', opts: { maxDepth: 3, timeMs: 400, noise: 25, nodeLimit: 40000 } },
+  { id: 'house-4 (warden)', kind: 'house', opts: { maxDepth: 5, timeMs: 600, noise: 0, nodeLimit: 80000 } },  // sim budget; the game's warden thinks longer
 ];
 const SF_ELOS = [1350, 1600, 1900, 2200, 2500, 2850];
 
@@ -176,9 +176,18 @@ async function main() {
     const b = roster[Math.floor(rnd() * roster.length)];
     for (const e of engines.values()) await e.newGame();
     const r = await playGame(`#${i + 1} ${eco} ${name}`, { w, b }, uci, ref, engines);
-    console.log(`${r.game} | ${w.id} vs ${b.id}: ${r.plies} plies, ${r.status} ${r.result}`);
+    console.log(`${r.game} | ${w.id} vs ${b.id}: ${r.plies} plies, ${r.status} ${r.result} | anomalies so far ${anomalies.length}`);
+    writeReport(ref, t0);  // incremental, so a long run can be inspected (or killed) at any time
   }
   finish(ref, engines, t0);
+}
+
+function writeReport(ref: UciEngine | null, t0: number) {
+  const byKind: Record<string, number> = {};
+  for (const a of anomalies) byKind[a.kind] = (byKind[a.kind] ?? 0) + 1;
+  writeFileSync(`${OUT}/report.json`, JSON.stringify({ when: new Date().toISOString(), seed: SEED, referee: ref?.name ?? null,
+    seconds: Math.round((Date.now() - t0) / 1000), games: results.length, anomalies: anomalies.length, anomalyKinds: byKind,
+    results, anomalyList: anomalies }, null, 2));
 }
 
 function finish(ref: UciEngine | null, engines: Map<number, UciEngine>, t0: number) {
