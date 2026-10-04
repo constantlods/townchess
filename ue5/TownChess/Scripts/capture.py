@@ -106,26 +106,26 @@ def tick(_dt):
                 cmd(f"sg.{g} {PRESET}")
             cmd(f"r.SetRes {RES}w")
         elif state["phase"] == "warm" and PLAY and not state.get("played"):
-        core = next((o for o in unreal.ObjectIterator(unreal.TCCoreClient) if not o.get_name().startswith("Default__")), None)
-        if core and core.has_game():
-            st = core.get_state()
-            if len(st.history) >= PLAY or st.status != "active":
-                state["played"] = True
-                state["t0"] = time.time() - WARM_SEC + 6  # let the last animation and the sheet settle
-            elif core.is_my_turn() and time.time() - state.get("moved_at", 0) > 1.2 and st.legal_moves:
-                mv = st.legal_moves[len(st.history) % len(st.legal_moves)]
-                core.submit_move(mv[:2], mv[2:4], mv[4:] if len(mv) > 4 else "")
-                state["moved_at"] = time.time()
-    elif state["phase"] == "warm" and time.time() - state["t0"] >= WARM_SEC:
-        if CLIPBOARD and not state.get("raised"):
-            pcm = camera_manager()
-            clips = unreal.GameplayStatics.get_all_actors_of_class(pcm.get_world(), unreal.TCClipboard)
-            if clips:
-                clips[0].set_raised(True)
-                log(f"clipboard raised: {len(clips[0].get_sheet_lines())} lines, opening '{clips[0].get_opening_line()}'")
-            state["raised"] = True
-            state["t0"] = time.time() - WARM_SEC + 2.5  # raise animation + focus pull
-            return
+            core = next((o for o in unreal.ObjectIterator(unreal.TCCoreClient) if not o.get_name().startswith("Default__")), None)
+            if core and core.has_game():
+                st = core.get_state()
+                if len(st.history) >= PLAY or st.status != "active":
+                    state["played"] = True
+                    state["t0"] = time.time() - WARM_SEC + 6  # let the last animation and the sheet settle
+                elif core.is_my_turn() and time.time() - state.get("moved_at", 0) > 1.2 and st.legal_moves:
+                    mv = st.legal_moves[len(st.history) % len(st.legal_moves)]
+                    core.submit_move(mv[:2], mv[2:4], mv[4:] if len(mv) > 4 else "")
+                    state["moved_at"] = time.time()
+        elif state["phase"] == "warm" and time.time() - state["t0"] >= WARM_SEC:
+            if CLIPBOARD and not state.get("raised"):
+                pcm = camera_manager()
+                clips = unreal.GameplayStatics.get_all_actors_of_class(pcm.get_world(), unreal.TCClipboard)
+                if clips:
+                    clips[0].set_raised(True)
+                    log(f"clipboard raised: {len(clips[0].get_sheet_lines())} lines, opening '{clips[0].get_opening_line()}'")
+                state["raised"] = True
+                state["t0"] = time.time() - WARM_SEC + 2.5  # raise animation + focus pull
+                return
             begin()
             state["phase"], state["tcap"] = "capturing", time.time()
         elif state["phase"] == "capturing" and time.time() - state["tcap"] >= 4:  # TSR/Lumen history in the capture
