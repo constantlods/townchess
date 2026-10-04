@@ -37,7 +37,8 @@ New in v2:
 | Area | Field or message | Purpose |
 | --- | --- | --- |
 | Handshake | `WELCOME.protocolVersion` | Clients refuse versions they don't know |
-| Game start | `CREATE_AI_GAME {level, color, timeControl}` | Play the house engine through the core: the path UE5 offline play uses (`timeControl: 'untimed'` allowed). Always unrated, and limited to one active game per player |
+| Game start | `CREATE_AI_GAME {level, color, timeControl}` | Play an engine through the core: the path UE5 offline play uses (`timeControl: 'untimed'` allowed). `level` is a house level (`novice`, `patient`, `warden`) or a league level (`sf1350`, `sf1600`, `sf1900`, `sf2200`, `sf2500`, `sfmax`: Stockfish over UCI, see [AI.md](AI.md)). A league level the core did not offer gets `ERROR engine_unavailable`. Always unrated, and limited to one active game per player |
+| Engine levels | `WELCOME.aiLevels: [{id, label, engine: 'house'\|'uci', uciElo: number\|null}]` | The levels this core can play right now, in menu order. Always the three house levels; the six league levels only when a UCI engine was found. Build the AI menu from this list. Optional in the schema: a core older than this field sends none, so treat absence as the three house levels |
 | Draws | `CLAIM_DRAW {gameId, intended?}`; `drawPolicy` on `CREATE_AI_GAME` / `CREATE_PRIVATE` | FIDE claims, for games created with the `claim` policy (matchmade games use `automatic`) |
 | Events | `state.eventSeq` | Act on `lastEvents` only once per sequence number |
 | Moves for clients | `state.legalMoves` | UCI moves for the side to move. Clients highlight moves without any rules code. Public information: it's derivable from the FEN |
@@ -48,6 +49,13 @@ New in v2:
 | Game start | `state.firstMoveDeadline` | Wall-clock deadline for the first move (the abort window) |
 | Clocks | `state.clockRunning` | Whose clock is running, or null. Clients extrapolate only this clock |
 | Players | `PlayerPublic.rating: number \| null`, `ai: {level}` | Engine seats show **no rating**: the levels are not calibrated |
+
+`WELCOME.aiLevels` was added after v2 shipped. It is additive (an optional field on an existing message), so
+`PROTOCOL_VERSION` stays 2: clients that ignore unknown fields keep working, and clients that read it can offer
+exactly what the core supports. This was chosen over a new capability message because WELCOME is already the one
+message every client waits for, and the list depends on the core's machine (whether an engine binary exists), not on
+the protocol version. Engine seats keep `rating: null` for every level; a league seat's `ai.level` is its id
+(`sf1600`), whose label comes from `aiLevels`.
 
 ## Local core (offline play in the UE5 client)
 
@@ -67,7 +75,8 @@ The native client never contains chess rules. For offline games it launches a pr
 | Paths | Highest precedence first: `-tccorenode=` / `-tccorescript=` / `-tccoreargs=` on the command line, then `TOWNCHESS_NODE` / `TOWNCHESS_CORE_SCRIPT`, then (packaged builds) the bundled runtime and core in `Content/TownChessCore`, then `NodePath` / `NodeArgs` / `ScriptPath` in `DefaultGame.ini`. Development builds run the TypeScript through the repo's tsx loader. `@PROJECTDIRURL@` expands to the project directory as a percent-encoded `file://` URL, because UE's ini parser strips braces and Node needs file URLs for absolute `--import` paths on Windows |
 
 Tests:
-- `packages/server/test/sidecar.test.ts` covers the secret, a crash plus journal resume, and stdin-close exit.
+- `packages/server/test/sidecar.test.ts` covers the secret, a crash plus journal resume, stdin-close exit, and
+  league-engine discovery in `<data>/engines/` (offered in WELCOME, played, sent `quit` on exit).
 - `ue5/tools/reconnect_test.sh` covers the same through the real UE client.
 
 ## Time
@@ -88,6 +97,7 @@ Tests:
 | Active engine games per IP | 3 | `LIMITS.aiGamesPerIp` |
 | Engine queue (global) | 64 pending searches; then `ERROR busy` on `CREATE_AI_GAME` | `LIMITS.aiQueueMax` |
 | Engine searches | Worker pool, at most min(4, cores − 1) threads, queued. A failed search is retried once, then a legal move is played so the human never waits forever | `AiPool`, `Hub.aiToMove` |
+| League engine processes | At most 4 (one per game in progress); then `ERROR busy` on `CREATE_AI_GAME` with a league level. Any engine failure falls back to the house engine for that move | `UciLeague.maxEngines` |
 | Time-control keys | Own keys of `TIME_CONTROLS` only (`toString`/`__proto__` are rejected) | `timeControlOf` |
 
 Further protections:

@@ -21,9 +21,10 @@ const procs: ChildProcess[] = [];
 afterEach(() => { for (const p of procs) p.kill('SIGKILL'); procs.length = 0; });
 
 /** `viaStdin`: deliver the secret as the first stdin line and the data dir as --data (how the UE client launches). */
-function launch(dataDir: string, viaStdin = false): Promise<{ proc: ChildProcess; port: number }> {
+function launch(dataDir: string, viaStdin = false, extraEnv: Record<string, string> = {}): Promise<{ proc: ChildProcess; port: number }> {
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, HC_AI_MIN_THINK_MS: '0' } as Record<string, string>;
+    const env = { ...process.env, HC_AI_MIN_THINK_MS: '0', ...extraEnv } as Record<string, string>;
+    if (extraEnv.TC_STOCKFISH === '') delete env.TC_STOCKFISH;
     if (!viaStdin) { env.TOWNCHESS_CORE_SECRET = SECRET; env.TOWNCHESS_CORE_DATA = dataDir; }
     const args = ['--import', tsxLoader, entry, ...(viaStdin ? ['--data', dataDir] : [])];
     const proc = spawn(process.execPath, args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -157,5 +158,31 @@ describe('local core (sidecar)', () => {
     const exited = new Promise<number | null>((r) => proc.once('exit', (code) => r(code)));
     proc.stdin!.end();
     expect(await exited).toBe(0);
+  }, 30_000);
+
+  // POSIX only: the stand-in engine is a shell script wrapping the fake UCI engine.
+  it.skipIf(process.platform === 'win32')('finds <data>/engines/stockfish, offers league levels, plays them, and quits the engine on exit', async () => {
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-core-'));
+    const log = path.join(data, 'uci.log');
+    fs.mkdirSync(path.join(data, 'engines'));
+    const bin = path.join(data, 'engines/stockfish');
+    fs.writeFileSync(bin, `#!/bin/sh\nexec "${process.execPath}" "${path.join(here, 'fixtures/fake-uci.mjs')}" legal "" "${log}"\n`);
+    fs.chmodSync(bin, 0o755);
+    const { proc, port } = await launch(data, false, { TC_STOCKFISH: '' });
+    const c = connect(port, SECRET);
+    await c.opened;
+    c.send({ type: 'HELLO', username: 'LEAGUE' });
+    const w = await c.next('WELCOME');
+    expect(w.aiLevels?.filter((l) => l.engine === 'uci').map((l) => l.id)).toEqual(['sf1350', 'sf1600', 'sf1900', 'sf2200', 'sf2500', 'sfmax']);
+    c.send({ type: 'CREATE_AI_GAME', level: 'sf1350', color: 'w', timeControl: '5+0' });
+    const j = await c.next('GAME_JOINED');
+    c.send({ type: 'MOVE', gameId: j.state.id, seq: 1, from: 'e2', to: 'e4', ply: 0 });
+    const u = await c.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 2);
+    expect(u.state.moveHistory[1].san).toBe('a5'); // the fake engine's choice, so the league path played it
+    c.ws.close();
+    const exited = new Promise((r) => proc.once('exit', r));
+    proc.stdin!.end();
+    await exited;
+    expect(fs.readFileSync(log, 'utf8').trim().split('\n')).toContain('quit');
   }, 30_000);
 });

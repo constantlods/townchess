@@ -72,8 +72,8 @@ Checks:
 
 ```bash
 npm run typecheck
-npm test               # 446 tests in 18 files: 123 FIDE fixture cases (vs chess.js and vs GameCore), core, protocol,
-                       # server, sidecar, engine, learning
+npm test               # 473 tests in 19 files: 123 FIDE fixture cases (vs chess.js and vs GameCore), core, protocol,
+                       # server, sidecar, engine, UCI league (1 test needs TC_STOCKFISH), learning
 npm run e2e:offline    # browser vs the in-tab engine (client must be served, e.g. npm run start)
 node tools/gpubench.mjs 2560x1440   # FPS / frame time / 1% lows on the real GPU (client on :5199)
 npm run e2e:online     # two headless browsers play through the real server (server + client must be running)

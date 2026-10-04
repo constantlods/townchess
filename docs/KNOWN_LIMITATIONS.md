@@ -39,6 +39,7 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [BUG-006](#bug-006) | Restored history carries fabricated `clockAfterMs` | Low (wrong clock annotations) | Fixed |
 | [LIM-008](#lim-008) | Lenient FEN castling field (X-FEN/Shredder letters ignored) | Low | Open, documented |
 | [LIM-009](#lim-009) | What a journal restore does not bring back | Low/informational | Open, documented |
+| [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
 
 ---
 
@@ -335,3 +336,20 @@ normalises the order. Pinned in `regressions.test.ts` ("sanitizeCastling FEN edg
 - Time between the last journal write and the crash is given back to the side to move (clocks come from `record()`).
 - Resolved by e819a2a: the first-move window is now restored when fewer than two moves were played. This is pinned
   as a control.
+
+## LIM-010
+
+**League (Stockfish) opponents: what the labels and the fallbacks mean.** Pinned in `packages/server/test/uci.test.ts`.
+- **Strength labels are the engine's setting, not a measurement.** `sf1600` means Stockfish with `UCI_LimitStrength`
+  and `UCI_Elo 1600`. Stockfish calibrates that scale at 120s+1s against CCRL 40/4; TownChess plays it with 0.6 to
+  1.5 s per move (less on a low clock), so real strength can differ from the number. No TownChess calibration exists.
+  The house levels still claim no Elo at all.
+- **A failed engine move is replaced silently for the player.** On a timeout, crash, missing reply or a move GameCore
+  rejects, the house engine (Warden) plays that one move, which is weaker than the chosen level. It is logged on the
+  core (`[hub] league engine ...`) and counted in `Hub.leagueFallbacks`, but not shown to the client.
+- **Restarts lose engine state.** A crashed engine, or a journal-restored game after a core restart, gets a fresh
+  process (empty hash, `ucinewgame`). Positions are always sent as start FEN plus every move, so the engine still
+  sees the whole game, including repetitions.
+- **Capacity.** At most 4 engine processes per core; a fifth league game is refused with `ERROR busy`.
+- **Availability is decided by file discovery.** A binary that exists but cannot start is only detected on first
+  use; after three failed starts in a row the league levels stop being offered (until the core restarts).

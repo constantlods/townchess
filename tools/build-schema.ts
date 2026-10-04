@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { ClientMessage, GameCore, PROTOCOL_VERSION, ServerMessageSchema, type GameStateDTO } from '../packages/shared/src/index.js';
+import { ClientMessage, GameCore, PROTOCOL_VERSION, ServerMessageSchema, aiLevelsOffered, type GameStateDTO } from '../packages/shared/src/index.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'docs/protocol');
@@ -41,9 +41,10 @@ function stateAfter(moves: string[], startFen?: string): GameStateDTO {
 const examples: Record<string, unknown> = {
   'client-hello': { type: 'HELLO', username: 'PATIENT_07' },
   'client-create-ai-game': { type: 'CREATE_AI_GAME', level: 'warden', color: 'w', timeControl: '5+0' },
+  'client-create-ai-game-league': { type: 'CREATE_AI_GAME', level: 'sf1600', color: 'b', timeControl: '10+5' },
   'client-move-promotion': { type: 'MOVE', gameId: 'GAME-0A1B2C', seq: 12, from: 'b7', to: 'a8', promotion: 'n', ply: 22 },
   'client-claim-draw-intended': { type: 'CLAIM_DRAW', gameId: 'GAME-0A1B2C', intended: { from: 'f6', to: 'g8' } },
-  'server-welcome': { type: 'WELCOME', protocolVersion: PROTOCOL_VERSION, token: '<opaque-48-hex>', player: { ...human, gamesPlayed: 3, wins: 1, losses: 1, draws: 1 }, activeGameId: null },
+  'server-welcome': { type: 'WELCOME', protocolVersion: PROTOCOL_VERSION, token: '<opaque-48-hex>', player: { ...human, gamesPlayed: 3, wins: 1, losses: 1, draws: 1 }, activeGameId: null, aiLevels: aiLevelsOffered(true) },
   'server-game-joined': { type: 'GAME_JOINED', color: 'w', state: stateAfter([]) },
   'server-state-castling': { type: 'GAME_STATE_UPDATED', reason: 'move', state: stateAfter(['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6', 'e1g1']) },
   'server-state-en-passant': { type: 'GAME_STATE_UPDATED', reason: 'move', state: stateAfter(['e2e4', 'a7a6', 'e4e5', 'd7d5', 'e5d6']) },

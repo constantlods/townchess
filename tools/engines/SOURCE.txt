@@ -1,0 +1,17 @@
+Stockfish (GPL-3.0, see Copying.txt in this directory)
+
+This directory ships an unmodified Stockfish binary. TownChess runs it only as a separate process over the UCI
+protocol (stdin/stdout); it is not linked into or compiled with any TownChess code.
+
+Upstream release: Stockfish 19
+  Tag:            sf_19
+  Release page:   https://github.com/official-stockfish/Stockfish/releases/tag/sf_19
+  Binary asset:   stockfish-windows-x86-64-avx2.zip (stockfish-windows-x86-64-avx2.exe inside)
+  Source archive: https://github.com/official-stockfish/Stockfish/archive/refs/tags/sf_19.tar.gz
+  Repository:     https://github.com/official-stockfish/Stockfish
+
+Neural network embedded in the binary: nn-1a298aa575a0.nnue (EvalFileDefaultName in src/evaluate.h at sf_19),
+available from https://tests.stockfishchess.org/nns
+
+The corresponding source is the unmodified upstream source at the tag above. It can also be requested from the
+TownChess maintainers.

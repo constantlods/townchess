@@ -17,5 +17,61 @@
     "losses": 1,
     "draws": 1
   },
-  "activeGameId": null
+  "activeGameId": null,
+  "aiLevels": [
+    {
+      "id": "novice",
+      "label": "Novice",
+      "engine": "house",
+      "uciElo": null
+    },
+    {
+      "id": "patient",
+      "label": "Patient",
+      "engine": "house",
+      "uciElo": null
+    },
+    {
+      "id": "warden",
+      "label": "Warden",
+      "engine": "house",
+      "uciElo": null
+    },
+    {
+      "id": "sf1350",
+      "label": "Stockfish (UCI_Elo 1350)",
+      "engine": "uci",
+      "uciElo": 1350
+    },
+    {
+      "id": "sf1600",
+      "label": "Stockfish (UCI_Elo 1600)",
+      "engine": "uci",
+      "uciElo": 1600
+    },
+    {
+      "id": "sf1900",
+      "label": "Stockfish (UCI_Elo 1900)",
+      "engine": "uci",
+      "uciElo": 1900
+    },
+    {
+      "id": "sf2200",
+      "label": "Stockfish (UCI_Elo 2200)",
+      "engine": "uci",
+      "uciElo": 2200
+    },
+    {
+      "id": "sf2500",
+      "label": "Stockfish (UCI_Elo 2500)",
+      "engine": "uci",
+      "uciElo": 2500
+    },
+    {
+      "id": "sfmax",
+      "label": "Stockfish (full strength)",
+      "engine": "uci",
+      "uciElo": null
+    }
+  ]
 }

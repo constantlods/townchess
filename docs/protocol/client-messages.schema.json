@@ -144,7 +144,13 @@
           "enum": [
             "novice",
             "patient",
-            "warden"
+            "warden",
+            "sf1350",
+            "sf1600",
+            "sf1900",
+            "sf2200",
+            "sf2500",
+            "sfmax"
           ]
         },
         "color": {
