@@ -30,6 +30,7 @@ SOURCES = {"final": "SCS_FINAL_TONE_CURVE_HDR", "basecolor": "SCS_BASE_COLOR", "
 SOURCE = arg("TCSource", "final").lower()
 PLAY = int(arg("TCPlay", "0"))          # play this many plies (our side: first legal move) before the shot
 CLIPBOARD = arg("TCClipboard", "") == "1"  # raise the game-record clipboard for the shot
+CMDS = [c.replace("_", " ") for c in arg("TCCmds", "").split(";") if c]  # console commands, "_" for spaces (e.g. r.Fog_0)
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
 
 
@@ -105,6 +106,8 @@ def tick(_dt):
                       "ReflectionQuality", "PostProcessQuality", "TextureQuality", "EffectsQuality", "ShadingQuality"):
                 cmd(f"sg.{g} {PRESET}")
             cmd(f"r.SetRes {RES}w")
+            for c in CMDS:
+                cmd(c)
             if PRESET >= 3:  # RTX reference quality: hardware ray-traced Lumen and RT shadows (the RX 6650 XT target stays software)
                 for c in ("r.Lumen.HardwareRayTracing 1", "r.Lumen.Reflections.HardwareRayTracing 1", "r.RayTracing.Shadows 1"):
                     cmd(c)

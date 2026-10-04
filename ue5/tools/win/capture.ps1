@@ -11,6 +11,8 @@ $log = Join-Path $Logs "capture-$Name.log"
 $argv = @("`"$Project`"", '/Game/TownChess/L_Table', '-game', '-RenderOffscreen', '-nosound', '-unattended',
           "-tcauto=$Auto", "-ExecCmds=`"py $script`"", "-TCShot=$out", "-TCShotRes=$Res", "-TCPreset=$Preset",
           "-TCWarmSec=$WarmSec", "-TCSource=$Source", "-TCProbe=$Probe", "-abslog=`"$log`"") + ($Extra -split ' ' | Where-Object { $_ })
+# reference shots start from a fresh game: an unfinished game in the local core's journal would be restored instead
+Remove-Item (Join-Path $Repo 'ue5\TownChess\Saved\TownChess\core\journal') -Recurse -Force -ErrorAction SilentlyContinue
 $p = Start-Process "$UERoot\Engine\Binaries\Win64\UnrealEditor.exe" -ArgumentList $argv -PassThru
 if (-not $p.WaitForExit(900000)) { $p.Kill(); throw 'capture timed out' }
 Select-String -Path $log -Pattern '\[TCSHOT\]' | ForEach-Object { $_.Line }
