@@ -701,7 +701,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
     new_w, new_l = solve(deltas)
     ARM_TARGETS = {"clasp": {"hand": (3.0, 15.0, -13.0), "elbow_z": -31.0, "elbow_x": 19.0},
-                   "player": {"hand": (24.0, 50.0, -40.0), "elbow_z": -40.0, "elbow_x": 26.0}}
+                   "player": {"hand": (24.0, 60.0, -31.0), "elbow_z": -36.0, "elbow_x": 24.0}}  # head sits ~34 cm over the table
     if pose_name in ARM_TARGETS and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
         # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
         head = new_w["head"][0]
@@ -730,8 +730,8 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             target = (head[0] + sign * tg["hand"][0], head[1] + tg["hand"][1], head[2] + tg["hand"][2])
             elbow_z = head[2] + tg["elbow_z"]  # elbows on the table: the table top is ~31 cm under the seated head
             score_best = None
-            for ux in range(20, 101, 8):
-                for uz in range(-60, 61, 10):
+            for ux in range(10, 131, 8):
+                for uz in range(-80, 81, 10):
                     for lx in range(20, 161, 10):
                         for lz in range(-80, 81, 10):
                             o = chain(side, ux, uz, lx, lz)
