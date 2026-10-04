@@ -52,7 +52,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<UFontFace> HandFace;
 	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<UFontFace> FormFace;
 	/** Reading pose relative to the camera (cm): forward, right, up. */
-	UPROPERTY(EditAnywhere, Category = "TownChess") FVector RaisedOffset = FVector(57.f, 17.f, -2.f);
+	UPROPERTY(EditAnywhere, Category = "TownChess") FVector RaisedOffset = FVector(62.f, 25.f, -1.f);
 	UPROPERTY(EditAnywhere, Category = "TownChess") float RaiseSeconds = 0.45f;
 
 private:

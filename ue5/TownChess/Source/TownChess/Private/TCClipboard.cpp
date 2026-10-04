@@ -17,7 +17,7 @@
 
 namespace
 {
-	constexpr int32 SheetW = 1024, SheetH = 1152;   // 16 x 18 cm of paper
+	constexpr int32 SheetW = 1024, SheetH = 1365;   // 20 x 26.7 cm of paper (fills the clipboard under the clip)
 	constexpr int32 Rows = 15, PliesPerPage = Rows * 2 * 2;
 	const FLinearColor PaperInk(0.13f, 0.12f, 0.12f), Pencil(0.22f, 0.21f, 0.23f), Rule(0.55f, 0.5f, 0.42f), Faded(0.42f, 0.38f, 0.32f);
 }
@@ -35,8 +35,8 @@ ATCClipboard::ATCClipboard()
 	Paper->SetupAttachment(Root);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Plane(TEXT("/Engine/BasicShapes/Plane.Plane"));
 	if (Plane.Succeeded()) Paper->SetStaticMesh(Plane.Object);
-	Paper->SetRelativeScale3D(FVector(0.16f, 0.18f, 1.f));  // the engine plane is 100 x 100 cm
-	Paper->SetRelativeLocation(FVector(0.f, 1.0f, 0.45f));
+	Paper->SetRelativeScale3D(FVector(0.20f, 0.267f, 1.f));  // the engine plane is 100 x 100 cm
+	Paper->SetRelativeLocation(FVector(0.f, 1.6f, 0.45f));
 	Paper->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ReadLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("ReadLight"));
 	ReadLight->SetupAttachment(Root);
@@ -135,7 +135,7 @@ void ATCClipboard::DrawSheet(UCanvas* Canvas, int32 Width, int32 Height)
 	};
 	const float M = 60.f;
 	Text(Form, TEXT("WARD B"), M, 40.f, 2.0f, PaperInk);
-	Text(Form, FString::Printf(TEXT("GAME RECORD   Form 7/C   Sheet %d"), Page + 1), M + 260.f, 58.f, 1.0f, Faded);
+	Text(Form, FString::Printf(TEXT("GAME RECORD   Form 7/C   Sheet %d"), Page + 1), M + 330.f, 66.f, 0.95f, Faded);
 	Line(M, 120.f, Width - M, 120.f, PaperInk, 3.f);
 	Text(Form, TEXT("WHITE"), M, 140.f, 0.9f, Faded);
 	Text(Hand, WhiteName, M + 120.f, 128.f, 1.25f, Pencil);
@@ -149,7 +149,7 @@ void ATCClipboard::DrawSheet(UCanvas* Canvas, int32 Width, int32 Height)
 	if (!Op2.IsEmpty()) Text(Hand, Op2, M + 170.f, 246.f, 1.1f, Pencil);
 	Line(M, 300.f, Width - M, 300.f, PaperInk, 3.f);
 	// two columns of 15 rows; each row holds one full move ("12. Nf3  Nc6")
-	const float Top = 330.f, RowH = 50.f, ColW = (Width - 2 * M) / 2.f;
+	const float Top = 330.f, RowH = 62.f, ColW = (Width - 2 * M) / 2.f;
 	for (int32 r = 0; r <= Rows; ++r) Line(M, Top + r * RowH + RowH - 6.f, Width - M, Top + r * RowH + RowH - 6.f, Rule, 1.5f);
 	Line(M + ColW, Top, M + ColW, Top + Rows * RowH + RowH, Rule, 1.5f);
 	const int32 First = Page * Rows * 2;
@@ -158,7 +158,7 @@ void ATCClipboard::DrawSheet(UCanvas* Canvas, int32 Width, int32 Height)
 		const int32 Idx = First + i;
 		if (!SheetLines.IsValidIndex(Idx)) break;
 		const float X = M + (i / Rows) * ColW + 14.f, Y = Top + (i % Rows) * RowH + 4.f;
-		Text(Hand, SheetLines[Idx], X, Y, 1.15f, Pencil);
+		Text(Hand, SheetLines[Idx], X, Y, 1.4f, Pencil);
 	}
 	if (!ResultLine.IsEmpty()) Text(Hand, TEXT("Result: ") + ResultLine, M, Top + Rows * RowH + RowH + 20.f, 1.3f, PaperInk);
 }
