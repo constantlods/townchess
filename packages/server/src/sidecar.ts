@@ -10,15 +10,18 @@
  *   - prints exactly one line `TOWNCHESS_CORE_READY {"port":N,"pid":P,"protocolVersion":V}` on stdout when ready;
  *   - exits when stdin closes (the parent died or closed the pipe), so a crashed game never leaves an orphan;
  *     on Windows the game additionally puts this process in a Job Object with KILL_ON_JOB_CLOSE;
- *   - unfinished games are journaled and restored on restart (crash recovery).
+ *   - unfinished games are journaled and restored on restart (crash recovery);
+ *   - league (Stockfish) levels are offered when a UCI engine is found (see discoverUciEngine in uciEngine.ts).
  */
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
+import { fileURLToPath } from 'node:url';
 import { PROTOCOL_VERSION } from '@hc/shared';
 import { Hub } from './hub.js';
 import { PlayerStore } from './players.js';
+import { discoverUciEngine } from './uciEngine.js';
 
 const argData = process.argv.indexOf('--data');
 const dataDir = argData > 0 ? process.argv[argData + 1] : process.env.TOWNCHESS_CORE_DATA ?? path.join(os.homedir(), '.townchess', 'core');
@@ -53,14 +56,19 @@ const server = http.createServer((req, res) => {
   res.end(req.url === '/health' ? 'ok' : 'not found');
 });
 const players = new PlayerStore(path.join(dataDir!, 'players.json'));
-const hub = new Hub(server, players, '/ws', { secret, journalDir: path.join(dataDir!, 'journal') });
+// League engine (Stockfish, GPL-3.0): a separate process found via TC_STOCKFISH, <data>/engines or engines/ next to
+// this file (the packaged townchess-core.mjs). None found = league levels are simply not offered.
+const uciEngine = discoverUciEngine({ dataDir, coreDir: path.dirname(fileURLToPath(import.meta.url)) });
+const hub = new Hub(server, players, '/ws', { secret, journalDir: path.join(dataDir!, 'journal'), uciEngine });
 
 const shutdown = (why: string) => {
   console.error(`[sidecar] shutting down: ${why}`);
   players.flush();
   hub.close();
   server.close();
-  process.exit(0);
+  // let engine processes receive `quit` (they also exit on stdin EOF when this process is gone), at most 1 s
+  setTimeout(() => process.exit(0), 1000).unref();
+  void hub.league.close().finally(() => process.exit(0));
 };
 process.stdin.on('end', () => shutdown('stdin closed (parent gone)'));
 process.stdin.on('error', () => shutdown('stdin error'));

@@ -3,11 +3,12 @@ import nodePath from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage, Server } from 'node:http';
-import { parseClientMessage, PROTOCOL_VERSION, TIME_CONTROLS, isFinished, type ClientMessage, type ServerMessage, type TimeControl } from '@hc/shared';
-import { AI_LEVELS, type AiLevel } from '@hc/engine';
+import { parseClientMessage, PROTOCOL_VERSION, TIME_CONTROLS, isFinished, aiLevelsOffered, isLeagueLevel, moveBudgetMs, LEAGUE_LEVELS, type ClientMessage, type ServerMessage, type TimeControl, type LeagueLevelId } from '@hc/shared';
+import { AI_LEVELS, isAiLevel, type AiLevel } from '@hc/engine';
 import { PlayerStore } from './players.js';
 import { GameRoom, isAiSeat, newGameId, type RoomEvents, type RoomRecord } from './room.js';
 import { AiPool } from './aiPool.js';
+import { UciLeague, discoverUciEngine, type UciCommand, type LeagueOptions } from './uciEngine.js';
 
 export interface HubOptions {
   allowedOrigins?: string[];
@@ -16,6 +17,13 @@ export interface HubOptions {
   secret?: string;
   /** Directory for the unfinished-game journal (crash recovery). */
   journalDir?: string;
+  /**
+   * UCI engine for the league (Stockfish) levels. undefined = discover from env TC_STOCKFISH only; null = none.
+   * The sidecar passes discoverUciEngine({ dataDir, coreDir }) so engines/ next to the core is found as well.
+   */
+  uciEngine?: UciCommand | null;
+  /** Pool / timeout settings for the league engine processes (tests shorten them). */
+  league?: LeagueOptions;
 }
 
 /** Abuse limits. Per IP: concurrent sockets and new identities per minute. AI games: one active per player. */
@@ -43,6 +51,10 @@ export class Hub implements RoomEvents {
   private socketsByIp = new Map<string, number>();
   private identitiesByIp = new Map<string, number[]>();
   readonly ai = new AiPool();
+  /** League (Stockfish / UCI) engine processes: separate OS processes, one per game in progress. */
+  readonly league: UciLeague;
+  /** League moves replaced by the house engine (no reply, timeout, crash or a move GameCore rejected). */
+  leagueFallbacks = 0;
   /** Minimum engine "thinking" time so moves don't appear instantly (spent on the engine's own clock). */
   aiMinThinkMs = Number(process.env.HC_AI_MIN_THINK_MS ?? 700);
 
@@ -50,6 +62,8 @@ export class Hub implements RoomEvents {
     const allowed = opts.allowedOrigins ?? (process.env.HC_ALLOWED_ORIGINS ? process.env.HC_ALLOWED_ORIGINS.split(',') : null);
     this.trustProxy = opts.trustProxy ?? process.env.HC_TRUST_PROXY === '1';
     this.journalDir = opts.journalDir ?? null;
+    this.league = new UciLeague(opts.uciEngine === undefined ? discoverUciEngine() : opts.uciEngine, opts.league);
+    if (this.league.cmd) console.log(`[hub] league engine: ${this.league.cmd.path}`);
     const secret = opts.secret ? Buffer.from(opts.secret) : null;
     this.wss = new WebSocketServer({
       server, path, maxPayload: 4096,
@@ -142,6 +156,7 @@ export class Hub implements RoomEvents {
     if (this.journalTimer) clearInterval(this.journalTimer);
     this.persistAll(); // a clean shutdown keeps every unfinished game, clocks included
     this.ai.close();
+    void this.league.close();
     clearInterval(this.matchTimer);
     clearInterval(this.pingTimer);
     for (const r of this.rooms.values()) r.dispose();
@@ -158,6 +173,7 @@ export class Hub implements RoomEvents {
     if (c && c.ws.readyState === WebSocket.OPEN) c.ws.send(JSON.stringify(msg));
   }
   finished(room: GameRoom) {
+    this.league.release(room.id);
     for (const id of [room.white, room.black]) if (id && this.activeGame.get(id) === room.id) this.activeGame.delete(id);
     // keep finished rooms briefly for rematch / late reconnects
     setTimeout(() => { if (isFinished(room.status)) { room.dispose(); this.rooms.delete(room.id); } }, 10 * 60_000).unref();
@@ -227,7 +243,7 @@ export class Hub implements RoomEvents {
       c.playerId = player.id;
       this.socketOf.set(player.id, c);
       const active = this.activeGame.get(player.id) ?? null;
-      this.reply(c, { type: 'WELCOME', protocolVersion: PROTOCOL_VERSION, token, player: { ...this.players.publicOf(player.id)!, gamesPlayed: player.gamesPlayed, wins: player.wins, losses: player.losses, draws: player.draws }, activeGameId: active });
+      this.reply(c, { type: 'WELCOME', protocolVersion: PROTOCOL_VERSION, token, player: { ...this.players.publicOf(player.id)!, gamesPlayed: player.gamesPlayed, wins: player.wins, losses: player.losses, draws: player.draws }, activeGameId: active, aiLevels: aiLevelsOffered(this.league.available) });
       return;
     }
     const pid = c.playerId;
@@ -261,7 +277,12 @@ export class Hub implements RoomEvents {
         const tc = m.timeControl === 'untimed' ? null : timeControlOf(m.timeControl);
         if (tc === undefined) { this.reply(c, { type: 'ERROR', code: 'tc', message: 'unknown time control' }); break; }
         if (this.activeGame.has(pid)) { this.reply(c, { type: 'ERROR', code: 'busy', message: 'Finish or leave your current game first.' }); break; }
-        if (this.aiGamesForIp(c.ip) >= LIMITS.aiGamesPerIp || this.ai.pending >= LIMITS.aiQueueMax) {
+        if (isLeagueLevel(m.level) && !this.league.available) {
+          this.reply(c, { type: 'ERROR', code: 'engine_unavailable', message: 'That engine is not installed on this core.' });
+          break;
+        }
+        if (this.aiGamesForIp(c.ip) >= LIMITS.aiGamesPerIp || this.ai.pending >= LIMITS.aiQueueMax
+          || (isLeagueLevel(m.level) && this.leagueGamesActive() >= this.league.maxEngines)) {
           this.reply(c, { type: 'ERROR', code: 'busy', message: 'The engine is busy. Try again shortly.' });
           break;
         }
@@ -356,22 +377,79 @@ export class Hub implements RoomEvents {
     return n;
   }
 
-  /** RoomEvents: search for the engine seat off the event loop, then submit through the same validation as a human. */
-  aiToMove(room: GameRoom, attempt = 1) {
+  /** Active games against a league (UCI) level: each holds one engine process. */
+  private leagueGamesActive(): number {
+    let n = 0;
+    for (const r of this.rooms.values()) {
+      if (r.status !== 'active') continue;
+      if ([r.white, r.black].some((id) => isAiSeat(id) && isLeagueLevel(id!.slice(3)))) n++;
+    }
+    return n;
+  }
+
+  /** Remaining clock of the side to move (null = untimed) and the minimum display delay that clock can afford. */
+  private clockBudget(room: GameRoom): { remaining: number | null; minThink: number } {
+    const clock = room.untimed ? null : room.core.clock;
+    const remaining = clock ? clock.peek(room.core.turn, room.now()) : null;
+    return { remaining, minThink: remaining === null ? this.aiMinThinkMs : Math.min(this.aiMinThinkMs, Math.floor(remaining / 40)) };
+  }
+
+  /**
+   * RoomEvents: the engine seat must move. League levels ask the UCI engine (separate process); house levels, and any
+   * league failure, use the house engine in a worker thread. Either way the move is submitted through the same
+   * GameCore validation as a human move. The engine is never asked about a finished position.
+   */
+  aiToMove(room: GameRoom) {
+    if (room.status !== 'active') return;
+    const level = room.playerOf(room.core.turn)!.slice(3);
+    if (isLeagueLevel(level) && this.league.available) this.leagueMove(room, level);
+    else this.houseMove(room, isAiLevel(level) ? level : 'warden');
+  }
+
+  private leagueMove(room: GameRoom, level: LeagueLevelId) {
     const ply = room.core.ply;
     const fen = room.core.fen;
     const aiId = room.playerOf(room.core.turn)!;
-    const level = aiId.split(':')[1] as AiLevel;
-    const { maxDepth, timeMs, noise } = AI_LEVELS[level] ?? AI_LEVELS.patient;
+    if (room.core.legalMovesUci().length === 0) return; // finished position: never sent to the engine
+    const { remaining, minThink } = this.clockBudget(room);
+    const movetime = moveBudgetMs(LEAGUE_LEVELS[level].movetimeMs, remaining, room.tc.incrementMs, 100);
     const started = Date.now();
-    void this.ai.search(fen, { maxDepth, timeMs, noise }).then((mv) => {
-      const wait = Math.max(0, this.aiMinThinkMs - (Date.now() - started));
+    void this.league.bestMove(room.id, level, room.core.startFen, movetime, room.core.movesUci()).then((uci) => {
+      const wait = Math.max(0, minThink - (Date.now() - started));
+      setTimeout(() => {
+        if (room.status !== 'active' || room.core.ply !== ply) return; // game moved on (resign, flag, abort)
+        if (!uci) {
+          this.leagueFallbacks++;
+          console.error(`[hub] league engine gave no move in ${room.id} at ply ${ply} (${level}); house engine moves instead: ${fen}`);
+          this.houseMove(room, 'warden');
+          return;
+        }
+        const err = room.move(aiId, uci.slice(0, 2), uci.slice(2, 4), (uci[4] || undefined) as never, ply);
+        if (err) {
+          this.leagueFallbacks++;
+          console.error(`[hub] league engine move ${uci} rejected by GameCore in ${room.id} at ply ${ply} (${err}); house engine moves instead: ${fen}`);
+          this.houseMove(room, 'warden');
+        }
+      }, wait).unref();
+    });
+  }
+
+  /** House engine in the worker pool. */
+  private houseMove(room: GameRoom, level: AiLevel, attempt = 1) {
+    const ply = room.core.ply;
+    const fen = room.core.fen;
+    const aiId = room.playerOf(room.core.turn)!;
+    const { maxDepth, timeMs, noise } = AI_LEVELS[level] ?? AI_LEVELS.patient;
+    const { remaining, minThink } = this.clockBudget(room);
+    const started = Date.now();
+    void this.ai.search(fen, { maxDepth, timeMs: moveBudgetMs(timeMs, remaining, room.tc.incrementMs, 100), noise }).then((mv) => {
+      const wait = Math.max(0, minThink - (Date.now() - started));
       setTimeout(() => {
         if (room.status !== 'active' || room.core.ply !== ply) return; // game moved on (resign, flag, abort)
         let move = mv;
         if (!move) {
           console.error(`[hub] engine returned no move in ${room.id} at ply ${ply} (attempt ${attempt}): ${fen}`);
-          if (attempt < 2) { this.aiToMove(room, attempt + 1); return; }
+          if (attempt < 2) { this.houseMove(room, level, attempt + 1); return; }
           // never leave a human waiting forever: fall back to any legal move
           const any = room.core.legalMovesUci()[0];
           if (!any) return;

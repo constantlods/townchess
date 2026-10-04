@@ -11,7 +11,8 @@
   "dependencies": {
     "@hc/shared": "*",
     "ws": "^8.18.0",
-    "@hc/engine": "*"
+    "@hc/engine": "*",
+    "@hc/learning": "*"
   },
   "devDependencies": {
     "@types/ws": "^8.5.12",
