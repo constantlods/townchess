@@ -612,6 +612,8 @@ POSES = {
     "rest": {"spine_01": (-6, 0), "spine_03": (-8, 0), "neck_01": (4, 0), "head": (14, 0),
              "upperarm_l": (52, 0), "upperarm_r": (52, 0), "lowerarm_l": (50, 0), "lowerarm_r": (50, 0)},
     # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
+    # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
+    "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0)},
     "clasp": {"spine_01": (6, 0), "spine_03": (10, 0), "neck_01": (-4, 0), "head": (6, 0),
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
               "hand_l": (0, -15), "hand_r": (0, 15)},
@@ -698,7 +700,9 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         return new_w, new_l
 
     new_w, new_l = solve(deltas)
-    if pose_name == "clasp" and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
+    ARM_TARGETS = {"clasp": {"hand": (3.0, 15.0, -13.0), "elbow_z": -31.0, "elbow_x": 19.0},
+                   "player": {"hand": (24.0, 50.0, -40.0), "elbow_z": -40.0, "elbow_x": 26.0}}
+    if pose_name in ARM_TARGETS and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
         # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
         head = new_w["head"][0]
         table_z = float(os.environ.get("TC_TABLE_Z", 80.0))
@@ -722,8 +726,9 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         for side, sx in (("l", 1.0), ("r", -1.0)):
             # which way is "this arm's side": the upper arm's x sign in the seated torso
             sign = 1.0 if new_w[f"upperarm_{side}"][0][0] > head[0] else -1.0
-            target = (head[0] + sign * 3.0, head[1] + 15.0, head[2] - 13.0)   # hands just in front of the chin
-            elbow_z = head[2] - 31.0  # elbows on the table: the table top is ~31 cm under the seated head
+            tg = ARM_TARGETS[pose_name]
+            target = (head[0] + sign * tg["hand"][0], head[1] + tg["hand"][1], head[2] + tg["hand"][2])
+            elbow_z = head[2] + tg["elbow_z"]  # elbows on the table: the table top is ~31 cm under the seated head
             score_best = None
             for ux in range(20, 101, 8):
                 for uz in range(-60, 61, 10):
@@ -732,19 +737,20 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
                             o = chain(side, ux, uz, lx, lz)
                             e, h = o[f"lowerarm_{side}"][0], o[f"hand_{side}"][0]
                             err = sum((h[i] - target[i]) ** 2 for i in range(3)) + 0.5 * (e[2] - elbow_z) ** 2
+                            err += 0.3 * (abs(e[0] - head[0]) - tg["elbow_x"]) ** 2   # elbows spread, forearms in a V
                             if (h[0] - head[0]) * sign < -1.0:   # hands meet, they do not cross
                                 err += 300
                             if e[1] < head[1] + 6:   # elbows forward of the chest, on the table
                                 err += 400
                             if score_best is None or err < score_best:
                                 score_best, best[side] = err, (ux, uz, lx, lz)
-            log("clasp", side, "best", best[side], "error", round(score_best, 1), "target", [round(v, 1) for v in target])
+            log(pose_name, side, "best", best[side], "error", round(score_best, 1), "target", [round(v, 1) for v in target])
         for side in ("l", "r"):
             ux, uz, lx, lz = best[side]
             deltas[f"upperarm_{side}"] = _qmul(_axis(Z, uz), _axis(X, ux))
             deltas[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
         new_w, new_l = solve(deltas)
-        log("clasp hands", [round(v, 1) for v in new_w["hand_l"][0]], [round(v, 1) for v in new_w["hand_r"][0]],
+        log(pose_name, "hands", [round(v, 1) for v in new_w["hand_l"][0]], [round(v, 1) for v in new_w["hand_r"][0]],
             "elbows", [round(v, 1) for v in new_w["lowerarm_l"][0]], [round(v, 1) for v in new_w["lowerarm_r"][0]])
 
     # head in the seated pose (component space) and its idle orientation, for props attached to the head bone
@@ -1104,9 +1110,9 @@ def build():
             EAL.save_loaded_asset(sm)
         return meshes[0] if meshes else None
 
-    def spawn_opponent(opp_id, mhn, outfit_mi=None, pose="rest"):
+    def spawn_opponent(opp_id, mhn, outfit_mi=None, pose="rest", loc=(90.0, 0.0, 0.0), yaw=90.0, with_face=True, group_tag=None):
         """Body (seated pose), face and outfit as skeletal mesh actors; the game links face/outfit to the body."""
-        opp_tag = f"TC_Opponent_{opp_id}"
+        opp_tag = group_tag or f"TC_Opponent_{opp_id}"
         mh_body = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh") if GAMEPLAY and mhn else None
         body_mesh = mh_body or manny
         if not (idle and body_mesh):
@@ -1122,7 +1128,7 @@ def build():
                 seated_cache[key] = (None, dict(SEATED))
         seated, head = seated_cache[key]
         SEATED.update(head)
-        opp = EAS.spawn_actor_from_object(body_mesh, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> -X
+        opp = EAS.spawn_actor_from_object(body_mesh, unreal.Vector(*loc), unreal.Rotator(0, 0, yaw))  # mesh faces +Y; yaw 90 -> -X
         opp.set_actor_label(f"Opponent_{opp_id}")
         smc = opp.skeletal_mesh_component
         tag(opp); tag(opp, opp_tag); tag(opp, "TC_Body")
@@ -1134,7 +1140,7 @@ def build():
         setp(smc, "animation_data", data)
         if mh_body:
             followers = []
-            face = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Face/SKM_{mhn}_FaceMesh")
+            face = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Face/SKM_{mhn}_FaceMesh") if with_face else None
             if face:
                 followers.append(("Face", face, None))
             # outfit meshes: the body hides the skin under them, so they must be present or the torso renders as a hole
@@ -1143,7 +1149,7 @@ def build():
                 if isinstance(cm, unreal.SkeletalMesh):
                     followers.append((cm.get_name(), cm, outfit_mi))
             for label, mesh, mi in followers:
-                f = EAS.spawn_actor_from_object(mesh, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
+                f = EAS.spawn_actor_from_object(mesh, unreal.Vector(*loc), unreal.Rotator(0, 0, yaw))
                 f.set_actor_label(f"Opponent_{opp_id}_{label}")
                 f.skeletal_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
                 f.attach_to_actor(opp, "", R.KEEP_WORLD, R.KEEP_WORLD, R.KEEP_WORLD, False)
@@ -1172,6 +1178,19 @@ def build():
             EAL.save_loaded_asset(cage[0])
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,4.5,-1").split(",")]  # forward (+Y), up (+Z) from the head bone
             attach_static("CageMask", cage[0], smc, "head", *head_relative(off), "TC_Opponent_caged")
+
+    # 0. The player's own arms (first person): the reference shows real hands with sleeves resting on the board,
+    #    not floating gloves. Eyes at the camera (x=-87, z=top+42); ATCGameMode hides the head (tag TC_PlayerBody).
+    if mhn and GAMEPLAY and os.environ.get("TC_PLAYER_BODY", "1") == "1":
+        probe = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh")
+        build_seated_pose(probe, idle, f"{ROOT}/Anims", "A_TC_Probe_player", own_proportions=True, pose_name="player")
+        hx, hy, hz = SEATED["head"][0]
+        ploc = (-87.0 - (hy + 9.0), hx, top + 42.0 - (hz + 8.0))  # component +Y (forward) -> world +X with yaw -90
+        pb, _ = spawn_opponent("player", mhn, outfit_mi=mi_gown_early, pose="player", loc=ploc, yaw=-90.0, with_face=False,
+                               group_tag="TC_PlayerBody")
+        if pb:
+            log("player body at", [round(v, 1) for v in ploc])
+            SEATED["player_body"] = True  # the XR stand-in gloves give way to real arms
 
     # 2. The Annotator: slate-green coat, tan oversleeves, linen coif, two-leaf riveted plate, ledger and pencil
     # flat cloth colours (the linen scan's yellow cast turned slate green into lime) + our grime layer for wear
@@ -1213,7 +1232,7 @@ def build():
                 tag(a); tag(a, "TC_Opponent_annotator")
 
     # ---- Player hands (XR mannequin hands as stand-ins), resting near the near board edge.
-    for side, y, yaw_h in (("left", -26, 0), ("right", 26, 0)):
+    for side, y, yaw_h in (() if SEATED.get("player_body") else (("left", -26, 0), ("right", 26, 0))):
         hm = unreal.load_asset(f"/Game/XRMannequins/Meshes/SKM_MannyXR_{side}")
         if hm:
             b = hm.get_bounds()
@@ -1240,7 +1259,7 @@ def build():
     tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (70, 0, top + 45)), 220, 2400, 400, 40, src=2.5, vol=0.6))
     rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
     # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)
-    rect("Lamp_TableBounce", (10, 0, top + 2), (0, 90, 0), 900, 2600, 120, 90, 260, vol=0.4)
+    rect("Lamp_TableBounce", (10, 0, top + 2), (0, 90, 0), 300, 2600, 120, 90, 260, vol=0.4)
     # corridor light behind the bars: a cold glow that separates the opponent from the back wall
     rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)
 

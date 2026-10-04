@@ -57,11 +57,12 @@ FString ATCGameMode::GetServerLabel() const
 	return IsOnline() ? ServerUrl : TEXT("local core");
 }
 
+/** The character group an actor belongs to: TC_Opponent_<id> (roster) or TC_PlayerBody (first-person arms). */
 static FName OpponentTagOf(const AActor* A)
 {
 	for (const FName& T : A->Tags)
 	{
-		if (T.ToString().StartsWith(TEXT("TC_Opponent_"))) return T;
+		if (T.ToString().StartsWith(TEXT("TC_Opponent_")) || T == TEXT("TC_PlayerBody")) return T;
 	}
 	return NAME_None;
 }
@@ -85,8 +86,11 @@ void ATCGameMode::ApplyOpponent(const FString& Id)
 	{
 		const FName T = OpponentTagOf(*It);
 		if (T == NAME_None) continue;
-		It->SetActorHiddenInGame(T != Show);
-		It->SetActorEnableCollision(T == Show);
+		if (T != TEXT("TC_PlayerBody"))
+		{
+			It->SetActorHiddenInGame(T != Show);
+			It->SetActorEnableCollision(T == Show);
+		}
 		if (It->ActorHasTag(TEXT("TC_FollowBody")))
 		{
 			if (USkeletalMeshComponent* const* B = Bodies.Find(T))
@@ -105,6 +109,15 @@ void ATCGameMode::BeginPlay()
 	// Opponent roster: every character is built into the level, tagged TC_Opponent_<id>. Show the selected one
 	// (-tcopponent=<id>, default "caged") and hide the rest. MetaHuman faces/outfits are separate skeletal mesh actors
 	// that follow their own body's skeleton (leader pose), which is runtime state and so is linked here.
+	// First-person arms: the player's own MetaHuman body sits at the camera; its head (and neck) must not be drawn.
+	for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("TC_PlayerBody")) && It->ActorHasTag(TEXT("TC_Body")))
+		{
+			It->GetSkeletalMeshComponent()->HideBoneByName(TEXT("neck_01"), EPhysBodyOp::PBO_None);
+			It->GetSkeletalMeshComponent()->SetCastShadow(true);
+		}
+	}
 	FString OpponentId = TEXT("caged");
 	FParse::Value(FCommandLine::Get(), TEXT("-tcopponent="), OpponentId);
 	ApplyOpponent(OpponentId);
