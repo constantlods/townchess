@@ -6,7 +6,8 @@ protocol (stdin/stdout); it is not linked into or compiled with any TownChess co
 Upstream release: Stockfish 19
   Tag:            sf_19
   Release page:   https://github.com/official-stockfish/Stockfish/releases/tag/sf_19
-  Binary asset:   stockfish-windows-x86-64-avx2.zip (stockfish-windows-x86-64-avx2.exe inside)
+  Binary asset:   stockfish-windows-x86-64-universal.zip (shipped renamed to stockfish.exe; the universal build
+                  picks the best code path for the CPU at run time)
   Source archive: https://github.com/official-stockfish/Stockfish/archive/refs/tags/sf_19.tar.gz
   Repository:     https://github.com/official-stockfish/Stockfish
 
