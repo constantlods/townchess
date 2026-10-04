@@ -951,8 +951,10 @@ def build():
                                grime_color=(0.35, 0.33, 0.32), scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.5, "GrimeContrast": 2.5})
     mi_coif = surface_material(master, "rough_linen", name="MI_Coif", tiling=7.0, tint=(0.5, 0.47, 0.42),
                                scalars={"GrimeTiling": 1.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
-    mi_steel = surface_material(master, "rusty_metal_02", name="MI_MaskSteel", tiling=1.5, metal=1.0, tint=(0.6, 0.6, 0.6), rough=0.55,
-                                scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.0, "MicroRough": 0.2})
+    # hand-formed steel with light patina (the spec's mask is maintained, not rusted through): plain metal + grime layer
+    mi_steel = make_mi(master, "MI_MaskSteel", {"BaseColor": None}, metal=1.0, rough=0.42, tint=(0.56, 0.56, 0.57),
+                       grime_color=(0.45, 0.38, 0.3), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.5,
+                                                               "MicroRough": 0.25, "GrimeRoughness": 0.7})
     mi_copper = surface_material(master, "rusty_metal_02", name="MI_Copper", tiling=3.0, metal=1.0, tint=(0.95, 0.5, 0.32), rough=0.45)
     mi_black = make_mi(master, "MI_Pupil", {"BaseColor": None}, tint=(0.01, 0.01, 0.01), rough=0.9)
     mi_oxblood = surface_material(master, "brown_leather", name="MI_LedgerCloth", tiling=3.0, tint=(0.36, 0.09, 0.08), rough=0.85)
