@@ -46,6 +46,8 @@ private:
 
 	FString ServerUrl, Auto, Username, SeatApplied, OpponentShown;
 	int32 SmokePlies = 0, SmokeChecked = -1, SmokeFailures = 0;
+	FString SmokeGameId;
+	bool bSmokeResigned = false;
 	double SmokeDeadline = 0;
 	TArray<FString> SmokeLog;
 	void SmokeTick();

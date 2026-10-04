@@ -151,6 +151,15 @@ void ATCGameMode::SmokeTick()
 	if (FPlatformTime::Seconds() > SmokeDeadline) { SmokeFinish(TEXT("timeout")); return; }
 	const FTCGameState& S = C->GetState();
 	if (!C->HasGame() || B->IsAnimating() || B->IsAwaitingCore()) return;
+	// Only a game this run started counts: the local core may restore an unfinished game from its journal (an earlier
+	// run), which would otherwise "pass" with its old plies. Resign and leave it, then play our own.
+	if (SmokeGameId.IsEmpty())
+	{
+		if (bAutoDone && S.IsActive() && S.History.Num() == 0) { SmokeGameId = S.Id; SmokeLog.Add(FString::Printf(TEXT("own game %s vs %s"), *S.Id, *(S.White.AiLevel + S.Black.AiLevel))); }
+		else if (S.IsActive()) { if (!bSmokeResigned) { SmokeLog.Add(TEXT("resigning a restored game ") + S.Id); C->Resign(); bSmokeResigned = true; } return; }
+		else { C->LeaveGame(); return; }
+	}
+	if (S.Id != SmokeGameId) return;
 	const int32 Ply = S.History.Num();
 	if (Ply != SmokeChecked)
 	{
@@ -171,7 +180,7 @@ void ATCGameMode::SmokeFinish(const FString& Why)
 {
 	UTCCoreClient* C = GetGameInstance()->GetSubsystem<UTCCoreClient>();
 	UTCLocalCore* L = GetGameInstance()->GetSubsystem<UTCLocalCore>();
-	const bool bPass = SmokeFailures == 0 && SmokeChecked >= FMath::Min(SmokePlies, 2) && Why != TEXT("timeout");
+	const bool bPass = SmokeFailures == 0 && !SmokeGameId.IsEmpty() && SmokeChecked >= FMath::Min(SmokePlies, 2) && Why != TEXT("timeout");
 	FString Json = FString::Printf(TEXT("{\n  \"pass\": %s,\n  \"reason\": \"%s\",\n  \"plies\": %d,\n  \"failures\": %d,\n  \"rhi\": \"%s\",\n  \"corePid\": %d,\n  \"coreUrl\": \"%s\",\n  \"log\": [\n"),
 		bPass ? TEXT("true") : TEXT("false"), *Why, SmokeChecked, SmokeFailures, GDynamicRHI ? GDynamicRHI->GetName() : TEXT("?"), L ? L->GetCorePid() : 0, L ? *L->GetUrl() : TEXT(""));
 	for (int32 i = 0; i < SmokeLog.Num(); ++i) Json += FString::Printf(TEXT("    \"%s\"%s\n"), *SmokeLog[i], i + 1 < SmokeLog.Num() ? TEXT(",") : TEXT(""));
@@ -204,7 +213,7 @@ void ATCGameMode::OnCoreReady(const FString& Url)
 void ATCGameMode::OnConnection(const FString& State)
 {
 	UTCCoreClient* Core = GetGameInstance()->GetSubsystem<UTCCoreClient>();
-	if (Core->GetConnection() != ETCConnection::Welcomed || bAutoDone || Auto.IsEmpty() || Core->HasGame()) return;
+	if (Core->GetConnection() != ETCConnection::Welcomed || bAutoDone || Auto.IsEmpty() || (Core->HasGame() && !Core->GetState().IsFinished())) return;
 	TArray<FString> Parts;
 	Auto.ParseIntoArray(Parts, TEXT(":"));
 	if (Parts.Num() >= 1 && Parts[0] == TEXT("cpu"))
