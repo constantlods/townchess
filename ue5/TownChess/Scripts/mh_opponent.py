@@ -3,7 +3,8 @@
     UnrealEditor-Cmd TownChess.uproject -ExecutePythonScript=Scripts/mh_opponent.py -unattended -nosplash
 
 Stages are chosen with TC_MH_STAGES (comma list, default "create,inspect"):
-  create   - new MetaHumanCharacter asset /Game/TownChess/MetaHumans/MH_Opponent (kept if it exists)
+  create   - new MetaHumanCharacter asset /Game/TownChess/MetaHumans/<TC_MH_NAME> (kept if it exists), optionally
+             duplicated from an Epic preset (TC_MH_PRESET); presets come rigged and textured, so no cloud step is needed
   inspect  - log body constraint names and the stock wardrobe/groom items
   body     - gaunt, long-armed build
   skin     - pale, rough, worn skin
@@ -16,7 +17,9 @@ import traceback
 
 import unreal
 
-PATH, NAME = "/Game/TownChess/MetaHumans", "MH_Opponent"
+PATH = "/Game/TownChess/MetaHumans"
+NAME = os.environ.get("TC_MH_NAME", "MH_Opponent")
+PRESET = os.environ.get("TC_MH_PRESET", "")  # e.g. Walter: start from /MetaHumanCharacter/Optional/Presets/<name>
 STAGES = [s.strip() for s in os.environ.get("TC_MH_STAGES", "create,inspect").split(",") if s.strip()]
 EAL = unreal.EditorAssetLibrary
 
@@ -29,6 +32,11 @@ def character():
     full = f"{PATH}/{NAME}"
     if EAL.does_asset_exist(full):
         return unreal.load_asset(full)
+    if PRESET:
+        ch = EAL.duplicate_asset(f"/MetaHumanCharacter/Optional/Presets/{PRESET}", full)
+        EAL.save_loaded_asset(ch)
+        log("created", full, "from preset", PRESET)
+        return ch
     ch = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
         asset_name=NAME, package_path=PATH, asset_class=unreal.MetaHumanCharacter,
         factory=unreal.new_object(type=unreal.MetaHumanCharacterFactoryNew))

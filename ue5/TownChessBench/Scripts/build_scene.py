@@ -848,8 +848,9 @@ def build():
     idle = unreal.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
     # MetaHuman opponent, built by ue5/TownChess/Scripts/mh_opponent.py (needs MetaHuman Creator and an Epic login
     # once for the cloud steps); the template mannequin stands in where it has not been built.
-    mh_bp = unreal.load_asset("/Game/TownChess/MetaHumans/Built/MH_Opponent/BP_MH_Opponent") if GAMEPLAY else None
-    mh_body = unreal.load_asset("/Game/TownChess/MetaHumans/Built/MH_Opponent/Body/SKM_MH_Opponent_BodyMesh") if mh_bp else None
+    mhn = os.environ.get("TC_MH_NAME", "MH_Opponent")
+    mh_bp = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}") if GAMEPLAY else None
+    mh_body = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh") if mh_bp else None
     if idle and (mh_body or manny):
         seated = None
         try:
@@ -863,7 +864,7 @@ def build():
             opp = EAS.spawn_actor_from_object(mh_body, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
             smc = opp.skeletal_mesh_component
             tag(opp, "TC_Body")
-            mh_face = unreal.load_asset("/Game/TownChess/MetaHumans/Built/MH_Opponent/Face/SKM_MH_Opponent_FaceMesh")
+            mh_face = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Face/SKM_{mhn}_FaceMesh")
             if mh_face:
                 face = EAS.spawn_actor_from_object(mh_face, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
                 face.set_actor_label("OpponentFace")
