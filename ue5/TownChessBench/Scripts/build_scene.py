@@ -17,6 +17,7 @@ import zlib
 import unreal
 
 ASSETS = os.path.expanduser(os.environ.get("TC_ASSETS", "~/assets/polyhaven"))
+PROPS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "props"))
 ROOT = os.environ.get("TC_ROOT", "/Game/Bench")
 LEVEL = os.environ.get("TC_LEVEL", "L_Bench")
 # Gameplay mode (ue5/TownChess): the board and pieces are the C++ ATCBoard actor, driven by the core; seat-relative
@@ -217,6 +218,36 @@ def build_master_material(defaults):
     MEL.recompile_material(m)
     EAL.save_loaded_asset(m)
     return m
+
+
+def emissive_material(name, color, strength):
+    path = f"{ROOT}/Materials/{name}"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    m = AT.create_asset(name, f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    c = MEL.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -400, 0)
+    c.set_editor_property("constant", unreal.LinearColor(color[0] * strength, color[1] * strength, color[2] * strength, 1))
+    MEL.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(m)
+    EAL.save_loaded_asset(m)
+    return m
+
+
+def import_prop(name):
+    """Our Blender-authored props (ue5/tools/blender/props.py -> ue5/assets/props/*.obj)."""
+    src = os.path.join(PROPS, f"{name}.obj")
+    dest = f"{ROOT}/Models/{name}"
+    if EAL.does_directory_exist(dest):
+        EAL.delete_directory(dest)
+    objs = import_file(src, dest)
+    meshes = [o for o in objs if isinstance(o, unreal.StaticMesh)] or \
+        [unreal.load_asset(p) for p in EAL.list_assets(dest, recursive=True) if isinstance(unreal.load_asset(p), unreal.StaticMesh)]
+    for sm in meshes:
+        b = sm.get_bounding_box()
+        log("prop", name, sm.get_name(), "bounds", round(b.min.x, 1), round(b.min.y, 1), round(b.min.z, 1), "..",
+            round(b.max.x, 1), round(b.max.y, 1), round(b.max.z, 1))
+    return meshes
 
 
 def make_mi(master, name, textures, tiling=1.0, rough=1.0, metal=0.0, tint=None, scalars=None, grime_color=None):
@@ -649,14 +680,20 @@ def build():
     defaults["grime"] = import_texture(os.path.join(tmp, "T_TC_Grime.png"), f"{ROOT}/Textures", "T_TC_Grime", "linear")
     master = build_master_material(defaults)
 
-    mi_floor = surface_material(master, "concrete_floor_worn_001", tiling=4.0,
+    mi_floor = surface_material(master, "old_linoleum_flooring_01", tiling=3.0, tint=(0.55, 0.55, 0.48),
                                 scalars={"GrimeTiling": 0.6, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
-    mi_wall = surface_material(master, "painted_plaster_wall", tiling=3.0, tint=(0.62, 0.66, 0.58), grime_color=(0.35, 0.3, 0.22),
+    mi_wall = surface_material(master, "damaged_plaster", tiling=2.0, tint=(0.55, 0.6, 0.52), grime_color=(0.35, 0.3, 0.22),
                                scalars={"GrimeTiling": 0.8, "GrimeThreshold": 0.38, "GrimeContrast": 1.8, "GrimeStreaks": 0.6})
-    mi_wall_low = surface_material(master, "cracked_concrete_wall", tiling=3.0, tint=(0.45, 0.42, 0.36))
+    mi_wall_low = surface_material(master, "dirty_tiles", tiling=3.0, tint=(0.62, 0.66, 0.6), grime_color=(0.3, 0.26, 0.18),
+                                   scalars={"GrimeTiling": 0.7, "GrimeThreshold": 0.35, "GrimeContrast": 1.6, "GrimeStreaks": 0.7})
+    mi_rust = surface_material(master, "rusty_metal_02", tiling=1.0, metal=1.0, tint=(0.5, 0.45, 0.4),
+                               scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
+    mi_cloth = surface_material(master, "rough_linen", tiling=6.0, tint=(0.3, 0.28, 0.2), grime_color=(0.35, 0.25, 0.16),
+                                scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "GrimeStreaks": 0.5})
+    mi_leather = surface_material(master, "brown_leather", tiling=4.0, tint=(0.38, 0.28, 0.2), rough=0.8,
+                                  scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "MicroRough": 0.2})
     mi_ceiling = make_mi(master, "MI_ceiling", {"BaseColor": None}, tint=(0.22, 0.22, 0.2), rough=0.9)
     surface_material(master, "wood_table_worn", tiling=1.0)
-    surface_material(master, "rusty_metal_02", tiling=2.0, metal=1.0)
 
     # ---- Room: 5.2 m x 4.4 m x 3.0 m, player at -X looking +X.
     L, W, H = 520.0, 440.0, 300.0
@@ -668,14 +705,14 @@ def build():
     box("Wall_Left", (cx, -W / 2 - 5, H / 2), (L, 10, H), mi_wall)
     box("Wall_Right", (cx, W / 2 + 5, H / 2), (L, 10, H), mi_wall)
     # Institutional wainscot band (darker, cracked concrete) along the back and side walls.
-    box("Wainscot_Back", (cx + L / 2 - 1, 0, 55), (4, W, 110), mi_wall_low)
-    box("Wainscot_Left", (cx, -W / 2 + 1, 55), (L, 4, 110), mi_wall_low)
-    box("Wainscot_Right", (cx, W / 2 - 1, 55), (L, 4, 110), mi_wall_low)
+    box("Wainscot_Back", (cx + L / 2 - 1, 0, 70), (4, W, 140), mi_wall_low)
+    box("Wainscot_Left", (cx, -W / 2 + 1, 70), (L, 4, 140), mi_wall_low)
+    box("Wainscot_Right", (cx, W / 2 - 1, 70), (L, 4, 140), mi_wall_low)
 
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
-    assign(table, model_material(master, "wooden_table_02", "wooden_table_02", "MI_Table", grime_color=(0.3, 0.22, 0.15), tint=(0.55, 0.45, 0.38),
-                                 scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.4, "GrimeContrast": 2.0,
+    assign(table, model_material(master, "wooden_table_02", "wooden_table_02", "MI_Table", grime_color=(0.3, 0.22, 0.15), tint=(0.42, 0.35, 0.29),
+                                 scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.32, "GrimeContrast": 2.0,
                                           "GrimeStreaks": 0.5, "MicroRough": 0.2}))
     tlo, thi = bounds_of(table)
     # Long side runs across the player's view (along Y). Poly Haven models are centred on their origin in XY.
@@ -726,12 +763,30 @@ def build():
     # ---- Props with intentional placement.
     lamp = import_model("desk_lamp_arm_01")
     # Upper-left of frame, arm reaching over the board's corner.
-    lamp_actors, llo, lhi = place_model(lamp, (-8, -68, 0), yaw=30, label="Lamp", sit_on=top)
+    lamp_actors, llo, lhi = place_model(lamp, (18, -52, 0), yaw=40, label="Lamp", sit_on=top)
     tag(lamp_actors)
     log("lamp bounds", llo, lhi)
     clock = import_model("alarm_clock_01")
     if clock:  # this FBX currently imports without a static mesh; skip rather than fail
         place_model(clock, (-8, 46, 0), yaw=-150, label="Clock", sit_on=top)
+    mug = import_prop("tin_mug")
+    tag(place_model(mug, (38, 46, 0), yaw=-120, label="Mug", sit_on=top)[0])
+    for sm in mug:
+        sm.set_material(0, mi_rust)
+        EAL.save_loaded_asset(sm)
+    beds = import_model("old_bed_frame")
+    if beds:
+        place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)
+        place_model(beds, (cx + L / 2 - 55, 125, 0), yaw=90, label="BedB", sit_on=0.0)
+    # barred window high on the back wall, left of the opponent: cold glow + rusty bars (the window rect light sits in it)
+    glow = emissive_material("M_TC_WindowGlow", (0.55, 0.7, 0.8), 6.0)
+    box("Window_Glow", (cx + L / 2 - 1, -150, 185), (2, 60, 90), glow, folder="Window")
+    cyl = unreal.load_asset("/Engine/BasicShapes/Cylinder")
+    for k in range(6):
+        b = EAS.spawn_actor_from_object(cyl, unreal.Vector(cx + L / 2 - 5, -150 - 25 + k * 10, 185), unreal.Rotator(0, 0, 0))
+        b.set_actor_scale3d(unreal.Vector(0.022, 0.022, 0.92))
+        b.static_mesh_component.set_material(0, mi_rust)
+        b.set_folder_path("Window")
     binder = import_model("binder_notebook")
     place_model(binder, (-30, -40, 0), yaw=12, label="Binder", sit_on=top)
     chair = import_model("painted_wooden_chair_01")
@@ -768,6 +823,22 @@ def build():
         setp(data, "saved_looping", True)
         setp(data, "saved_playing", True)
         setp(smc, "animation_data", data)
+        for i in range(smc.get_num_materials()):
+            smc.set_material(i, mi_cloth)
+        mask = import_prop("cage_mask")
+        if mask:
+            mask[0].set_material(0, mi_rust)
+            EAL.save_loaded_asset(mask[0])
+            m = EAS.spawn_actor_from_object(mask[0], unreal.Vector(90, 0, 150), unreal.Rotator(0, 0, 0))
+            m.set_actor_label("CageMask")
+            m.attach_to_component(smc, "head", unreal.AttachmentRule.SNAP_TO_TARGET, unreal.AttachmentRule.SNAP_TO_TARGET,
+                                  unreal.AttachmentRule.KEEP_WORLD, False)
+            # head bone frame on the UE5 mannequin: X up the neck, Y towards the face (tuned by screenshot)
+            rel = [float(v) for v in os.environ.get("TC_MASK_XF", "8,1.5,0,0,0,0").split(",")]
+            m.root_component.set_relative_location(unreal.Vector(*rel[:3]), False, False)
+            m.root_component.set_relative_rotation(unreal.Rotator(*rel[3:]), False, False)
+            tag(m)
+            log("mask attached rel", rel)
     else:
         log("WARNING: mannequin not found")
 
@@ -778,7 +849,9 @@ def build():
             b = hm.get_bounds()
             log("hand", side, "bounds origin", b.origin, "extent", b.box_extent)
             # Fingers point along +Y in mesh space; yaw -90 points them at the board (+X).
-            h = EAS.spawn_actor_from_object(hm, unreal.Vector(-22, y * 1.35, top + 6), unreal.Rotator(0, 0, -90))
+            h = EAS.spawn_actor_from_object(hm, unreal.Vector(-40, y * 1.45, top + 5), unreal.Rotator(0, 0, -90))
+            for i in range(h.skeletal_mesh_component.get_num_materials()):
+                h.skeletal_mesh_component.set_material(i, mi_leather)
             h.set_actor_label(f"Hand_{side}")
             tag(h)
             h.set_folder_path("Player")
@@ -792,7 +865,7 @@ def build():
     tag(bulb)
     rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 150, 5600, 120, 15, 900, vol=0.2)
     # cold window light from back-left (fill, 3-4 stops under the key) and a back-rim on the opponent's shoulder
-    rect("Window_Cold", (cx + L / 2 - 5, -150, 180), (0, 0, 180), 400, 7500, 60, 90, 700, vol=3.0)
+    rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0)
     point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0)
 
     sky = EAS.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 400), unreal.Rotator(0, 0, 0))
