@@ -120,9 +120,11 @@ def run():
             log("textures requested")
         if "build" in STAGES:
             b = unreal.MetaHumanCharacterEditorBuildParameters()
-            b.pipeline_type = unreal.MetaHumanDefaultPipelineType.OPTIMIZED
-            b.pipeline_quality = unreal.MetaHumanQualityLevel.HIGH
-            b.absolute_build_path = f"{PATH}/Built"
+            cine = os.environ.get("TC_MH_PIPELINE", "optimized") == "cinematic"
+            # cinematic: full skin shader (SSS, micro-detail normals: pores and veins), top LODs, strand grooms
+            b.pipeline_type = unreal.MetaHumanDefaultPipelineType.CINEMATIC if cine else unreal.MetaHumanDefaultPipelineType.OPTIMIZED
+            b.pipeline_quality = unreal.MetaHumanQualityLevel.CINEMATIC if cine else unreal.MetaHumanQualityLevel.HIGH
+            b.absolute_build_path = f"{PATH}/BuiltCine" if cine else f"{PATH}/Built"
             b.common_folder_path = f"{PATH}/Common"
             b.enable_wardrobe_item_validation = False
             try:
@@ -132,7 +134,7 @@ def run():
                 if "Cannot break link" not in str(e):
                     raise
                 log("build finished with control-rig link warnings (harmless)")
-            if not EAL.does_asset_exist(f"{PATH}/Built/{NAME}/BP_{NAME}"):
+            if not EAL.list_assets(b.absolute_build_path + f"/{NAME}", recursive=True):
                 raise RuntimeError("build produced no blueprint")
             log("build done")
         EAL.save_loaded_asset(ch)
