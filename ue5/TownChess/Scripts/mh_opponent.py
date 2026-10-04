@@ -51,8 +51,10 @@ def run():
                 items = [p for p in EAL.list_assets(root, recursive=True) if "/WI_" in p]
                 log("wardrobe under", root, len(items), sorted({p.split(".")[0] for p in items})[:60])
         if "body" in STAGES:
-            want = {"height": 182.0, "chest": 88.0, "waist": 70.0, "hips": 86.0, "upper_arm_length": 37.0,
-                    "lower_arm_length": 30.0, "shoulder_width": 44.0}
+            # gaunt, long-limbed adult male (names from the "inspect" stage; cm unless noted)
+            want = {"height": 183.0, "chest": 90.0, "waist": 72.0, "hip": 88.0, "upper_arm_length": 36.5,
+                    "lower_arm_length": 28.0, "across_shoulder": 38.0, "bicep": 27.0, "forearm": 24.0, "wrist": 16.0,
+                    "neck": 35.0, "fat": 0.0, "muscularity": 0.15}
             cons = sub.get_body_constraints(ch)
             for c in cons:
                 key = str(c.name).lower().replace(" ", "_")
