@@ -707,7 +707,7 @@ def build():
                                    scalars={"GrimeTiling": 0.7, "GrimeThreshold": 0.35, "GrimeContrast": 1.6, "GrimeStreaks": 0.7})
     mi_rust = surface_material(master, "rusty_metal_02", tiling=1.0, metal=1.0, tint=(0.5, 0.45, 0.4),
                                scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
-    mi_cloth = surface_material(master, "rough_linen", name="MI_OpponentCloth", tiling=6.0, tint=(0.3, 0.28, 0.2), grime_color=(0.35, 0.25, 0.16),
+    mi_cloth = surface_material(master, "rough_linen", name="MI_OpponentCloth", tiling=6.0, tint=(0.24, 0.23, 0.2), grime_color=(0.35, 0.25, 0.16),
                                 scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "GrimeStreaks": 0.5})
     mi_leather = surface_material(master, "brown_leather", name="MI_Gloves", tiling=4.0, tint=(0.38, 0.28, 0.2), rough=0.8,
                                   scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "MicroRough": 0.2})
@@ -745,7 +745,7 @@ def build():
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
     mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.55, 0.43, 0.3), tint=(0.95, 0.85, 0.68), rough=0.75,
                            scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.5, "MicroRough": 0.25})
-    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(0.6, 0.5, 0.4), rough=0.55,
+    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.5, tint=(0.11, 0.095, 0.085),
                            scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.75, "GrimeContrast": 2.0, "MicroRough": 0.15})
     mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.42, 0.32, 0.22), tint=(0.85, 0.77, 0.62),
                            scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.4, "GrimeContrast": 2.5, "MicroRough": 0.2})
@@ -860,6 +860,7 @@ def build():
             EAL.save_loaded_asset(mask[0])
             m = EAS.spawn_actor_from_object(mask[0], unreal.Vector(90, 0, 150), unreal.Rotator(0, 0, 0))
             m.set_actor_label("CageMask")
+            m.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)  # a Static actor cannot attach to the animated body
             m.attach_to_component(smc, "head", unreal.AttachmentRule.SNAP_TO_TARGET, unreal.AttachmentRule.SNAP_TO_TARGET,
                                   unreal.AttachmentRule.KEEP_WORLD, False)
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,2.5,9").split(",")]  # forward (+Y), up (+Z) from the head bone
@@ -899,6 +900,7 @@ def build():
     # cold window light from back-left (fill, 3-4 stops under the key) and a back-rim on the opponent's shoulder
     rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0)
     point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0)
+    tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (70, 0, top + 45)), 220, 2400, 400, 40, src=2.5, vol=0.6))
     rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 1800, 7000, 200, 40, 600, vol=1.5)
 
     sky = EAS.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 400), unreal.Rotator(0, 0, 0))
