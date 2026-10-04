@@ -65,8 +65,27 @@ def begin():
     cc.set_editor_property("capture_every_frame", True)
     cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
     state["cap"] = (world, rt)
+    probe(world)
     loc = pcm.get_camera_location()
     log(f"capture {w}x{h} fov={pcm.get_fov_angle():.1f} cam=({loc.x:.0f},{loc.y:.0f},{loc.z:.0f}) preset={PRESET}")
+
+
+def probe(world):
+    """-TCProbe=<substring>: log world transforms of matching actors (and the opponent's head bone) for placement checks."""
+    key = arg("TCProbe", "").lower()
+    if not key:
+        return
+    for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor):
+        if key in a.get_actor_label().lower() or key in a.get_name().lower():
+            l, r = a.get_actor_location(), a.get_actor_rotation()
+            parent = a.get_attach_parent_actor()
+            log(f"probe {a.get_name()} loc=({l.x:.1f},{l.y:.1f},{l.z:.1f}) rot=({r.pitch:.0f},{r.yaw:.0f},{r.roll:.0f}) "
+                f"parent={parent.get_name() if parent else None} hidden={a.is_hidden_ed() if hasattr(a, 'is_hidden_ed') else '?'}")
+    for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SkeletalMeshActor):
+        smc = a.skeletal_mesh_component
+        if smc.does_socket_exist("head"):
+            h = smc.get_socket_location("head")
+            log(f"probe head of {a.get_name()} at ({h.x:.1f},{h.y:.1f},{h.z:.1f})")
 
 
 def export():
