@@ -46,10 +46,11 @@ def run():
         if "inspect" in STAGES:
             for c in sub.get_body_constraints(ch):
                 log("body constraint", c.name, "active", c.is_active, "target", round(c.target_measurement, 1))
-            for root in ("/MetaHumanCharacter/Optional/Clothing", "/MetaHumanCharacter/Optional/Grooms",
-                         "/MetaHumanCharacter/Optional"):
-                items = [p for p in EAL.list_assets(root, recursive=True) if "/WI_" in p]
-                log("wardrobe under", root, len(items), sorted({p.split(".")[0] for p in items})[:60])
+            items = sorted({p.split(".")[0] for p in EAL.list_assets("/MetaHumanCharacter/Optional", recursive=True) if "/WI_" in p})
+            log("wardrobe items", len(items))
+            for it in items:
+                if "/Grooms/" not in it or any(k in it for k in ("Hair_S", "Beard", "Eyebrows", "Mustache", "Peachfuzz")):
+                    log("  ", it.replace("/MetaHumanCharacter/Optional/", ""))
         if "body" in STAGES:
             # gaunt, long-limbed adult male (names from the "inspect" stage; cm unless noted)
             want = {"height": 183.0, "chest": 90.0, "waist": 72.0, "hip": 88.0, "upper_arm_length": 36.5,
