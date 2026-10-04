@@ -143,6 +143,20 @@ void UTCCoreClient::HandleMessage(const FString& Text)
 		Token = M->GetStringField(TEXT("token"));
 		FFileHelper::SaveStringToFile(Token, *TokenPath());
 		PlayerId = M->GetObjectField(TEXT("player"))->GetStringField(TEXT("id"));
+		AiLevels.Reset();
+		const TArray<TSharedPtr<FJsonValue>>* Levels;
+		if (M->TryGetArrayField(TEXT("aiLevels"), Levels))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Levels)
+			{
+				const TSharedPtr<FJsonObject> L = V->AsObject();
+				if (L.IsValid()) AiLevels.Add({ L->GetStringField(TEXT("id")), L->GetStringField(TEXT("label")) });
+			}
+		}
+		if (AiLevels.IsEmpty())
+		{
+			AiLevels = { { TEXT("novice"), TEXT("Novice") }, { TEXT("patient"), TEXT("Patient") }, { TEXT("warden"), TEXT("Warden") } };
+		}
 		FString Active;
 		ServerActiveGame = M->TryGetStringField(TEXT("activeGameId"), Active) ? Active : FString();
 		PendingRejoin = HasGame() && !State.IsFinished() ? State.Id : ServerActiveGame;

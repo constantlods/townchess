@@ -386,12 +386,29 @@ bool ATCHUD::HandleClick(const FVector2D& Pos)
 void ATCHUD::OnRejected(const FString& Reason) { Toast = FString::Printf(TEXT("The move was refused: %s"), *Reason); ToastUntil = FPlatformTime::Seconds() + 3.5; }
 void ATCHUD::OnError(const FString& Message) { Toast = Message; ToastUntil = FPlatformTime::Seconds() + 3.5; }
 
+FString ATCHUD::OpponentName(const FString& Id)
+{
+	return Id == TEXT("annotator") ? TEXT("The Annotator") : TEXT("The Patient");
+}
+
 void ATCHUD::PressButton(const FString& Id)
 {
 	UTCCoreClient* C = GetGameInstance()->GetSubsystem<UTCCoreClient>();
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
 	ATCBoard* B = PC ? PC->Board() : nullptr;
-	if (Id == TEXT("level")) Level = Level == TEXT("novice") ? TEXT("patient") : Level == TEXT("patient") ? TEXT("warden") : TEXT("novice");
+	if (Id == TEXT("level"))
+	{
+		const TArray<FTCAiLevel>& L = C->GetAiLevels();
+		const int32 I = L.IndexOfByPredicate([&](const FTCAiLevel& X) { return X.Id == Level; });
+		if (L.Num()) Level = L[(I + 1) % L.Num()].Id;
+	}
+	else if (Id == TEXT("opponent"))
+	{
+		if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
+		{
+			GM->ApplyOpponent(GM->GetOpponent() == TEXT("caged") ? TEXT("annotator") : TEXT("caged"));
+		}
+	}
 	else if (Id == TEXT("tc")) TimeControl = TimeControl == TEXT("5+0") ? TEXT("10+0") : TimeControl == TEXT("10+0") ? TEXT("untimed") : TimeControl == TEXT("untimed") ? TEXT("3+2") : TEXT("5+0");
 	else if (Id == TEXT("cpu_w")) C->CreateAiGame(Level, TEXT("w"), TimeControl);
 	else if (Id == TEXT("cpu_b")) C->CreateAiGame(Level, TEXT("b"), TimeControl);
@@ -437,7 +454,13 @@ void ATCHUD::DrawMenu(UTCCoreClient* C)
 	}
 	Button(TEXT("cpu_w"), TEXT("Play The Annotator - White"), X, Y0 + 10.f, 320.f);
 	Button(TEXT("cpu_b"), TEXT("Play The Annotator - Black"), X, Y0 + 52.f, 320.f);
-	Button(TEXT("level"), FString::Printf(TEXT("Strength: %s"), *Level), X, Y0 + 94.f, 320.f);
+	FString LevelLabel = Level;
+	for (const FTCAiLevel& L : C->GetAiLevels()) if (L.Id == Level) LevelLabel = L.Label;
+	Button(TEXT("level"), FString::Printf(TEXT("Strength: %s"), *LevelLabel), X, Y0 + 94.f, 320.f);
+	if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
+	{
+		Button(TEXT("opponent"), FString::Printf(TEXT("Opponent: %s"), *OpponentName(GM->GetOpponent())), X + 340.f, Y0 + 94.f, 320.f);
+	}
 	Button(TEXT("tc"), FString::Printf(TEXT("Clock: %s"), *TimeControl), X, Y0 + 136.f, 320.f);
 	Button(TEXT("private"), TEXT("Create private table"), X, Y0 + 196.f, 320.f);
 	Button(TEXT("casual"), TEXT("Find casual opponent"), X, Y0 + 238.f, 320.f);
@@ -455,7 +478,9 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 	const FLinearColor Ink(0.88f, 0.82f, 0.70f), Dim(0.62f, 0.58f, 0.5f);
 	const auto Plate = [&](const FTCPlayer& P, const FString& Col, float X, bool bRight)
 	{
-		const FString Name = P.AiLevel.IsEmpty() ? P.Username : FString::Printf(TEXT("THE ANNOTATOR (%s)"), *P.AiLevel);
+		const ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>();
+		const FString Who = OpponentName(GM ? GM->GetOpponent() : FString()).ToUpper();
+		const FString Name = P.AiLevel.IsEmpty() ? P.Username : FString::Printf(TEXT("%s (%s)"), *Who, *P.AiLevel);
 		const FString Sub = P.Rating >= 0 ? FString::Printf(TEXT("%s  %d"), Col == TEXT("w") ? TEXT("White") : TEXT("Black"), P.Rating) : (Col == TEXT("w") ? TEXT("White") : TEXT("Black"));
 		const float W = 300.f;
 		const float Bx = bRight ? X - W : X;
@@ -474,7 +499,12 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 	if (S.IsFinished()) Status = ResultText(S, Me);
 	else if (B && B->IsAwaitingCore()) Status = TEXT("...");
 	else if (C->IsMyTurn()) Status = TEXT("Your move");
-	else Status = ThemP.AiLevel.IsEmpty() ? TEXT("Opponent to move") : TEXT("The Annotator is writing...");
+	else if (ThemP.AiLevel.IsEmpty()) Status = TEXT("Opponent to move");
+	else
+	{
+		const ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>();
+		Status = GM && GM->GetOpponent() == TEXT("annotator") ? TEXT("The Annotator is writing...") : TEXT("The patient is thinking...");
+	}
 	for (const FTCGameEvent& E : S.LastEvents) if (E.Type == TEXT("check") && S.IsActive()) Status = TEXT("CHECK  -  ") + Status;
 	Text(Status, Canvas->ClipX * 0.5f, 30.f, S.IsFinished() ? FLinearColor(0.95f, 0.8f, 0.55f) : Ink, S.IsFinished() ? 1.6f : 1.2f, true);
 	if (!S.OpeningName.IsEmpty()) Text(FString::Printf(TEXT("%s  %s"), *S.OpeningEco, *S.OpeningName), Canvas->ClipX * 0.5f, 64.f, Dim, 0.85f, true);

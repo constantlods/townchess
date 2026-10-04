@@ -92,6 +92,7 @@ public:
 	FString Toast;
 	double ToastUntil = 0;
 	bool bConfirmResign = false;
+	static FString OpponentName(const FString& Id);
 
 private:
 	struct FButton { FString Id; FString Label; FVector2D Pos, Size; };

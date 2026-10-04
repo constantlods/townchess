@@ -11,6 +11,15 @@ class IWebSocket;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FTCOnState, const FTCGameState&, State, const FString&, Reason);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTCOnText, const FString&, Text);
 
+/** A CPU strength the core offers (WELCOME.aiLevels): house levels always, Stockfish ladder when it is installed. */
+USTRUCT(BlueprintType)
+struct FTCAiLevel
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, Category = "TownChess") FString Id;
+	UPROPERTY(BlueprintReadOnly, Category = "TownChess") FString Label;
+};
+
 UENUM(BlueprintType)
 enum class ETCConnection : uint8 { Disconnected, Connecting, Connected, Welcomed };
 
@@ -65,6 +74,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetLastRejection() const { return LastRejection; }
 	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetLastError() const { return LastError; }
 	UFUNCTION(BlueprintPure, Category = "TownChess") int32 GetReconnectCount() const { return ReconnectCount; }
+	/** CPU strengths offered by the connected core (falls back to the three house levels for older cores). */
+	UFUNCTION(BlueprintPure, Category = "TownChess") const TArray<FTCAiLevel>& GetAiLevels() const { return AiLevels; }
 
 	/** Every authoritative state (joined, updated, rejected-with-state). Reason: "joined", "move", "rejected", ... */
 	UPROPERTY(BlueprintAssignable) FTCOnState OnState;
@@ -87,6 +98,7 @@ private:
 	TSharedPtr<IWebSocket> Socket;
 	FString Url, Secret, Username, Token, PlayerId, MyColor, PendingRejoin, ServerActiveGame;
 	FTCGameState State;
+	TArray<FTCAiLevel> AiLevels;
 	double StateReceivedAt = 0;
 	int32 NextSeq = 1;
 	int32 RejectedCount = 0;
