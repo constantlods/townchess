@@ -157,7 +157,7 @@ void ATCGameMode::SmokeTick()
 	{
 		if (bAutoDone && S.IsActive() && S.History.Num() == 0) { SmokeGameId = S.Id; SmokeLog.Add(FString::Printf(TEXT("own game %s vs %s"), *S.Id, *(S.White.AiLevel + S.Black.AiLevel))); }
 		else if (S.IsActive()) { if (!bSmokeResigned) { SmokeLog.Add(TEXT("resigning a restored game ") + S.Id); C->Resign(); bSmokeResigned = true; } return; }
-		else { C->LeaveGame(); return; }
+		else { C->LeaveGame(); bAutoDone = false; return; }  // the auto-start may have been refused ("busy") by the restored game: retry
 	}
 	if (S.Id != SmokeGameId) return;
 	const int32 Ply = S.History.Num();
