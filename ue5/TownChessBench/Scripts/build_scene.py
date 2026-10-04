@@ -674,27 +674,75 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         deltas[bone] = _qmul(_axis(Z, az), _axis(X, ax))
     pelvis_drop = float(os.environ.get("TC_PELVIS_DROP", 47.0))
 
-    new_w = {}
-    new_l = dict(loc)
-    for b in order:
-        p = parent[b]
-        t_l, q_l = new_l[b]
-        if p is None:
-            t_w, q_w = t_l, q_l
-        else:
-            tp, qp = new_w[p]
-            r = _qrot(qp, t_l)
-            t_w, q_w = (tp[0] + r[0], tp[1] + r[1], tp[2] + r[2]), _qmul(qp, q_l)
-        if b == "pelvis":
-            t_w = (t_w[0], t_w[1], t_w[2] - pelvis_drop)
-        if b in deltas:
-            q_w = _qmul(deltas[b], q_w)
-        if (b in deltas or b == "pelvis") and p is not None:
-            tp, qp = new_w[p]
-            iq = _qinv(qp)
-            d = (t_w[0] - tp[0], t_w[1] - tp[1], t_w[2] - tp[2])
-            new_l[b] = (_qrot(iq, d), _qmul(iq, q_w))
-        new_w[b] = (t_w, q_w)
+    def solve(deltas):
+        new_w, new_l = {}, dict(loc)
+        for b in order:
+            p = parent[b]
+            t_l, q_l = new_l[b]
+            if p is None:
+                t_w, q_w = t_l, q_l
+            else:
+                tp, qp = new_w[p]
+                r = _qrot(qp, t_l)
+                t_w, q_w = (tp[0] + r[0], tp[1] + r[1], tp[2] + r[2]), _qmul(qp, q_l)
+            if b == "pelvis":
+                t_w = (t_w[0], t_w[1], t_w[2] - pelvis_drop)
+            if b in deltas:
+                q_w = _qmul(deltas[b], q_w)
+            if (b in deltas or b == "pelvis") and p is not None:
+                tp, qp = new_w[p]
+                iq = _qinv(qp)
+                d = (t_w[0] - tp[0], t_w[1] - tp[1], t_w[2] - tp[2])
+                new_l[b] = (_qrot(iq, d), _qmul(iq, q_w))
+            new_w[b] = (t_w, q_w)
+        return new_w, new_l
+
+    new_w, new_l = solve(deltas)
+    if pose_name == "clasp" and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
+        # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
+        head = new_w["head"][0]
+        table_z = float(os.environ.get("TC_TABLE_Z", 80.0))
+        def chain(side, ux, uz, lx, lz):
+            dl = dict(deltas)
+            dl[f"upperarm_{side}"] = _qmul(_axis(Z, uz), _axis(X, ux))
+            dl[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
+            par = parent[f"upperarm_{side}"]
+            tp, qp = new_w[par]
+            out = {}
+            for b in (f"upperarm_{side}", f"lowerarm_{side}", f"hand_{side}"):
+                t_l, q_l = loc[b]
+                r = _qrot(qp, t_l)
+                t_w, q_w = (tp[0] + r[0], tp[1] + r[1], tp[2] + r[2]), _qmul(qp, q_l)
+                if b in dl:
+                    q_w = _qmul(dl[b], q_w)
+                out[b] = (t_w, q_w)
+                tp, qp = t_w, q_w
+            return out
+        best = {}
+        for side, sx in (("l", 1.0), ("r", -1.0)):
+            # which way is "this arm's side": the upper arm's x sign in the seated torso
+            sign = 1.0 if new_w[f"upperarm_{side}"][0][0] > head[0] else -1.0
+            target = (head[0] + sign * 4.0, head[1] + 16.0, head[2] - 14.0)   # hands just in front of the chin
+            score_best = None
+            for ux in range(20, 101, 8):
+                for uz in range(-60, 61, 10):
+                    for lx in range(20, 161, 10):
+                        for lz in range(-80, 81, 10):
+                            o = chain(side, ux, uz, lx, lz)
+                            e, h = o[f"lowerarm_{side}"][0], o[f"hand_{side}"][0]
+                            err = sum((h[i] - target[i]) ** 2 for i in range(3)) + 0.5 * (e[2] - (table_z + 4)) ** 2
+                            if e[1] < head[1] + 6:   # elbows forward of the chest, on the table
+                                err += 400
+                            if score_best is None or err < score_best:
+                                score_best, best[side] = err, (ux, uz, lx, lz)
+            log("clasp", side, "best", best[side], "error", round(score_best, 1), "target", [round(v, 1) for v in target])
+        for side in ("l", "r"):
+            ux, uz, lx, lz = best[side]
+            deltas[f"upperarm_{side}"] = _qmul(_axis(Z, uz), _axis(X, ux))
+            deltas[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
+        new_w, new_l = solve(deltas)
+        log("clasp hands", [round(v, 1) for v in new_w["hand_l"][0]], [round(v, 1) for v in new_w["hand_r"][0]],
+            "elbows", [round(v, 1) for v in new_w["lowerarm_l"][0]], [round(v, 1) for v in new_w["lowerarm_r"][0]])
 
     # head in the seated pose (component space) and its idle orientation, for props attached to the head bone
     SEATED["head"] = (new_w["head"][0], new_w["head"][1], wld["head"][1])
