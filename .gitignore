@@ -7,3 +7,4 @@ server-data/
 
 # Claude Code agent worktrees
 .claude/
+tools/.cache/

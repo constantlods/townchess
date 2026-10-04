@@ -875,6 +875,18 @@ def build():
                                      unreal.AttachmentRule.KEEP_WORLD, False)
                 tag(face, "TC_FollowBody")
                 tag(face)
+            # outfit meshes: the body hides the skin under them, so they must be present or the torso renders as a hole
+            for p in EAL.list_assets(f"/Game/TownChess/MetaHumans/Built/{mhn}/Clothing", recursive=False):
+                cm = unreal.load_asset(p)
+                if isinstance(cm, unreal.SkeletalMesh):
+                    c = EAS.spawn_actor_from_object(cm, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
+                    c.set_actor_label(f"OpponentOutfit_{cm.get_name()}")
+                    c.skeletal_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+                    c.attach_to_actor(opp, "", unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD,
+                                      unreal.AttachmentRule.KEEP_WORLD, False)
+                    tag(c, "TC_FollowBody")
+                    tag(c)
+                    log("outfit", cm.get_name())
         else:
             opp = EAS.spawn_actor_from_object(manny, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> faces -X
             smc = opp.skeletal_mesh_component
