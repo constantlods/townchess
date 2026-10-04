@@ -901,7 +901,7 @@ def build():
                 m.attach_to_component(smc, "head", R.SNAP_TO_TARGET, R.SNAP_TO_TARGET, R.KEEP_WORLD, False)
             except TypeError as e:
                 log("WARNING mask attach failed:", e)
-            off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,2.5,9").split(",")]  # forward (+Y), up (+Z) from the head bone
+            off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,4.5,-1").split(",")]  # forward (+Y), up (+Z) from the head bone
             if "head" in SEATED:
                 rl, rr = head_relative(off)
                 m.root_component.set_relative_location(rl, False, False)
