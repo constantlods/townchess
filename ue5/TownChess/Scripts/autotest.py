@@ -12,6 +12,8 @@ Scenarios (-TCTest=):
   script     plays the moves listed in -TCMoves=uci,uci,... for our side (the other side is a scripted browser or the
              engine), checking sync after every move; used for the special-rules game against a browser opponent
   reconnect  joins the active game after a restart and verifies the rebuilt board, turn and clocks, then plays on
+  rematch    resigns the first game and asks for a rematch: the new game must seat us on the other colour, and the
+             board, camera and seat-mirrored props must follow by themselves ("the board flips between games")
 """
 import json
 import os
@@ -210,7 +212,7 @@ def _tick(_dt):
             check("connected, authenticated and joined a game", True, f"{st.id} as {core.get_my_color()}")
             check("board built from authoritative FEN", board.is_in_sync(), st.fen)
             screenshot("start")
-            S["phase"] = "reject" if TEST == "cpu" else ("verify_reconnect" if TEST == "reconnect" else "play")
+            S["phase"] = {"cpu": "reject", "reconnect": "verify_reconnect", "rematch": "rematch_resign"}.get(TEST, "play")
             S["wait_until"] = now + 1.0
         return
 
@@ -234,6 +236,35 @@ def _tick(_dt):
         check("board unchanged after rejection", dict(board.get_shown_layout()) == S["layout_before"] and board.is_in_sync())
         check("history unchanged after rejection", len(core.get_state().history) == S["len_before"])
         S["phase"] = "play"
+        return
+
+    if S["phase"] == "rematch_resign":
+        S["first"] = (st.id, core.get_my_color(), pcm.get_camera_location().x)
+        core.resign()
+        S["phase"] = "rematch_ask"
+        S["wait_until"] = now + 1.5
+        return
+
+    if S["phase"] == "rematch_ask":
+        check("first game ended by resignation", st.status == "resigned", st.status)
+        core.rematch()
+        S["phase"] = "rematch_verify"
+        S["wait_until"] = now + 3.0
+        return
+
+    if S["phase"] == "rematch_verify":
+        first_id, first_color, first_cam_x = S["first"]
+        if st.id == first_id or board.is_animating():
+            return
+        _, pcm2 = world()
+        color = core.get_my_color()
+        cam_x = pcm2.get_camera_location().x
+        check("rematch is a new game", st.id != first_id, f"{first_id} -> {st.id}")
+        check("colours swapped on rematch", color != first_color and color in ("w", "b"), f"{first_color} -> {color}")
+        check("camera moved to the other side of the table", (first_cam_x < 0) != (cam_x < 0), f"camera x {first_cam_x:.0f} -> {cam_x:.0f}")
+        check("board shown from the new seat matches the core", board.is_in_sync(), st.fen)
+        screenshot("rematch")
+        finish(True)
         return
 
     if S["phase"] == "verify_reconnect":
