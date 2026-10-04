@@ -846,84 +846,140 @@ def build():
     # ---- Opponent (template mannequin as a stand-in until MetaHuman): seated across the table, facing the player.
     manny = unreal.load_asset("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
     idle = unreal.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
-    # MetaHuman opponent, built by ue5/TownChess/Scripts/mh_opponent.py (needs MetaHuman Creator and an Epic login
-    # once for the cloud steps); the template mannequin stands in where it has not been built.
-    mhn = os.environ.get("TC_MH_NAME", "MH_Walter")
-    if not EAL.does_asset_exist(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}"):
-        mhn = "MH_Opponent"  # first build (default face) until the preset-based one exists
-    mh_bp = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}") if GAMEPLAY else None
-    mh_body = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh") if mh_bp else None
-    if idle and (mh_body or manny):
-        seated = None
+    # ---- Opponent roster (docs/CHARACTERS.md). Every character is built into the level at the same seat, tagged
+    # TC_Opponent_<id>; ATCGameMode shows the selected one (-tcopponent=<id>, default "caged") and hides the rest.
+    # MetaHumans come from ue5/TownChess/Scripts/mh_opponent.py; the template mannequin stands in where none is built.
+    R = unreal.AttachmentRule
+    seated_cache = {}
+
+    def attach_static(name, mesh, parent_smc, bone, loc, rot, opp_tag):
+        a = EAS.spawn_actor_from_object(mesh, unreal.Vector(90, 0, 120), unreal.Rotator(0, 0, 0))
+        a.set_actor_label(name)
+        a.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)  # a Static actor cannot attach to the animated body
         try:
-            seated = build_seated_pose(mh_body or manny, idle, f"{ROOT}/Anims", "A_TC_Seated_MH" if mh_body else "A_TC_Seated",
-                                       own_proportions=bool(mh_body))
-        except Exception:
-            log("WARNING seated pose failed\n" + traceback.format_exc())
-        if mh_body:
-            # Body and face as plain skeletal mesh actors: the MetaHuman blueprint's construction script resets the
-            # body's animation, so our seated pose would not stick. ATCGameMode links the face to the body at start.
-            opp = EAS.spawn_actor_from_object(mh_body, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
-            smc = opp.skeletal_mesh_component
-            tag(opp, "TC_Body")
-            mh_face = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Face/SKM_{mhn}_FaceMesh")
-            if mh_face:
-                face = EAS.spawn_actor_from_object(mh_face, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
-                face.set_actor_label("OpponentFace")
-                face.skeletal_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
-                face.attach_to_actor(opp, "", unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD,
-                                     unreal.AttachmentRule.KEEP_WORLD, False)
-                tag(face, "TC_FollowBody")
-                tag(face)
-            # outfit meshes: the body hides the skin under them, so they must be present or the torso renders as a hole
-            for p in EAL.list_assets(f"/Game/TownChess/MetaHumans/Built/{mhn}/Clothing", recursive=False):
-                cm = unreal.load_asset(p)
-                if isinstance(cm, unreal.SkeletalMesh):
-                    c = EAS.spawn_actor_from_object(cm, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
-                    c.set_actor_label(f"OpponentOutfit_{cm.get_name()}")
-                    c.skeletal_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
-                    c.attach_to_actor(opp, "", unreal.AttachmentRule.KEEP_WORLD, unreal.AttachmentRule.KEEP_WORLD,
-                                      unreal.AttachmentRule.KEEP_WORLD, False)
-                    tag(c, "TC_FollowBody")
-                    tag(c)
-                    log("outfit", cm.get_name())
-        else:
-            opp = EAS.spawn_actor_from_object(manny, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> faces -X
-            smc = opp.skeletal_mesh_component
-        opp.set_actor_label("Opponent")
-        tag(opp)
+            a.attach_to_component(parent_smc, bone, R.SNAP_TO_TARGET, R.SNAP_TO_TARGET, R.KEEP_WORLD, False)
+        except TypeError as e:
+            log("WARNING attach failed:", name, e)
+        a.root_component.set_relative_location(loc, False, False)
+        a.root_component.set_relative_rotation(rot, False, False)
+        tag(a); tag(a, opp_tag)
+        return a
+
+    def prop_with(name, mats):
+        """Import a Blender prop and map its OBJ material slots (usemtl names) to our material instances."""
+        meshes = import_prop(name)
+        for sm in meshes:
+            for i, sl in enumerate(sm.static_materials):
+                slot = str(sl.material_slot_name)
+                mi = next((v for k, v in mats.items() if k.lower() in slot.lower()), None)
+                if mi:
+                    sm.set_material(i, mi)
+            EAL.save_loaded_asset(sm)
+        return meshes[0] if meshes else None
+
+    def spawn_opponent(opp_id, mhn, outfit_mi=None):
+        """Body (seated pose), face and outfit as skeletal mesh actors; the game links face/outfit to the body."""
+        opp_tag = f"TC_Opponent_{opp_id}"
+        mh_body = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh") if GAMEPLAY and mhn else None
+        body_mesh = mh_body or manny
+        if not (idle and body_mesh):
+            log("WARNING: no body for", opp_id)
+            return None, None
+        key = body_mesh.get_path_name()
+        if key not in seated_cache:
+            try:
+                seated_cache[key] = (build_seated_pose(body_mesh, idle, f"{ROOT}/Anims", f"A_TC_Seated_{body_mesh.get_name()}",
+                                                       own_proportions=bool(mh_body)), dict(SEATED))
+            except Exception:
+                log("WARNING seated pose failed\n" + traceback.format_exc())
+                seated_cache[key] = (None, dict(SEATED))
+        seated, head = seated_cache[key]
+        SEATED.update(head)
+        opp = EAS.spawn_actor_from_object(body_mesh, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))  # mesh faces +Y; yaw 90 -> -X
+        opp.set_actor_label(f"Opponent_{opp_id}")
+        smc = opp.skeletal_mesh_component
+        tag(opp); tag(opp, opp_tag); tag(opp, "TC_Body")
         setp(smc, "animation_mode", unreal.AnimationMode.ANIMATION_SINGLE_NODE)
         data = unreal.SingleAnimationPlayData()
         setp(data, "anim_to_play", seated or idle)
         setp(data, "saved_looping", True)
         setp(data, "saved_playing", True)
         setp(smc, "animation_data", data)
-        if not mh_body:
+        if mh_body:
+            followers = []
+            face = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Face/SKM_{mhn}_FaceMesh")
+            if face:
+                followers.append(("Face", face, None))
+            # outfit meshes: the body hides the skin under them, so they must be present or the torso renders as a hole
+            for p in EAL.list_assets(f"/Game/TownChess/MetaHumans/Built/{mhn}/Clothing", recursive=False):
+                cm = unreal.load_asset(p)
+                if isinstance(cm, unreal.SkeletalMesh):
+                    followers.append((cm.get_name(), cm, outfit_mi))
+            for label, mesh, mi in followers:
+                f = EAS.spawn_actor_from_object(mesh, unreal.Vector(90, 0, 0), unreal.Rotator(0, 0, 90))
+                f.set_actor_label(f"Opponent_{opp_id}_{label}")
+                f.skeletal_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+                f.attach_to_actor(opp, "", R.KEEP_WORLD, R.KEEP_WORLD, R.KEEP_WORLD, False)
+                if mi:
+                    for i in range(f.skeletal_mesh_component.get_num_materials()):
+                        f.skeletal_mesh_component.set_material(i, mi)
+                tag(f); tag(f, opp_tag); tag(f, "TC_FollowBody")
+        else:
             for i in range(smc.get_num_materials()):
                 smc.set_material(i, mi_cloth)
-        mask = import_prop("cage_mask")
-        if mask:
-            mask[0].set_material(0, mi_rust)
-            EAL.save_loaded_asset(mask[0])
-            m = EAS.spawn_actor_from_object(mask[0], unreal.Vector(90, 0, 150), unreal.Rotator(0, 0, 0))
-            m.set_actor_label("CageMask")
-            m.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)  # a Static actor cannot attach to the animated body
-            R = unreal.AttachmentRule
-            try:
-                m.attach_to_component(smc, "head", R.SNAP_TO_TARGET, R.SNAP_TO_TARGET, R.KEEP_WORLD, False)
-            except TypeError as e:
-                log("WARNING mask attach failed:", e)
+        log("opponent", opp_id, "body", body_mesh.get_name())
+        return opp, smc
+
+    mhn = os.environ.get("TC_MH_NAME", "MH_Walter")
+    if not EAL.does_asset_exist(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}"):
+        mhn = "MH_Opponent" if EAL.does_asset_exist("/Game/TownChess/MetaHumans/Built/MH_Opponent/BP_MH_Opponent") else None
+
+    # 1. The caged patient: Blender cage mask over the face
+    opp, smc = spawn_opponent("caged", mhn)
+    if smc and "head" in SEATED:
+        cage = import_prop("cage_mask")
+        if cage:
+            cage[0].set_material(0, mi_rust)
+            EAL.save_loaded_asset(cage[0])
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,4.5,-1").split(",")]  # forward (+Y), up (+Z) from the head bone
-            if "head" in SEATED:
-                rl, rr = head_relative(off)
-                m.root_component.set_relative_location(rl, False, False)
-                m.root_component.set_relative_rotation(rr, False, False)
-                log("mask attached rel", rl, rr)
-            else:
-                log("WARNING no seated head transform; mask left at the bone origin")
-            tag(m)
-    else:
-        log("WARNING: mannequin not found")
+            attach_static("CageMask", cage[0], smc, "head", *head_relative(off), "TC_Opponent_caged")
+
+    # 2. The Annotator: slate-green coat, tan oversleeves, linen coif, two-leaf riveted plate, ledger and pencil
+    mi_coat = surface_material(master, "rough_linen", name="MI_AnnotatorCoat", tiling=8.0, tint=(0.243, 0.29, 0.263),
+                               scalars={"GrimeTiling": 1.2, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
+    mi_duck = surface_material(master, "rough_linen", name="MI_Oversleeve", tiling=6.0, tint=(0.62, 0.52, 0.38),
+                               grime_color=(0.35, 0.33, 0.32), scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.5, "GrimeContrast": 2.5})
+    mi_coif = surface_material(master, "rough_linen", name="MI_Coif", tiling=7.0, tint=(0.5, 0.47, 0.42),
+                               scalars={"GrimeTiling": 1.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
+    mi_steel = surface_material(master, "rusty_metal_02", name="MI_MaskSteel", tiling=1.5, metal=1.0, tint=(0.6, 0.6, 0.6), rough=0.55,
+                                scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.0, "MicroRough": 0.2})
+    mi_copper = surface_material(master, "rusty_metal_02", name="MI_Copper", tiling=3.0, metal=1.0, tint=(0.95, 0.5, 0.32), rough=0.45)
+    mi_black = make_mi(master, "MI_Pupil", {"BaseColor": None}, tint=(0.01, 0.01, 0.01), rough=0.9)
+    mi_oxblood = surface_material(master, "brown_leather", name="MI_LedgerCloth", tiling=3.0, tint=(0.36, 0.09, 0.08), rough=0.85)
+    mi_pages = make_mi(master, "MI_Pages", {"BaseColor": None}, tint=(0.78, 0.72, 0.6), rough=0.95)
+    opp_a, smc_a = spawn_opponent("annotator", mhn, outfit_mi=mi_coat)
+    if smc_a and "head" in SEATED:
+        plate = prop_with("annotator_mask", {"Steel": mi_steel, "Copper": mi_copper, "Pupil": mi_black})
+        coif = prop_with("annotator_coif", {"Linen": mi_coif})
+        noff = [float(v) for v in os.environ.get("TC_NASION_OFFSET", "0,9.5,7").split(",")]  # head bone -> nasion
+        if coif:
+            attach_static("AnnotatorCoif", coif, smc_a, "head", *head_relative(noff), "TC_Opponent_annotator")
+        if plate:
+            attach_static("AnnotatorMask", plate, smc_a, "head", *head_relative([noff[0], noff[1] + 1.2, noff[2]]), "TC_Opponent_annotator")
+        over = prop_with("oversleeve", {"Duck": mi_duck})
+        coat = prop_with("coat_sleeve", {"Wool": mi_coat})
+        for side, flip in (("l", 0.0), ("r", 180.0)):  # right-side bones point back along the arm on this skeleton
+            if over:
+                attach_static(f"Oversleeve_{side}", over, smc_a, f"lowerarm_{side}", unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, flip), "TC_Opponent_annotator")
+            if coat:
+                attach_static(f"CoatSleeve_{side}", coat, smc_a, f"upperarm_{side}", unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, flip), "TC_Opponent_annotator")
+        led = prop_with("ledger", {"LedgerCloth": mi_oxblood, "Pages": mi_pages, "Ribbon": mi_oxblood})
+        pen = prop_with("pencil", {"PencilPaint": mi_coat, "PencilWood": mi_pages, "Ferrule": mi_copper, "Eraser": mi_oxblood})
+        for nm, mesh, loc, yaw in (("Ledger", led, (52, -34), 75), ("Pencil", pen, (46, -20), 30)):
+            if mesh:
+                a = EAS.spawn_actor_from_object(mesh, unreal.Vector(loc[0], loc[1], top + 0.1), unreal.Rotator(0, 0, yaw))
+                a.set_actor_label(f"Annotator{nm}")
+                tag(a); tag(a, "TC_Opponent_annotator")
 
     # ---- Player hands (XR mannequin hands as stand-ins), resting near the near board edge.
     for side, y, yaw_h in (("left", -26, 0), ("right", 26, 0)):

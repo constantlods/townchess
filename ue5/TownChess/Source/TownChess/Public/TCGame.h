@@ -16,6 +16,7 @@ class UTCCoreClient;
  * - Online: `-tcserver=ws://host:port/ws` connects to a TownChess server instead.
  * - `-tcauto=cpu:<level>:<w|b|random>:<tc>` creates an engine game as soon as the session is up (demos, automation).
  * - `-tcname=<username>` sets the requested username.
+ * - `-tcopponent=<id>` picks the opponent from the level's roster (caged, annotator; default caged).
  * - `-tcsmoke=<plies>` (packaged-build smoke test, no Python needed): plays that many plies against the engine
  *   through the board's click path, checks every position (in sync, no silent repair, no misplaced piece), writes
  *   Saved/TownChess/smoke.json and quits.
@@ -32,6 +33,9 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	UFUNCTION(BlueprintPure, Category = "TownChess") bool IsOnline() const { return !ServerUrl.IsEmpty(); }
 	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetServerLabel() const;
+	/** Show one opponent from the level's roster (tags TC_Opponent_<id>) and hide the others. */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void ApplyOpponent(const FString& Id);
+	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetOpponent() const { return OpponentShown; }
 	virtual void Tick(float Dt) override;
 
 private:
@@ -40,7 +44,7 @@ private:
 	UFUNCTION() void OnState(const FTCGameState& State, const FString& Reason);
 	void ApplySeat(const FString& Color);
 
-	FString ServerUrl, Auto, Username, SeatApplied;
+	FString ServerUrl, Auto, Username, SeatApplied, OpponentShown;
 	int32 SmokePlies = 0, SmokeChecked = -1, SmokeFailures = 0;
 	double SmokeDeadline = 0;
 	TArray<FString> SmokeLog;

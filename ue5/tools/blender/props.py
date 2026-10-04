@@ -1,6 +1,6 @@
 """Procedural hero props for TownChess, authored in Blender (our own geometry, no third-party assets).
 
-    blender -b --factory-startup -P ue5/tools/blender/props.py -- <out_dir>
+    blender -b --factory-startup -P ue5/tools/blender/props.py -- <out_dir> [names...]
 
 Writes OBJ files (centimetres in UE):
   cage_mask.obj  - asylum restraint mask: a welded wire grid over the face, an iron rim band, a centre strap over the
@@ -258,6 +258,276 @@ def desk_lamp():
     export("dome_lamp.obj")
 
 
+# ---------------------------------------------------------------- The Annotator (docs/CHARACTERS.md 2.2, 2.3)
+
+def _mask_width(z):
+    """Plate width (cm) at height z (cm, 0 = brow edge, negative downwards, chin at -24)."""
+    pts = [(0.0, 15.0), (-9.0, 17.5), (-20.0, 11.0), (-23.2, 6.0), (-24.0, 0.0)]
+    for (z0, w0), (z1, w1) in zip(pts, pts[1:]):
+        if z1 <= z <= z0:
+            t = (z0 - z) / (z0 - z1)
+            t = t * t * (3 - 2 * t)
+            return w0 + (w1 - w0) * t
+    return 0.0
+
+
+def _plate_y(x, z):
+    """Front surface depth (cm, Blender -Y is forward): horizontal radius 11, vertical radius 30, spine most forward."""
+    r_h, r_v = 11.0, 30.0
+    y = -7.5 + (r_h - math.sqrt(max(r_h * r_h - x * x, 1.0)))
+    y += (z + 11.0) ** 2 / (2 * r_v)
+    return y
+
+
+def annotator_mask():
+    reset()
+    S = 0.01  # cm -> m
+    cell = 0.45
+    eye_cx, eye_cz = -3.2, -10.0           # viewer-left leaf (wearer's right eye)
+    dent_c = (3.2 + 0.8, -10.0 + 0.8)       # blind side
+    parts = []
+
+    def leaf(name, x0, x1, push):
+        bm = bmesh.new()
+        nx, nz = int(round((x1 - x0) / cell)), int(round(24.0 / cell))
+        vs = {}
+        def v(i, j):
+            if (i, j) not in vs:
+                x, z = x0 + i * cell, -j * cell
+                y = _plate_y(x, z) - push
+                dx, dz = x - dent_c[0], z - dent_c[1]
+                d = math.hypot(dx, dz)
+                if d < 1.25 and x > 0:
+                    y += 0.4 * (1 - (d / 1.25) ** 2)       # hammered dent
+                y += 0.03 * math.sin(x * 2.1 + z * 1.7)   # hand-formed waviness
+                vs[(i, j)] = bm.verts.new((x * S, y * S, (z + 2.0) * S))  # origin at the nasion, 2 cm under the brow
+            return vs[(i, j)]
+        for j in range(nz):
+            for i in range(nx):
+                xc, zc = x0 + (i + 0.5) * cell, -(j + 0.5) * cell
+                if abs(xc) > _mask_width(zc) / 2:
+                    continue
+                gi, gj = math.floor((xc - (eye_cx - 1.8)) / cell), math.floor((-(zc) - (-eye_cz - 1.8)) / cell)
+                if name == "Leaf_L" and 0 <= gi < 8 and 0 <= gj < 8 and (gi + gj) % 2 == 1:
+                    continue  # drilled dark squares: the checker eye opening
+                bm.faces.new((v(i, j), v(i + 1, j), v(i + 1, j + 1), v(i, j + 1)))
+        ob = obj_from_bm(name, bm)
+        so = ob.modifiers.new("solid", "SOLIDIFY")
+        so.thickness = 0.002
+        apply_mods(ob)
+        material(ob, "M_Steel")
+        return ob
+
+    parts.append(leaf("Leaf_L", -9.9, 0.9, 0.2))   # overlaps the right leaf by 1.8 cm, sits proud of it
+    parts.append(leaf("Leaf_R", -0.9, 9.9, 0.0))
+
+    # rolled bead around the outline
+    bpy.ops.curve.primitive_bezier_curve_add()
+    cu = bpy.context.active_object
+    sp = cu.data.splines[0]
+    pts = []
+    for k in range(60):
+        z = -24.0 * k / 59
+        pts.append((_mask_width(z) / 2, z))
+    outline = pts + [(-x, z) for x, z in reversed(pts)]
+    cu.data.splines.remove(sp)
+    poly = cu.data.splines.new("POLY")
+    poly.points.add(len(outline) - 1)
+    for p, (x, z) in zip(poly.points, outline):
+        p.co = (x * S, (_plate_y(x, z) - 0.25) * S, (z + 2.0) * S, 1)
+    poly.use_cyclic_u = True
+    cu.data.bevel_depth = 0.0025
+    cu.data.bevel_resolution = 3
+    bpy.ops.object.convert(target="MESH")
+    bead = bpy.context.active_object
+    material(bead, "M_Steel")
+    parts.append(bead)
+
+    def box(name, size, loc, mat, rot=(0, 0, 0)):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=loc, rotation=rot)
+        b = bpy.context.active_object
+        b.scale = size
+        bpy.ops.object.transform_apply(scale=True)
+        material(b, mat)
+        parts.append(b)
+        return b
+
+    def rivet(x, z, d=0.6, h=0.25, proud=0.6):
+        y = _plate_y(x, z) - proud
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=d / 2 * S, segments=12, ring_count=6, location=(x * S, y * S, (z + 2.0) * S))
+        r = bpy.context.active_object
+        r.scale = (1, h / (d / 2), 1)
+        material(r, "M_Copper")
+        parts.append(r)
+
+    # spine strap with nine rivets
+    for k in range(23):
+        z = -0.5 - k
+        box(f"Spine{k}", (1.4 * S, 0.4 * S, 1.35 * S), (0, (_plate_y(0, z) - 0.45) * S, (z + 2.0) * S), "M_Steel")
+    for k in range(9):
+        rivet(0.0, -1.6 - k * 2.6, proud=0.75)
+    # repair patch, viewer-right lower cheek, six rivets with one missing
+    pz, px = -15.0, 3.4
+    box("Patch", (4.0 * S, 0.15 * S, 6.0 * S), (px * S, (_plate_y(px, pz) - 0.12) * S, (pz + 2.0) * S), "M_Steel", rot=(0, math.radians(8), 0))
+    for k, (dx, dz) in enumerate(((-1.6, 1.8), (1.6, 1.8), (-1.6, -1.8), (1.6, -1.8), (0, 2.7), (0, -2.7))):
+        if k != 3:
+            rivet(px + dx, pz + dz, d=0.4, h=0.18, proud=0.3)
+    # temple tabs and the head band (over the coif)
+    for sx in (-1, 1):
+        x = sx * 8.2
+        box(f"Tab{sx}", (2.5 * S, 0.3 * S, 4.0 * S), (x * S, (_plate_y(x, -3) + 0.6) * S, (-3 + 2.0) * S), "M_Steel", rot=(0, 0, math.radians(-sx * 55)))
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.092, minor_radius=0.004, major_segments=64, minor_segments=8,
+                                     location=(0, 0.035, 0.005))
+    band = bpy.context.active_object
+    band.scale = (0.87, 1.08, 2.6)
+    bpy.ops.object.transform_apply(scale=True)
+    material(band, "M_Steel")
+    parts.append(band)
+    # dark pupil plane behind the eye grid
+    box("Pupil", (3.4 * S, 0.05 * S, 3.4 * S), (eye_cx * S, (_plate_y(eye_cx, eye_cz) + 1.2) * S, (eye_cz + 2.0) * S), "M_Pupil")
+
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    m = bpy.context.active_object
+    m.name = "SM_AnnotatorMask"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.005)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.shade_smooth()
+    export("annotator_mask.obj")
+
+
+def annotator_coif():
+    """Coarse linen coif covering skull, ears and neck; open where the plate sits. Origin at the nasion."""
+    reset()
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=32, radius=1, location=(0, 0, 0))
+    c = bpy.context.active_object
+    bm = bmesh.new()
+    bm.from_mesh(c.data)
+    for v in bm.verts:
+        x, y, z = v.co
+        v.co = (x * 0.088, y * 0.105 + 0.085, z * 0.12 + 0.03)  # head shell centred ~8.5 cm behind the nasion
+    # neck tube below the skull
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.035 and v.co.y < 0.03], context="VERTS")  # open face/jaw front
+    bm.to_mesh(c.data)
+    bm.free()
+    so = c.modifiers.new("solid", "SOLIDIFY")
+    so.thickness = 0.003
+    apply_mods(c)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=0.068, depth=0.13, location=(0, 0.085, -0.13))
+    neck = bpy.context.active_object
+    so = neck.modifiers.new("solid", "SOLIDIFY")
+    so.thickness = 0.003
+    apply_mods(neck)
+    for o in (c, neck):
+        material(o, "M_Linen")
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = c
+    bpy.ops.object.join()
+    co = bpy.context.active_object
+    co.name = "SM_AnnotatorCoif"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.shade_smooth()
+    export("annotator_coif.obj")
+
+
+def sleeve(name, length, r0, r1, mat, out):
+    """Tapered tube along +X from the origin (attach to an arm bone), gathered at both ends."""
+    reset()
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=1, depth=1, location=(0, 0, 0), rotation=(0, math.radians(90), 0))
+    t = bpy.context.active_object
+    bpy.ops.object.transform_apply(rotation=True)
+    bm = bmesh.new()
+    bm.from_mesh(t.data)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if abs(f.normal.x) > 0.9], context="FACES")
+    for v in bm.verts:
+        u = v.co.x + 0.5
+        r = r0 + (r1 - r0) * u
+        r *= 1.0 + 0.08 * math.sin(u * math.pi) - 0.1 * (math.exp(-u * 18) + math.exp(-(1 - u) * 18))  # gathered ends
+        r *= 1.0 + 0.02 * math.sin(math.atan2(v.co.z, v.co.y) * 5 + u * 9)                              # folds
+        a = math.atan2(v.co.z, v.co.y)
+        v.co = (u * length, math.cos(a) * r, math.sin(a) * r)
+    bm.to_mesh(t.data)
+    bm.free()
+    so = t.modifiers.new("solid", "SOLIDIFY")
+    so.thickness = 0.002
+    sub = t.modifiers.new("sub", "SUBSURF")
+    sub.levels = 1
+    apply_mods(t)
+    t.name = name
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.shade_smooth()
+    material(t, mat)
+    export(out)
+
+
+def ledger():
+    """Cloth-bound ledger 27 x 20 x 3 cm, oxblood cover, cream page block, ribbon marker. Origin bottom centre."""
+    reset()
+    parts = []
+    def box(size, loc, mat):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+        b = bpy.context.active_object
+        b.scale = size
+        bpy.ops.object.transform_apply(scale=True)
+        bv = b.modifiers.new("bevel", "BEVEL")
+        bv.width = 0.0015
+        bv.segments = 2
+        apply_mods(b)
+        material(b, mat)
+        parts.append(b)
+    box((0.27, 0.20, 0.004), (0, 0, 0.002), "M_LedgerCloth")
+    box((0.27, 0.20, 0.004), (0, 0, 0.028), "M_LedgerCloth")
+    box((0.006, 0.20, 0.03), (-0.135, 0, 0.015), "M_LedgerCloth")
+    box((0.262, 0.192, 0.022), (0.002, 0, 0.015), "M_Pages")
+    box((0.008, 0.0015, 0.09), (0.04, -0.1, -0.03), "M_Ribbon")
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    l = bpy.context.active_object
+    l.name = "SM_Ledger"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    export("ledger.obj")
+
+
+def pencil():
+    """Hexagonal pencil about 11 cm with a metal ferrule and eraser, along +X."""
+    reset()
+    parts = []
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.0036, depth=0.095, location=(0.0475, 0, 0), rotation=(0, math.radians(90), 0))
+    parts.append(bpy.context.active_object); material(parts[-1], "M_PencilPaint")
+    bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.0036, radius2=0.0006, depth=0.012, location=(-0.006, 0, 0), rotation=(0, math.radians(-90), 0))
+    parts.append(bpy.context.active_object); material(parts[-1], "M_PencilWood")
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.0039, depth=0.008, location=(0.099, 0, 0), rotation=(0, math.radians(90), 0))
+    parts.append(bpy.context.active_object); material(parts[-1], "M_Ferrule")
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.0035, depth=0.006, location=(0.106, 0, 0), rotation=(0, math.radians(90), 0))
+    parts.append(bpy.context.active_object); material(parts[-1], "M_Eraser")
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    p = bpy.context.active_object
+    p.name = "SM_Pencil"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    export("pencil.obj")
+
+
 def export(name):
     # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
     # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
@@ -276,6 +546,13 @@ def export(name):
     print(f"[TCPROPS] wrote {name} tris={tris}", flush=True)
 
 
-cage_mask()
-tin_mug()
-desk_lamp()
+WHICH = sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else []
+BUILDERS = {
+    "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp,
+    "annotator_mask": annotator_mask, "annotator_coif": annotator_coif, "ledger": ledger, "pencil": pencil,
+    "oversleeve": lambda: sleeve("SM_Oversleeve", 0.24, 0.042, 0.034, "M_Duck", "oversleeve.obj"),
+    "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.055, 0.046, "M_CoatWool", "coat_sleeve.obj"),
+}
+for k, f in BUILDERS.items():
+    if not WHICH or k in WHICH:
+        f()

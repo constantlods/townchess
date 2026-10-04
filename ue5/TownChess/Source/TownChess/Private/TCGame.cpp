@@ -56,24 +56,57 @@ FString ATCGameMode::GetServerLabel() const
 	return IsOnline() ? ServerUrl : TEXT("local core");
 }
 
+static FName OpponentTagOf(const AActor* A)
+{
+	for (const FName& T : A->Tags)
+	{
+		if (T.ToString().StartsWith(TEXT("TC_Opponent_"))) return T;
+	}
+	return NAME_None;
+}
+
+void ATCGameMode::ApplyOpponent(const FString& Id)
+{
+	const FName Want(*(TEXT("TC_Opponent_") + Id));
+	bool bFound = false;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		const FName T = OpponentTagOf(*It);
+		if (T != NAME_None && T == Want) bFound = true;
+	}
+	const FName Show = bFound ? Want : FName(TEXT("TC_Opponent_caged"));
+	TMap<FName, USkeletalMeshComponent*> Bodies;
+	for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("TC_Body"))) Bodies.Add(OpponentTagOf(*It), It->GetSkeletalMeshComponent());
+	}
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		const FName T = OpponentTagOf(*It);
+		if (T == NAME_None) continue;
+		It->SetActorHiddenInGame(T != Show);
+		It->SetActorEnableCollision(T == Show);
+		if (It->ActorHasTag(TEXT("TC_FollowBody")))
+		{
+			if (USkeletalMeshComponent* const* B = Bodies.Find(T))
+			{
+				Cast<ASkeletalMeshActor>(*It)->GetSkeletalMeshComponent()->SetLeaderPoseComponent(*B);
+			}
+		}
+	}
+	OpponentShown = Show.ToString().RightChop(12);
+	UE_LOG(LogTownChess, Log, TEXT("opponent: %s%s"), *OpponentShown, bFound ? TEXT("") : TEXT(" (requested one not in the level)"));
+}
+
 void ATCGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-	// MetaHuman opponent: the level places the body (seated pose) and the face as separate skeletal mesh actors; the
-	// face follows the body's skeleton (leader pose), which is runtime state and so is linked here, not in the level.
-	ASkeletalMeshActor* Body = nullptr;
-	for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); It; ++It)
-	{
-		if (It->ActorHasTag(TEXT("TC_Body"))) Body = *It;
-	}
-	for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); Body && It; ++It)
-	{
-		if (It->ActorHasTag(TEXT("TC_FollowBody")))
-		{
-			It->GetSkeletalMeshComponent()->SetLeaderPoseComponent(Body->GetSkeletalMeshComponent());
-			UE_LOG(LogTownChess, Log, TEXT("%s follows %s"), *It->GetName(), *Body->GetName());
-		}
-	}
+	// Opponent roster: every character is built into the level, tagged TC_Opponent_<id>. Show the selected one
+	// (-tcopponent=<id>, default "caged") and hide the rest. MetaHuman faces/outfits are separate skeletal mesh actors
+	// that follow their own body's skeleton (leader pose), which is runtime state and so is linked here.
+	FString OpponentId = TEXT("caged");
+	FParse::Value(FCommandLine::Get(), TEXT("-tcopponent="), OpponentId);
+	ApplyOpponent(OpponentId);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcserver="), ServerUrl);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcauto="), Auto);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcname="), Username);

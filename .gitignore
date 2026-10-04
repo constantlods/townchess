@@ -9,3 +9,4 @@ server-data/
 .claude/
 tools/.cache/
 tools/sim/out*/
+tools/sim/*.log
