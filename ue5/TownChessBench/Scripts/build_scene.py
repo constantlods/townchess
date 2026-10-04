@@ -614,7 +614,7 @@ POSES = {
     # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
     # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
     "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0)},
-    "clasp": {"spine_01": (6, 0), "spine_03": (10, 0), "neck_01": (-4, 0), "head": (6, 0),
+    "clasp": {"spine_01": (12, 0), "spine_03": (18, 0), "neck_01": (-6, 0), "head": (10, 0),
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
               "hand_l": (0, -15), "hand_r": (0, 15)},
 }
@@ -674,7 +674,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
     deltas = {"thigh_l": _axis(X, 90), "thigh_r": _axis(X, 90), "calf_l": _axis(X, -90), "calf_r": _axis(X, -90)}
     for bone, (ax, az) in POSES[pose_name].items():  # component-space rotation applied to each bone's orientation, top-down
         deltas[bone] = _qmul(_axis(Z, az), _axis(X, ax))
-    pelvis_drop = float(os.environ.get("TC_PELVIS_DROP", 47.0))
+    pelvis_drop = float(os.environ.get("TC_PELVIS_DROP", 47.0)) + (6.0 if pose_name == "clasp" else 0.0)  # he sits low, bowed in
 
     def solve(deltas):
         new_w, new_l = {}, dict(loc)
@@ -1279,7 +1279,7 @@ def build():
 
     # ---- Camera: seated eye height, natural focal length, focus on the board.
     eye = (-87.0, 0.0, top + 42.0)
-    PITCH = -15.0  # 16:9 cannot match both the reference's near board edge and its headroom; headroom wins (the opponent is the subject)
+    PITCH = -21.0  # the reference's pitch: the player's own hands show at the bottom; the bowed opponent keeps his head in frame
     cam = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(*eye), unreal.Rotator(0, PITCH, 0))
     cam.set_actor_label("PlayerEye")
     tag(cam, "TC_Camera_White")
