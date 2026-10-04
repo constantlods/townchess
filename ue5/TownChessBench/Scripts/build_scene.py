@@ -919,7 +919,7 @@ def build():
 
     # ---- Camera: seated eye height, natural focal length, focus on the board.
     eye = (-87.0, 0.0, top + 42.0)
-    PITCH = -20.0
+    PITCH = -15.0  # 16:9 cannot match both the reference's near board edge and its headroom; headroom wins (the opponent is the subject)
     cam = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(*eye), unreal.Rotator(0, PITCH, 0))
     cam.set_actor_label("PlayerEye")
     tag(cam, "TC_Camera_White")
