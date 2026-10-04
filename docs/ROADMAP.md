@@ -255,6 +255,8 @@ Per-ply checks (every scenario):
 | Job Object: the game is killed with `TerminateProcess` (no shutdown code runs) while its core runs | Pass: Windows terminated the core with the game | `test_package.ps1` |
 | Core crash in a packaged build: the core was killed while the game ran | Pass, observed once: the game logged `exited unexpectedly`, relaunched the core within 0.2 s and reconnected. Seen in an accidentally overlapping run, not yet a scripted test | `pkg-smoke.log` |
 | Antivirus: Defender real-time protection on, build run unmodified | Pass: no detections involving the build or `node.exe` (read-only query) | `test_package.ps1` |
+| Packaged game vs the bundled Stockfish (league level `sf1600`, Annotator opponent): the core finds `engines\stockfish.exe`; the smoke run plays its **own** new game (a journal-restored game is resigned and left first) | Pass (16/16 plies, 0 failures, no Stockfish process left) | `-tcsmoke=16 -tcauto=cpu:sf1600:w:untimed` |
+| Simulator: historical games + CPU vs CPU (house tiers, Stockfish UCI_Elo 1350-2850) cross-checked per ply against Stockfish's move generator | Pass (19 games, 0 anomalies, all mates confirmed by the referee) | `tools/sim/simulate.ts` |
 | **Owner's interactive launch through the root `TownChess.exe` stub: HUD and real mouse input** | **Pending** (the stub hung with no child in the non-interactive SSH session; the tests launch `TownChess/Binaries/Win64/TownChess.exe` directly) | owner |
 
 Bugs found and fixed while testing:
