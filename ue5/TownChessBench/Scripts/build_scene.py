@@ -136,7 +136,37 @@ def build_master_material(defaults):
     bcm = expr(unreal.MaterialExpressionMultiply, -500, -450)
     MEL.connect_material_expressions(bc, "RGB", bcm, "A")
     MEL.connect_material_expressions(tint, "", bcm, "B")
-    MEL.connect_material_property(bcm, "", unreal.MaterialProperty.MP_BASE_COLOR)
+
+    # Layered wear on top of the scanned maps: a tiling grime mask (R macro blotches, G mid streaks, B micro smudge)
+    # darkens/tints the colour and changes roughness, so surfaces stop reading as clean CG. GrimeThreshold 1 = off.
+    guv = expr(unreal.MaterialExpressionMultiply, -1200, -800)
+    MEL.connect_material_expressions(uv, "", guv, "A")
+    MEL.connect_material_expressions(scalar("GrimeTiling", 1.0, -1400, -760), "", guv, "B")
+    grime = tex_param("Grime", defaults.get("grime", defaults["white"]), unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, -1000, -900)
+    MEL.connect_material_expressions(guv, "", grime, "UVs")
+    gmix = expr(unreal.MaterialExpressionLinearInterpolate, -800, -1000)  # macro blotches, broken up by streaks
+    MEL.connect_material_expressions(grime, "R", gmix, "A")
+    MEL.connect_material_expressions(grime, "G", gmix, "B")
+    MEL.connect_material_expressions(scalar("GrimeStreaks", 0.35, -1000, -1080), "", gmix, "Alpha")
+    gsub = expr(unreal.MaterialExpressionSubtract, -650, -1000)
+    MEL.connect_material_expressions(gmix, "", gsub, "A")
+    MEL.connect_material_expressions(scalar("GrimeThreshold", 1.0, -800, -1080), "", gsub, "B")
+    gmul = expr(unreal.MaterialExpressionMultiply, -500, -1000)
+    MEL.connect_material_expressions(gsub, "", gmul, "A")
+    MEL.connect_material_expressions(scalar("GrimeContrast", 3.0, -650, -1080), "", gmul, "B")
+    gmask = expr(unreal.MaterialExpressionSaturate, -380, -1000)
+    MEL.connect_material_expressions(gmul, "", gmask, "")
+    gcol = expr(unreal.MaterialExpressionVectorParameter, -500, -1200)
+    gcol.set_editor_property("parameter_name", "GrimeColor")
+    gcol.set_editor_property("default_value", unreal.LinearColor(0.32, 0.25, 0.17, 1))
+    dirty = expr(unreal.MaterialExpressionMultiply, -350, -1150)
+    MEL.connect_material_expressions(bcm, "", dirty, "A")
+    MEL.connect_material_expressions(gcol, "", dirty, "B")
+    bcf = expr(unreal.MaterialExpressionLinearInterpolate, -220, -500)
+    MEL.connect_material_expressions(bcm, "", bcf, "A")
+    MEL.connect_material_expressions(dirty, "", bcf, "B")
+    MEL.connect_material_expressions(gmask, "", bcf, "Alpha")
+    MEL.connect_material_property(bcf, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
     # Normal strength: lerp flat → sampled.
     flat = expr(unreal.MaterialExpressionConstant3Vector, -700, 120)
@@ -149,11 +179,34 @@ def build_master_material(defaults):
     MEL.connect_material_property(nl, "", unreal.MaterialProperty.MP_NORMAL)
 
     MEL.connect_material_property(arm, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
+    # Roughness: ARM.G, or a separate roughness map (Poly Haven model textures) when UseRoughTex = 1
+    rtex = tex_param("RoughTex", defaults["white"], unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE, -900, 700)
+    MEL.connect_material_expressions(uvm, "", rtex, "UVs")
+    rsel = expr(unreal.MaterialExpressionLinearInterpolate, -650, 380)
+    MEL.connect_material_expressions(arm, "G", rsel, "A")
+    MEL.connect_material_expressions(rtex, "R", rsel, "B")
+    MEL.connect_material_expressions(scalar("UseRoughTex", 0.0, -800, 460), "", rsel, "Alpha")
     rs = scalar("RoughnessScale", 1.0, -700, 420)
     rm = expr(unreal.MaterialExpressionMultiply, -450, 380)
-    MEL.connect_material_expressions(arm, "G", rm, "A")
+    MEL.connect_material_expressions(rsel, "", rm, "A")
     MEL.connect_material_expressions(rs, "", rm, "B")
-    MEL.connect_material_property(rm, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    rg = expr(unreal.MaterialExpressionLinearInterpolate, -320, 380)  # grime is matte
+    MEL.connect_material_expressions(rm, "", rg, "A")
+    MEL.connect_material_expressions(scalar("GrimeRoughness", 0.85, -450, 300), "", rg, "B")
+    MEL.connect_material_expressions(gmask, "", rg, "Alpha")
+    # micro smudges/fingerprints: +- MicroRough around the base value from the grime B channel
+    mc = expr(unreal.MaterialExpressionSubtract, -450, 470)
+    MEL.connect_material_expressions(grime, "B", mc, "A")
+    mc.set_editor_property("const_b", 0.5)
+    mcs = expr(unreal.MaterialExpressionMultiply, -320, 470)
+    MEL.connect_material_expressions(mc, "", mcs, "A")
+    MEL.connect_material_expressions(scalar("MicroRough", 0.0, -450, 540), "", mcs, "B")
+    radd = expr(unreal.MaterialExpressionAdd, -200, 400)
+    MEL.connect_material_expressions(rg, "", radd, "A")
+    MEL.connect_material_expressions(mcs, "", radd, "B")
+    rsat = expr(unreal.MaterialExpressionSaturate, -100, 400)
+    MEL.connect_material_expressions(radd, "", rsat, "")
+    MEL.connect_material_property(rsat, "", unreal.MaterialProperty.MP_ROUGHNESS)
     ms = scalar("MetallicScale", 0.0, -700, 560)
     mm = expr(unreal.MaterialExpressionMultiply, -450, 540)
     MEL.connect_material_expressions(arm, "B", mm, "A")
@@ -165,7 +218,7 @@ def build_master_material(defaults):
     return m
 
 
-def make_mi(master, name, textures, tiling=1.0, rough=1.0, metal=0.0, tint=None):
+def make_mi(master, name, textures, tiling=1.0, rough=1.0, metal=0.0, tint=None, scalars=None, grime_color=None):
     path = f"{ROOT}/Materials/{name}"
     if EAL.does_asset_exist(path):
         EAL.delete_asset(path)
@@ -180,6 +233,10 @@ def make_mi(master, name, textures, tiling=1.0, rough=1.0, metal=0.0, tint=None)
     MEL.set_material_instance_scalar_parameter_value(mi, "MetallicScale", metal)
     if tint:
         MEL.set_material_instance_vector_parameter_value(mi, "Tint", unreal.LinearColor(*tint, 1.0))
+    if grime_color:
+        MEL.set_material_instance_vector_parameter_value(mi, "GrimeColor", unreal.LinearColor(*grime_color, 1.0))
+    for k, v in (scalars or {}).items():
+        MEL.set_material_instance_scalar_parameter_value(mi, k, v)
     MEL.update_material_instance(mi)
     EAL.save_loaded_asset(mi)
     return mi
@@ -198,6 +255,94 @@ def surface_material(master, tex_name, **kw):
         elif stem.endswith("_arm"):
             maps["ARM"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "linear")
     return make_mi(master, "MI_" + tex_name, maps, **kw)
+
+
+def _value_noise(size, freq, seed, sx=1, sy=1):
+    """Tileable value noise in [0,1]: a wrapped (freq*sx) x (freq*sy) lattice, smoothstep-interpolated."""
+    import random
+    rnd = random.Random(seed)
+    gx, gy = freq * sx, freq * sy
+    lat = [[rnd.random() for _ in range(gx)] for _ in range(gy)]
+    out = [0.0] * (size * size)
+    for y in range(size):
+        fy = y * gy / size
+        y0 = int(fy); ty = fy - y0; ty = ty * ty * (3 - 2 * ty)
+        r0, r1 = lat[y0 % gy], lat[(y0 + 1) % gy]
+        row = y * size
+        for x in range(size):
+            fx = x * gx / size
+            x0 = int(fx); tx = fx - x0; tx = tx * tx * (3 - 2 * tx)
+            a = r0[x0 % gx] + (r0[(x0 + 1) % gx] - r0[x0 % gx]) * tx
+            b = r1[x0 % gx] + (r1[(x0 + 1) % gx] - r1[x0 % gx]) * tx
+            out[row + x] = a + (b - a) * ty
+    return out
+
+
+def _fbm(size, base, octaves, seed, sx=1, sy=1):
+    acc = [0.0] * (size * size)
+    amp, total = 1.0, 0.0
+    for o in range(octaves):
+        n = _value_noise(size, base << o, seed + o * 101, sx, sy)
+        for i, v in enumerate(n):
+            acc[i] += v * amp
+        total += amp
+        amp *= 0.5
+    lo, hi = min(acc), max(acc)
+    return [(v - lo) / (hi - lo) for v in acc]
+
+
+def grime_png(path, size=512):
+    """Our own tileable grime mask: R macro blotches, G vertical-ish streaks/scratches, B micro smudges."""
+    r = _fbm(size, 3, 5, 11)
+    g = _fbm(size, 2, 5, 23, sx=6, sy=1)
+    g = [abs(v - 0.5) * 2 for v in g]  # ridged: thin streak lines
+    g = [1.0 - v for v in g]
+    b = _fbm(size, 24, 3, 37)
+    raw = bytearray()
+    for y in range(size):
+        raw.append(0)
+        for x in range(size):
+            i = y * size + x
+            raw += bytes((int(r[i] * 255), int(g[i] ** 4 * 255), int(b[i] * 255), 255))
+    def chunk(tag, data):
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+    with open(path, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress(bytes(raw), 6)) + chunk(b"IEND", b""))
+
+
+def model_material(master, model, prefix, name, **kw):
+    """Material instance from a Poly Haven model's own maps (diff, nor_gl, rough, optional metal) on the layered
+    master, so the hero meshes get correct scanned colour plus our wear layers instead of the FBX importer's guess."""
+    d = os.path.join(ASSETS, "models", model, "textures")
+    dest = f"{ROOT}/Textures/{model}"
+    maps = {}
+    for f in sorted(os.listdir(d)):
+        stem, ext = os.path.splitext(f)
+        if not stem.startswith(prefix):
+            continue
+        if "_diff_" in stem:
+            maps["BaseColor"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "color")
+        elif "_nor_gl_" in stem:
+            t = import_texture(os.path.join(d, f), dest, "T_" + stem, "normal")
+            t.set_editor_property("flip_green_channel", True)  # OpenGL -> DirectX
+            maps["Normal"] = t
+        elif "_rough_" in stem:
+            maps["RoughTex"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "gray")
+    sc = dict(kw.pop("scalars", {}) or {})
+    if "RoughTex" in maps:
+        sc["UseRoughTex"] = 1.0
+    log("model material", name, sorted(maps))
+    return make_mi(master, name, maps, scalars=sc, **kw)
+
+
+def assign(meshes, mi, match=None):
+    for sm in meshes:
+        if match and not match(sm.get_name().lower()):
+            continue
+        for i in range(len(sm.static_materials)):
+            sm.set_material(i, mi)
+        EAL.save_loaded_asset(sm)
 
 
 # ---------------------------------------------------------------- models
@@ -498,10 +643,14 @@ def build():
         "normal": import_texture(os.path.join(tmp, "T_TC_FlatNormal.png"), f"{ROOT}/Textures", "T_TC_FlatNormal", "normal"),
         "arm": import_texture(os.path.join(tmp, "T_TC_DefaultARM.png"), f"{ROOT}/Textures", "T_TC_DefaultARM", "linear"),
     }
+    grime_png(os.path.join(tmp, "T_TC_Grime.png"))
+    defaults["grime"] = import_texture(os.path.join(tmp, "T_TC_Grime.png"), f"{ROOT}/Textures", "T_TC_Grime", "linear")
     master = build_master_material(defaults)
 
-    mi_floor = surface_material(master, "concrete_floor_worn_001", tiling=4.0)
-    mi_wall = surface_material(master, "painted_plaster_wall", tiling=3.0, tint=(0.62, 0.66, 0.58))
+    mi_floor = surface_material(master, "concrete_floor_worn_001", tiling=4.0,
+                                scalars={"GrimeTiling": 0.6, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
+    mi_wall = surface_material(master, "painted_plaster_wall", tiling=3.0, tint=(0.62, 0.66, 0.58), grime_color=(0.35, 0.3, 0.22),
+                               scalars={"GrimeTiling": 0.8, "GrimeThreshold": 0.38, "GrimeContrast": 1.8, "GrimeStreaks": 0.6})
     mi_wall_low = surface_material(master, "cracked_concrete_wall", tiling=3.0, tint=(0.45, 0.42, 0.36))
     mi_ceiling = make_mi(master, "MI_ceiling", {"BaseColor": None}, tint=(0.22, 0.22, 0.2), rough=0.9)
     surface_material(master, "wood_table_worn", tiling=1.0)
@@ -523,6 +672,9 @@ def build():
 
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
+    assign(table, model_material(master, "wooden_table_02", "wooden_table_02", "MI_Table", grime_color=(0.3, 0.22, 0.15),
+                                 scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.4, "GrimeContrast": 2.0,
+                                          "GrimeStreaks": 0.5, "MicroRough": 0.2}))
     tlo, thi = bounds_of(table)
     # Long side runs across the player's view (along Y). Poly Haven models are centred on their origin in XY.
     yaw = 90.0 if (thi[0] - tlo[0]) > (thi[1] - tlo[1]) else 0.0
@@ -532,6 +684,16 @@ def build():
 
     # ---- Chess set: board + 32 pieces; rotate so White faces the player (-X).
     chess = import_model("chess_set")
+    # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
+    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.55, 0.43, 0.3),
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.5, "MicroRough": 0.25})
+    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(0.8, 0.7, 0.6),
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.7, "GrimeContrast": 2.0, "MicroRough": 0.3})
+    mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.42, 0.32, 0.22),
+                           scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.48, "GrimeContrast": 2.5, "MicroRough": 0.2})
+    assign(chess, mi_pw, lambda n: "white" in n)
+    assign(chess, mi_pb, lambda n: "black" in n)
+    assign(chess, mi_cb, lambda n: "board" in n)
     king_w = next((m for m in chess if "king_white" in m.get_name()), None)
     cyaw = 0.0
     if king_w:
