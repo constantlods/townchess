@@ -293,6 +293,49 @@ def paper_material():
     return m
 
 
+def blood_decal_material(grime_tex):
+    """Dried blood: blotches from our grime mask, fading towards the decal's edge; projected onto table and board."""
+    path = f"{ROOT}/Materials/M_TC_BloodDecal"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    m = AT.create_asset("M_TC_BloodDecal", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    E = lambda cls, x, y: MEL.create_material_expression(m, cls, x, y)
+    uv = E(unreal.MaterialExpressionTextureCoordinate, -1200, 0)
+    t = E(unreal.MaterialExpressionTextureSample, -900, 0)
+    t.set_editor_property("texture", grime_tex)
+    t.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    MEL.connect_material_expressions(uv, "", t, "UVs")
+    c = E(unreal.MaterialExpressionConstant2Vector, -1200, 200)
+    c.set_editor_property("r", 0.5); c.set_editor_property("g", 0.5)
+    d = E(unreal.MaterialExpressionDistance, -900, 250)
+    MEL.connect_material_expressions(uv, "", d, "A")
+    MEL.connect_material_expressions(c, "", d, "B")
+    inv = E(unreal.MaterialExpressionOneMinus, -700, 250)
+    d2 = E(unreal.MaterialExpressionMultiply, -800, 250)
+    MEL.connect_material_expressions(d, "", d2, "A"); d2.set_editor_property("const_b", 2.0)
+    MEL.connect_material_expressions(d2, "", inv, "")
+    mul = E(unreal.MaterialExpressionMultiply, -550, 100)
+    MEL.connect_material_expressions(t, "R", mul, "A")
+    MEL.connect_material_expressions(inv, "", mul, "B")
+    sub = E(unreal.MaterialExpressionSubtract, -420, 100)
+    MEL.connect_material_expressions(mul, "", sub, "A"); sub.set_editor_property("const_b", 0.32)
+    k = E(unreal.MaterialExpressionMultiply, -300, 100)
+    MEL.connect_material_expressions(sub, "", k, "A"); k.set_editor_property("const_b", 4.0)
+    sat = E(unreal.MaterialExpressionSaturate, -180, 100)
+    MEL.connect_material_expressions(k, "", sat, "")
+    MEL.connect_material_property(sat, "", unreal.MaterialProperty.MP_OPACITY)
+    col = E(unreal.MaterialExpressionConstant3Vector, -300, -150)
+    col.set_editor_property("constant", unreal.LinearColor(0.09, 0.008, 0.006, 1))
+    MEL.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    r = E(unreal.MaterialExpressionConstant, -300, 300); r.set_editor_property("r", 0.45)
+    MEL.connect_material_property(r, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.recompile_material(m)
+    EAL.save_loaded_asset(m)
+    return m
+
+
 def import_prop(name):
     """Our Blender-authored props (ue5/tools/blender/props.py -> ue5/assets/props/*.obj)."""
     src = os.path.join(PROPS, f"{name}.obj")
@@ -564,7 +607,18 @@ def head_relative(offset):
     return unreal.Vector(*rel_t), unreal.Quat(*rel_q).rotator()
 
 
-def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False):
+POSES = {
+    # component-space rotations (degrees about X, the body's left-right axis; Z = turn inwards), top-down
+    "rest": {"spine_01": (-6, 0), "spine_03": (-8, 0), "neck_01": (4, 0), "head": (14, 0),
+             "upperarm_l": (52, 0), "upperarm_r": (52, 0), "lowerarm_l": (50, 0), "lowerarm_r": (50, 0)},
+    # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
+    "clasp": {"spine_01": (6, 0), "spine_03": (10, 0), "neck_01": (-4, 0), "head": (6, 0),
+              "upperarm_l": (62, 22), "upperarm_r": (62, -22), "lowerarm_l": (118, 38), "lowerarm_r": (118, -38),
+              "hand_l": (0, 20), "hand_r": (0, -20)},
+}
+
+
+def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, pose="rest"):
     """Authors a single-frame seated pose for the UE5 mannequin.
 
     Starts from MM_Idle frame 0, infers the bone hierarchy from local vs component transforms, applies
@@ -614,14 +668,10 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False):
     for b in names:
         visit(b)
 
-    X = (1.0, 0.0, 0.0)
-    deltas = {  # component-space rotation applied to each bone's current world orientation, top-down
-        "spine_01": _axis(X, -6), "spine_03": _axis(X, -8), "neck_01": _axis(X, 4), "head": _axis(X, 14),
-        "thigh_l": _axis(X, 90), "thigh_r": _axis(X, 90),
-        "calf_l": _axis(X, -90), "calf_r": _axis(X, -90),
-        "upperarm_l": _axis(X, 52), "upperarm_r": _axis(X, 52),
-        "lowerarm_l": _axis(X, 50), "lowerarm_r": _axis(X, 50),
-    }
+    X, Z = (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)
+    deltas = {"thigh_l": _axis(X, 90), "thigh_r": _axis(X, 90), "calf_l": _axis(X, -90), "calf_r": _axis(X, -90)}
+    for bone, (ax, az) in POSES[pose].items():  # component-space rotation applied to each bone's orientation, top-down
+        deltas[bone] = _qmul(_axis(Z, az), _axis(X, ax))
     pelvis_drop = float(os.environ.get("TC_PELVIS_DROP", 47.0))
 
     new_w = {}
@@ -800,7 +850,7 @@ def build():
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
     assign(table, surface_material(master, "wood_table_worn", tiling=1.0, grime_color=(0.3, 0.22, 0.15), tint=(0.7, 0.6, 0.5),
-                                   scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.32, "GrimeContrast": 2.0,
+                                   scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.22, "GrimeContrast": 1.8,
                                             "GrimeStreaks": 0.5, "MicroRough": 0.2}))
     tlo, thi = bounds_of(table)
     # Long side runs across the player's view (along Y). Poly Haven models are centred on their origin in XY.
@@ -812,12 +862,12 @@ def build():
     # ---- Chess set: board + 32 pieces; rotate so White faces the player (-X).
     chess = import_model("chess_set")
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
-    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.55, 0.43, 0.3), tint=(0.95, 0.85, 0.68), rough=0.75,
+    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.45, 0.34, 0.22), tint=(0.86, 0.72, 0.52), rough=0.7,
                            scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.5, "MicroRough": 0.25})
     mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.5, tint=(0.11, 0.095, 0.085),
                            scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.75, "GrimeContrast": 2.0, "MicroRough": 0.15})
-    mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.42, 0.32, 0.22), tint=(0.85, 0.77, 0.62),
-                           scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.4, "GrimeContrast": 2.5, "MicroRough": 0.2})
+    mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.36, 0.25, 0.16), tint=(0.8, 0.63, 0.44),
+                           scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.3, "GrimeContrast": 2.5, "MicroRough": 0.2})
     assign(chess, mi_pw, lambda n: "white" in n)
     assign(chess, mi_pb, lambda n: "black" in n)
     assign(chess, mi_cb, lambda n: "board" in n)
@@ -898,8 +948,23 @@ def build():
             else:
                 log("WARNING font face import failed", ttf)
         tag(clip)
+    # ---- Wear and clutter on the table: dried blood, papers, a book stack (the reference's table is a lived-in mess)
+    blood = blood_decal_material(defaults["grime"])
+    for k, (x, y, sz, yaw) in enumerate(((-18, 30, 22, 30), (24, -18, 14, 110), (-30, -46, 26, 200), (8, 34, 10, 60), (-6, -14, 9, 300))):
+        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, top + 2), unreal.Rotator(-90, yaw, 0))
+        dec.decal.set_decal_material(blood)
+        setp(dec.decal, "decal_size", unreal.Vector(6, sz, sz))
+        dec.set_folder_path("Wear")
+    mi_paper = make_mi(master, "MI_LoosePaper", {"BaseColor": None}, tint=(0.62, 0.56, 0.44), rough=0.95, grime_color=(0.4, 0.3, 0.2),
+                       scalars={"GrimeTiling": 2.5, "GrimeThreshold": 0.4, "GrimeContrast": 2.0})
+    cube = unreal.load_asset("/Engine/BasicShapes/Cube")
+    for k, (x, y, yaw) in enumerate(((-34, -44, 14), (-30, -50, -9), (44, 58, 24))):
+        pp = EAS.spawn_actor_from_object(cube, unreal.Vector(x, y, top + 0.15 + 0.06 * k), unreal.Rotator(0, yaw, 0))
+        pp.set_actor_scale3d(unreal.Vector(0.21, 0.297, 0.001))
+        pp.static_mesh_component.set_material(0, mi_paper)
+        pp.set_folder_path("Clutter")
     mug = import_prop("tin_mug")
-    tag(place_model(mug, (38, 46, 0), yaw=-120, label="Mug", sit_on=top)[0])
+    tag(place_model(mug, (30, 38, 0), yaw=-120, label="Mug", sit_on=top)[0])
     for sm in mug:
         sm.set_material(0, mi_rust)
         EAL.save_loaded_asset(sm)
@@ -917,6 +982,28 @@ def build():
         b.static_mesh_component.set_material(0, mi_rust)
         b.set_folder_path("Window")
     # (the white binder was the brightest thing in frame and pulled the eye off the board: removed)
+    # barred partition behind the opponent (the reference's cell bars) and a stencilled ward sign on the back wall
+    cyl = unreal.load_asset("/Engine/BasicShapes/Cylinder")
+    bx = cx + L / 2 - 75
+    for k in range(-9, 10):
+        if abs(k) < 2:
+            continue  # the gap of an open door behind him
+        b = EAS.spawn_actor_from_object(cyl, unreal.Vector(bx, k * 13.0, 115), unreal.Rotator(0, 0, 0))
+        b.set_actor_scale3d(unreal.Vector(0.03, 0.03, 2.3))
+        b.static_mesh_component.set_material(0, mi_rust)
+        b.set_folder_path("Bars")
+    for z in (12, 222):
+        rail = EAS.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Cube"), unreal.Vector(bx, 0, z), unreal.Rotator(0, 0, 0))
+        rail.set_actor_scale3d(unreal.Vector(0.05, 2.5, 0.06))
+        rail.static_mesh_component.set_material(0, mi_rust)
+        rail.set_folder_path("Bars")
+    sign = EAS.spawn_actor_from_class(unreal.TextRenderActor, unreal.Vector(cx + L / 2 - 1.5, -95, 205), unreal.Rotator(0, 0, 180))
+    tr = sign.text_render
+    tr.set_text("WARD B")
+    setp(tr, "world_size", 30.0)
+    setp(tr, "horizontal_alignment", unreal.HorizTextAligment.EHTA_CENTER)
+    setp(tr, "text_render_color", unreal.Color(40, 38, 34, 255))
+    sign.set_folder_path("Room")
     chair = import_model("painted_wooden_chair_01")
     tag(place_model(chair, (92, 0, 0), yaw=180, label="OpponentChair", sit_on=0.0)[0])
     cabinet = import_model("drawer_cabinet")
@@ -927,6 +1014,7 @@ def build():
     _, dlo, dhi = place_model(desk, (cx - 40, W / 2 - 45, 0), yaw=90, label="Desk", sit_on=0.0)
     books = import_model("book_encyclopedia_set_01")
     place_model(books, (cx - 40, W / 2 - 45, 0), yaw=90, label="Books", sit_on=dhi[2] - dlo[2])
+    place_model(books, (52, 50, 0), yaw=-70, label="TableBooks", scale=0.8, sit_on=top)  # a stack on the table too
     pipes = import_model("modular_industrial_pipes_01")
     place_model(pipes, (cx + L / 2 - 15, 0, H - 40), yaw=90, label="Pipes")
     fluo = import_model("mounted_fluorescent_lights")
@@ -966,7 +1054,7 @@ def build():
             EAL.save_loaded_asset(sm)
         return meshes[0] if meshes else None
 
-    def spawn_opponent(opp_id, mhn, outfit_mi=None):
+    def spawn_opponent(opp_id, mhn, outfit_mi=None, pose="rest"):
         """Body (seated pose), face and outfit as skeletal mesh actors; the game links face/outfit to the body."""
         opp_tag = f"TC_Opponent_{opp_id}"
         mh_body = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh") if GAMEPLAY and mhn else None
@@ -974,11 +1062,11 @@ def build():
         if not (idle and body_mesh):
             log("WARNING: no body for", opp_id)
             return None, None
-        key = body_mesh.get_path_name()
+        key = body_mesh.get_path_name() + pose
         if key not in seated_cache:
             try:
-                seated_cache[key] = (build_seated_pose(body_mesh, idle, f"{ROOT}/Anims", f"A_TC_Seated_{body_mesh.get_name()}",
-                                                       own_proportions=bool(mh_body)), dict(SEATED))
+                seated_cache[key] = (build_seated_pose(body_mesh, idle, f"{ROOT}/Anims", f"A_TC_Seated_{body_mesh.get_name()}_{pose}",
+                                                       own_proportions=bool(mh_body), pose=pose), dict(SEATED))
             except Exception:
                 log("WARNING seated pose failed\n" + traceback.format_exc())
                 seated_cache[key] = (None, dict(SEATED))
@@ -1026,7 +1114,7 @@ def build():
     # 1. The caged patient: Blender cage mask over the face, stained off-white shirt
     mi_gown_early = make_mi(master, "MI_PatientShirt", {"BaseColor": None}, tint=(0.42, 0.4, 0.34), rough=0.9, grime_color=(0.45, 0.36, 0.24),
                             scalars={"GrimeTiling": 1.6, "GrimeThreshold": 0.32, "GrimeContrast": 1.8, "GrimeStreaks": 0.6})
-    opp, smc = spawn_opponent("caged", mhn, outfit_mi=mi_gown_early)
+    opp, smc = spawn_opponent("caged", mhn, outfit_mi=mi_gown_early, pose=os.environ.get("TC_CAGED_POSE", "clasp"))
     if smc and "head" in SEATED:
         cage = import_prop("cage_mask")
         if cage:
@@ -1100,10 +1188,14 @@ def build():
     rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0)
     point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0)
     tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (70, 0, top + 45)), 220, 2400, 400, 40, src=2.5, vol=0.6))
-    rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 1800, 7000, 200, 40, 600, vol=1.5)
+    rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
+    # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)
+    rect("Lamp_TableBounce", (10, 0, top + 2), (0, 90, 0), 900, 2600, 120, 90, 260, vol=0.4)
+    # corridor light behind the bars: a cold glow that separates the opponent from the back wall
+    rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)
 
     sky = EAS.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 400), unreal.Rotator(0, 0, 0))
-    setp(sky.light_component, "intensity", 0.02)
+    setp(sky.light_component, "intensity", 0.07)  # lift the blacks a little: the reference never crushes the room
     sky.set_folder_path("Lights")
 
     fog = EAS.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
@@ -1162,8 +1254,8 @@ def build():
     s = ppv.settings
     for k, v in {
         "auto_exposure_method": unreal.AutoExposureMethod.AEM_HISTOGRAM,
-        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 8.5)),
-        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 8.5)),
+        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 7.4)),
+        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 7.4)),
         "bloom_intensity": 0.3, "vignette_intensity": 0.65, "film_grain_intensity": 0.15,
         "lumen_final_gather_quality": 2.0, "lumen_reflection_quality": 1.0,
         "lumen_scene_lighting_quality": 1.0, "lumen_scene_detail": 1.5,

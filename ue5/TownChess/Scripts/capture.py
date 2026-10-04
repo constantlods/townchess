@@ -105,6 +105,9 @@ def tick(_dt):
                       "ReflectionQuality", "PostProcessQuality", "TextureQuality", "EffectsQuality", "ShadingQuality"):
                 cmd(f"sg.{g} {PRESET}")
             cmd(f"r.SetRes {RES}w")
+            if PRESET >= 3:  # RTX reference quality: hardware ray-traced Lumen and RT shadows (the RX 6650 XT target stays software)
+                for c in ("r.Lumen.HardwareRayTracing 1", "r.Lumen.Reflections.HardwareRayTracing 1", "r.RayTracing.Shadows 1"):
+                    cmd(c)
         elif state["phase"] == "warm" and PLAY and not state.get("played"):
             core = next((o for o in unreal.ObjectIterator(unreal.TCCoreClient) if not o.get_name().startswith("Default__")), None)
             if core and core.has_game():
