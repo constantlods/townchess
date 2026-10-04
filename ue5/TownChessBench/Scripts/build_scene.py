@@ -613,8 +613,8 @@ POSES = {
              "upperarm_l": (52, 0), "upperarm_r": (52, 0), "lowerarm_l": (50, 0), "lowerarm_r": (50, 0)},
     # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
     "clasp": {"spine_01": (6, 0), "spine_03": (10, 0), "neck_01": (-4, 0), "head": (6, 0),
-              "upperarm_l": (62, 22), "upperarm_r": (62, -22), "lowerarm_l": (118, 38), "lowerarm_r": (118, -38),
-              "hand_l": (0, 20), "hand_r": (0, -20)},
+              "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
+              "hand_l": (0, -15), "hand_r": (0, 15)},
 }
 
 
@@ -1014,7 +1014,6 @@ def build():
     _, dlo, dhi = place_model(desk, (cx - 40, W / 2 - 45, 0), yaw=90, label="Desk", sit_on=0.0)
     books = import_model("book_encyclopedia_set_01")
     place_model(books, (cx - 40, W / 2 - 45, 0), yaw=90, label="Books", sit_on=dhi[2] - dlo[2])
-    place_model(books, (52, 50, 0), yaw=-70, label="TableBooks", scale=0.8, sit_on=top)  # a stack on the table too
     pipes = import_model("modular_industrial_pipes_01")
     place_model(pipes, (cx + L / 2 - 15, 0, H - 40), yaw=90, label="Pipes")
     fluo = import_model("mounted_fluorescent_lights")
