@@ -25,6 +25,9 @@ SHOT = arg("TCShot", "C:/TownChess/shots/shot.png")
 RES = arg("TCShotRes", "1920x1080")
 WARM_SEC = float(arg("TCWarmSec", 25))
 PRESET = PRESETS.get(arg("TCPreset", "cinematic").lower(), 4)
+# -TCSource=basecolor|normal|final: debug the material inputs directly (G-buffer captures)
+SOURCES = {"final": "SCS_FINAL_TONE_CURVE_HDR", "basecolor": "SCS_BASE_COLOR", "normal": "SCS_NORMAL"}
+SOURCE = arg("TCSource", "final").lower()
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
 
 
@@ -60,6 +63,7 @@ def begin():
     cc.set_editor_property("fov_angle", pcm.get_fov_angle())
     cc.set_editor_property("texture_target", rt)
     cc.set_editor_property("capture_every_frame", True)
+    cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
     state["cap"] = (world, rt)
     loc = pcm.get_camera_location()
     log(f"capture {w}x{h} fov={pcm.get_fov_angle():.1f} cam=({loc.x:.0f},{loc.y:.0f},{loc.z:.0f}) preset={PRESET}")
