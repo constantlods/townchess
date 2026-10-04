@@ -33,6 +33,7 @@ CLIPBOARD = arg("TCClipboard", "") == "1"  # raise the game-record clipboard for
 CAM_LOC = arg("TCCamLoc", "")   # close-up shots: x,y,z (cm) ...
 CAM_ROT = arg("TCCamRot", "")   # ... pitch,yaw,roll
 CAM_FOV = arg("TCFov", "")
+CAM_TARGET = arg("TCCamTarget", "")  # aim the close-up at this point (x,y,z) instead of giving a rotation
 CMDS = [c.replace("_", " ") for c in arg("TCCmds", "").split(";") if c]  # console commands, "_" for spaces (e.g. r.Fog_0)
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
 
@@ -70,6 +71,9 @@ def begin():
     if CAM_ROT:
         p_, y_, r_ = [float(v) for v in CAM_ROT.split(",")]
         rot = unreal.Rotator(r_, p_, y_)
+    if CAM_TARGET:
+        t = unreal.Vector(*[float(v) for v in CAM_TARGET.split(",")])
+        rot = unreal.MathLibrary.find_look_at_rotation(loc, t)
     if CAM_FOV:
         fov = float(CAM_FOV)
     cap.set_actor_location_and_rotation(loc, rot, False, True)

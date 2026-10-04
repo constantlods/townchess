@@ -2,6 +2,9 @@
 
 Models: FBX at the chosen resolution, plus the textures Poly Haven bundles with it.
 Textures: base color, DirectX normal, ARM (AO/rough/metal) and displacement as JPG.
+Hero textures (docs/FREE_ASSETS.md) are fetched at a fixed resolution regardless of [res]: the two board woods at
+8K (falling back to 4K when 8K is missing), the worn table top, piece lacquer and rust at 4K. A hero texture
+already on disk at a lower resolution is replaced once (a .res marker in its folder records what was fetched).
 Usage: python3 fetch_polyhaven.py <out_dir> [res]
 """
 import json, os, sys, urllib.request
@@ -17,6 +20,16 @@ TEXTURES = [
     "rusty_metal_02", "rough_linen", "brown_leather",
     "dirty_tiles", "damaged_plaster", "old_linoleum_flooring_01",
 ]
+# Hero surfaces: slug -> preferred resolutions, best first (docs/FREE_ASSETS.md explains each pick).
+HERO_TEXTURES = {
+    "white_maple_veneer": ("8k", "4k"),      # light board squares (maple/boxwood)
+    "dark_wood": ("8k", "4k"),               # dark board squares (walnut), strong figure, tint darker
+    "smoke_speckled_veneer": ("8k", "4k"),   # alternative dark square (cooler, near-ebony)
+    "wood_table_worn": ("4k",),              # current table top, upgraded from 2k
+    "wood_cabinet_worn_long": ("4k",),       # heavily worn, chipped dark finish: table top candidate
+    "lacquered_cherry_wood": ("4k",),        # lacquer roughness/normal reference for the pieces
+    "rust_coarse_01": ("4k",),               # rust on the lamp, cart and bed frames
+}
 TEX_MAPS = {"Diffuse": "diff", "nor_dx": "nor_dx", "arm": "arm", "Displacement": "disp"}
 
 
@@ -36,6 +49,32 @@ def files(asset):
         return json.load(r)
 
 
+def fetch_texture(out, t, wanted):
+    """Fetch one texture's maps at the first resolution in `wanted` that Poly Haven has; returns the resolution."""
+    f = files(t)
+    res = next((r for r in wanted if all(r in f.get(k, {}) for k in ("Diffuse", "nor_dx", "arm"))), None)
+    if res is None:
+        print("texture", t, "has none of", wanted, flush=True)
+        return None
+    d = os.path.join(out, "textures", t)
+    marker = os.path.join(d, ".res")
+    prev = open(marker).read().strip() if os.path.exists(marker) else None
+    if prev != res:
+        # first hero fetch, or an earlier run at another resolution: drop the old maps (same file names), then
+        # record the target so an interrupted run resumes instead of wiping again (get() skips finished files)
+        if os.path.isdir(d):
+            for n in os.listdir(d):
+                os.remove(os.path.join(d, n))
+        os.makedirs(d, exist_ok=True)
+        with open(marker, "w") as m:
+            m.write(res)
+    for key, short in TEX_MAPS.items():
+        if key in f and res in f[key]:
+            fmt = "jpg" if "jpg" in f[key][res] else "png"
+            get(f[key][res][fmt]["url"], os.path.join(d, f"{t}_{short}.{fmt}"))
+    return res
+
+
 def main():
     out, res = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "2k")
     for m in MODELS:
@@ -46,12 +85,16 @@ def main():
             get(inc["url"], os.path.join(base, rel))
         print("model", m, flush=True)
     for t in TEXTURES:
+        if t in HERO_TEXTURES:
+            continue
         f = files(t)
         for key, short in TEX_MAPS.items():
             if key in f and res in f[key]:
                 fmt = "jpg" if "jpg" in f[key][res] else "png"
                 get(f[key][res][fmt]["url"], os.path.join(out, "textures", t, f"{t}_{short}.{fmt}"))
         print("texture", t, flush=True)
+    for t, wanted in HERO_TEXTURES.items():
+        print("hero texture", t, fetch_texture(t, wanted), flush=True)
 
 
 if __name__ == "__main__":
