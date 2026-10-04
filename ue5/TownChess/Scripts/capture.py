@@ -28,6 +28,8 @@ PRESET = PRESETS.get(arg("TCPreset", "cinematic").lower(), 4)
 # -TCSource=basecolor|normal|final: debug the material inputs directly (G-buffer captures)
 SOURCES = {"final": "SCS_FINAL_TONE_CURVE_HDR", "basecolor": "SCS_BASE_COLOR", "normal": "SCS_NORMAL"}
 SOURCE = arg("TCSource", "final").lower()
+PLAY = int(arg("TCPlay", "0"))          # play this many plies (our side: first legal move) before the shot
+CLIPBOARD = arg("TCClipboard", "") == "1"  # raise the game-record clipboard for the shot
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
 
 
@@ -103,7 +105,27 @@ def tick(_dt):
                       "ReflectionQuality", "PostProcessQuality", "TextureQuality", "EffectsQuality", "ShadingQuality"):
                 cmd(f"sg.{g} {PRESET}")
             cmd(f"r.SetRes {RES}w")
-        elif state["phase"] == "warm" and time.time() - state["t0"] >= WARM_SEC:
+        elif state["phase"] == "warm" and PLAY and not state.get("played"):
+        core = next((o for o in unreal.ObjectIterator(unreal.TCCoreClient) if not o.get_name().startswith("Default__")), None)
+        if core and core.has_game():
+            st = core.get_state()
+            if len(st.history) >= PLAY or st.status != "active":
+                state["played"] = True
+                state["t0"] = time.time() - WARM_SEC + 6  # let the last animation and the sheet settle
+            elif core.is_my_turn() and time.time() - state.get("moved_at", 0) > 1.2 and st.legal_moves:
+                mv = st.legal_moves[len(st.history) % len(st.legal_moves)]
+                core.submit_move(mv[:2], mv[2:4], mv[4:] if len(mv) > 4 else "")
+                state["moved_at"] = time.time()
+    elif state["phase"] == "warm" and time.time() - state["t0"] >= WARM_SEC:
+        if CLIPBOARD and not state.get("raised"):
+            pcm = camera_manager()
+            clips = unreal.GameplayStatics.get_all_actors_of_class(pcm.get_world(), unreal.TCClipboard)
+            if clips:
+                clips[0].set_raised(True)
+                log(f"clipboard raised: {len(clips[0].get_sheet_lines())} lines, opening '{clips[0].get_opening_line()}'")
+            state["raised"] = True
+            state["t0"] = time.time() - WARM_SEC + 2.5  # raise animation + focus pull
+            return
             begin()
             state["phase"], state["tcap"] = "capturing", time.time()
         elif state["phase"] == "capturing" and time.time() - state["tcap"] >= 4:  # TSR/Lumen history in the capture
