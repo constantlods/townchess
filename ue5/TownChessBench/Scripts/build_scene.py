@@ -1116,7 +1116,7 @@ def build():
     def spawn_opponent(opp_id, mhn, outfit_mi=None, pose="rest", loc=(90.0, 0.0, 0.0), yaw=90.0, with_face=True, group_tag=None):
         """Body (seated pose), face and outfit as skeletal mesh actors; the game links face/outfit to the body."""
         opp_tag = group_tag or f"TC_Opponent_{opp_id}"
-        mh_body = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh") if GAMEPLAY and mhn else None
+        mh_body = unreal.load_asset(f"{MH_ROOT}/{mhn}/Body/SKM_{mhn}_BodyMesh") if GAMEPLAY and mhn else None
         body_mesh = mh_body or manny
         if not (idle and body_mesh):
             log("WARNING: no body for", opp_id)
@@ -1143,11 +1143,11 @@ def build():
         setp(smc, "animation_data", data)
         if mh_body:
             followers = []
-            face = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Face/SKM_{mhn}_FaceMesh") if with_face else None
+            face = unreal.load_asset(f"{MH_ROOT}/{mhn}/Face/SKM_{mhn}_FaceMesh") if with_face else None
             if face:
                 followers.append(("Face", face, None))
             # outfit meshes: the body hides the skin under them, so they must be present or the torso renders as a hole
-            for p in EAL.list_assets(f"/Game/TownChess/MetaHumans/Built/{mhn}/Clothing", recursive=False):
+            for p in EAL.list_assets(f"{MH_ROOT}/{mhn}/Clothing", recursive=False):
                 cm = unreal.load_asset(p)
                 if isinstance(cm, unreal.SkeletalMesh):
                     followers.append((cm.get_name(), cm, outfit_mi))
@@ -1167,7 +1167,11 @@ def build():
         return opp, smc
 
     mhn = os.environ.get("TC_MH_NAME", "MH_Walter")
-    if not EAL.does_asset_exist(f"/Game/TownChess/MetaHumans/Built/{mhn}/BP_{mhn}"):
+    # the cinematic build (full skin shader, top LODs, strand grooms) when it exists, else the optimized one
+    MH_ROOT = "/Game/TownChess/MetaHumans/BuiltCine" if EAL.does_asset_exist(f"/Game/TownChess/MetaHumans/BuiltCine/{mhn}/Body/SKM_{mhn}_BodyMesh") \
+        else "/Game/TownChess/MetaHumans/Built"
+    log("metahuman build", MH_ROOT)
+    if not EAL.does_asset_exist(f"{MH_ROOT}/{mhn}/BP_{mhn}"):
         mhn = "MH_Opponent" if EAL.does_asset_exist("/Game/TownChess/MetaHumans/Built/MH_Opponent/BP_MH_Opponent") else None
 
     # 1. The caged patient: Blender cage mask over the face, stained off-white shirt
@@ -1185,7 +1189,7 @@ def build():
     # 0. The player's own arms (first person): the reference shows real hands with sleeves resting on the board,
     #    not floating gloves. Eyes at the camera (x=-87, z=top+42); ATCGameMode hides the head (tag TC_PlayerBody).
     if mhn and GAMEPLAY and os.environ.get("TC_PLAYER_BODY", "1") == "1":
-        probe = unreal.load_asset(f"/Game/TownChess/MetaHumans/Built/{mhn}/Body/SKM_{mhn}_BodyMesh")
+        probe = unreal.load_asset(f"{MH_ROOT}/{mhn}/Body/SKM_{mhn}_BodyMesh")
         build_seated_pose(probe, idle, f"{ROOT}/Anims", "A_TC_Probe_player", own_proportions=True, pose_name="player")
         hx, hy, hz = SEATED["head"][0]
         ploc = (-87.0 - (hy + 9.0), hx, top + 42.0 - (hz + 8.0))  # component +Y (forward) -> world +X with yaw -90
@@ -1262,6 +1266,8 @@ def build():
     tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (70, 0, top + 45)), 220, 2400, 400, 40, src=2.5, vol=0.6))
     rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
     # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)
+    # the player's hands are hero assets in the reference: a soft warm light from the lamp side keeps them readable
+    tag(rect("Hands_Key", (-30, -40, top + 40), (0, -50, 30), 220, 2600, 70, 40, 160, vol=0.2))
     rect("Lamp_TableBounce", (10, 0, top + 2), (0, 90, 0), 300, 2600, 120, 90, 260, vol=0.4)
     # corridor light behind the bars: a cold glow that separates the opponent from the back wall
     rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)

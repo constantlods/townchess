@@ -30,6 +30,9 @@ SOURCES = {"final": "SCS_FINAL_TONE_CURVE_HDR", "basecolor": "SCS_BASE_COLOR", "
 SOURCE = arg("TCSource", "final").lower()
 PLAY = int(arg("TCPlay", "0"))          # play this many plies (our side: first legal move) before the shot
 CLIPBOARD = arg("TCClipboard", "") == "1"  # raise the game-record clipboard for the shot
+CAM_LOC = arg("TCCamLoc", "")   # close-up shots: x,y,z (cm) ...
+CAM_ROT = arg("TCCamRot", "")   # ... pitch,yaw,roll
+CAM_FOV = arg("TCFov", "")
 CMDS = [c.replace("_", " ") for c in arg("TCCmds", "").split(";") if c]  # console commands, "_" for spaces (e.g. r.Fog_0)
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
 
@@ -61,9 +64,17 @@ def begin():
     w, h = (int(x) for x in RES.split("x"))
     rt = unreal.RenderingLibrary.create_render_target2d(world, w, h, unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB)
     cap = caps[0]
-    cap.set_actor_location_and_rotation(pcm.get_camera_location(), pcm.get_camera_rotation(), False, True)
+    loc, rot, fov = pcm.get_camera_location(), pcm.get_camera_rotation(), pcm.get_fov_angle()
+    if CAM_LOC:
+        loc = unreal.Vector(*[float(v) for v in CAM_LOC.split(",")])
+    if CAM_ROT:
+        p_, y_, r_ = [float(v) for v in CAM_ROT.split(",")]
+        rot = unreal.Rotator(r_, p_, y_)
+    if CAM_FOV:
+        fov = float(CAM_FOV)
+    cap.set_actor_location_and_rotation(loc, rot, False, True)
     cc = cap.capture_component2d
-    cc.set_editor_property("fov_angle", pcm.get_fov_angle())
+    cc.set_editor_property("fov_angle", fov)
     cc.set_editor_property("texture_target", rt)
     cc.set_editor_property("capture_every_frame", True)
     cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
