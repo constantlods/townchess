@@ -94,6 +94,8 @@ public:
 	FString Toast;
 	double ToastUntil = 0;
 	bool bConfirmResign = false;
+	/** Accessibility: also print the opening on screen (the clipboard is the default home of the game record). */
+	bool bScreenRecord = false;
 	static FString OpponentName(const FString& Id);
 
 private:

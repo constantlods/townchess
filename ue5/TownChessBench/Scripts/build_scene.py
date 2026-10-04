@@ -234,6 +234,65 @@ def emissive_material(name, color, strength):
     return m
 
 
+FONTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "fonts"))
+
+
+def import_font(ttf, name, legacy_size=32):
+    """Runtime font from one of our OFL fonts (ue5/assets/fonts) for the clipboard's canvas text."""
+    dest = f"{ROOT}/Fonts"
+    objs = import_file(os.path.join(FONTS, ttf), dest, name + "_Face")
+    face = next((o for o in objs if isinstance(o, unreal.FontFace)), None) or unreal.load_asset(f"{dest}/{name}_Face")
+    if not isinstance(face, unreal.FontFace):
+        log("WARNING font face import failed", ttf, objs)
+        return None
+    path = f"{dest}/{name}"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    font = AT.create_asset(name, dest, unreal.Font, unreal.FontFactory())
+    try:
+        font.set_editor_property("font_cache_type", unreal.FontCacheType.RUNTIME)
+        fd = unreal.FontData()
+        fd.set_editor_property("font_face_asset", face)
+        entry = unreal.TypefaceEntry()
+        entry.set_editor_property("name", "Regular")
+        entry.set_editor_property("font", fd)
+        tf = unreal.Typeface()
+        tf.set_editor_property("fonts", [entry])
+        cf = unreal.CompositeFont()
+        cf.set_editor_property("default_typeface", tf)
+        font.set_editor_property("composite_font", cf)
+        font.set_editor_property("legacy_font_size", legacy_size)
+    except Exception as e:
+        log("WARNING font setup failed", name, e)
+        return None
+    EAL.save_loaded_asset(font)
+    log("font", name, "from", ttf)
+    return font
+
+
+def paper_material():
+    """Paper for the clipboard sheet: the game draws into the 'Sheet' render target; a little emission keeps pencil
+    legible when the sheet is raised out of the lamp's cone (a reading light does the rest)."""
+    path = f"{ROOT}/Materials/M_TC_Paper"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    m = AT.create_asset("M_TC_Paper", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+    t = MEL.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -600, 0)
+    t.set_editor_property("parameter_name", "Sheet")
+    t.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
+    MEL.connect_material_property(t, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    k = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -300, 200)
+    MEL.connect_material_expressions(t, "RGB", k, "A")
+    k.set_editor_property("const_b", 0.12)
+    MEL.connect_material_property(k, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    r = MEL.create_material_expression(m, unreal.MaterialExpressionConstant, -300, 350)
+    r.set_editor_property("r", 0.9)
+    MEL.connect_material_property(r, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.recompile_material(m)
+    EAL.save_loaded_asset(m)
+    return m
+
+
 def import_prop(name):
     """Our Blender-authored props (ue5/tools/blender/props.py -> ue5/assets/props/*.obj)."""
     src = os.path.join(PROPS, f"{name}.obj")
@@ -808,6 +867,36 @@ def build():
     clock = import_model("alarm_clock_01")
     if clock:  # this FBX currently imports without a static mesh; skip rather than fail
         place_model(clock, (-8, 46, 0), yaw=-150, label="Clock", sit_on=top)
+    # ---- Game record: an asylum medical cart at the right edge of frame; the clipboard rests on it and Tab lifts it
+    # to a reading pose (ATCClipboard, docs/CLIPBOARD_CRITIQUE.md).
+    mi_cart = make_mi(master, "MI_CartSteel", {"BaseColor": None}, metal=1.0, rough=0.5, tint=(0.5, 0.5, 0.48),
+                      grime_color=(0.4, 0.33, 0.25), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.2})
+    mi_rubber = make_mi(master, "MI_Rubber", {"BaseColor": None}, tint=(0.03, 0.03, 0.03), rough=0.8)
+    mi_hardboard = make_mi(master, "MI_Hardboard", {"BaseColor": None}, tint=(0.3, 0.2, 0.12), rough=0.75,
+                           scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.2})
+    cart = import_prop("med_cart")
+    for sm in cart:
+        for i, sl in enumerate(sm.static_materials):
+            sm.set_material(i, mi_rubber if "rubber" in str(sl.material_slot_name).lower() else mi_cart)
+        EAL.save_loaded_asset(sm)
+    CART = (16.0, 80.0)
+    tag(place_model(cart, (CART[0], CART[1], 0), yaw=90, label="Cart", sit_on=0.0)[0])
+    board_mesh = import_prop("clipboard")
+    if GAMEPLAY and board_mesh:
+        for sm in board_mesh:
+            for i, sl in enumerate(sm.static_materials):
+                sm.set_material(i, mi_cart if "steel" in str(sl.material_slot_name).lower() else mi_hardboard)
+            EAL.save_loaded_asset(sm)
+        clip = EAS.spawn_actor_from_class(unreal.TCClipboard, unreal.Vector(CART[0] - 4, CART[1] - 6, 86.2), unreal.Rotator(0, 0, -100))
+        clip.set_actor_label("GameRecordClipboard")
+        clip.board.set_static_mesh(board_mesh[0])
+        setp(clip, "paper_material", paper_material())
+        hand, form = import_font("PatrickHand-Regular.ttf", "F_TC_Hand"), import_font("CourierPrime-Bold.ttf", "F_TC_Form")
+        if hand:
+            setp(clip, "hand_font", hand)
+        if form:
+            setp(clip, "form_font", form)
+        tag(clip)
     mug = import_prop("tin_mug")
     tag(place_model(mug, (38, 46, 0), yaw=-120, label="Mug", sit_on=top)[0])
     for sm in mug:
@@ -826,8 +915,7 @@ def build():
         b.set_actor_scale3d(unreal.Vector(0.022, 0.022, 0.92))
         b.static_mesh_component.set_material(0, mi_rust)
         b.set_folder_path("Window")
-    binder = import_model("binder_notebook")
-    place_model(binder, (-30, -40, 0), yaw=12, label="Binder", sit_on=top)
+    # (the white binder was the brightest thing in frame and pulled the eye off the board: removed)
     chair = import_model("painted_wooden_chair_01")
     tag(place_model(chair, (92, 0, 0), yaw=180, label="OpponentChair", sit_on=0.0)[0])
     cabinet = import_model("drawer_cabinet")

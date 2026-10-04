@@ -528,6 +528,87 @@ def pencil():
     export("pencil.obj")
 
 
+
+def clipboard():
+    """Hardboard clipboard 23 x 32 cm with a steel spring clip at the top edge. Origin at the board centre, lying in
+    the XY plane, top edge towards +Y; the paper is a separate plane drawn by the game (ATCClipboard)."""
+    reset()
+    parts = []
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0))
+    b = bpy.context.active_object
+    b.scale = (0.23, 0.32, 0.004)
+    bpy.ops.object.transform_apply(scale=True)
+    bv = b.modifiers.new("bevel", "BEVEL"); bv.width = 0.012; bv.segments = 6; bv.affect = "VERTICES"
+    bv2 = b.modifiers.new("bevel2", "BEVEL"); bv2.width = 0.0008; bv2.segments = 2
+    apply_mods(b)
+    material(b, "M_Hardboard")
+    parts.append(b)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.135, 0.006))
+    c = bpy.context.active_object
+    c.scale = (0.11, 0.035, 0.008)
+    bpy.ops.object.transform_apply(scale=True)
+    bv = c.modifiers.new("bevel", "BEVEL"); bv.width = 0.003; bv.segments = 3
+    apply_mods(c)
+    material(c, "M_ClipSteel")
+    parts.append(c)
+    for x in (-0.035, 0.035):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.004, depth=0.012, location=(x, 0.152, 0.012), rotation=(0, math.radians(90), 0))
+        r = bpy.context.active_object; material(r, "M_ClipSteel"); parts.append(r)
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    cb = bpy.context.active_object
+    cb.name = "SM_Clipboard"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    export("clipboard.obj")
+
+
+def med_cart():
+    """Two-tier institutional instrument cart, 60 x 40 x 85 cm, tube frame, steel trays with raised lips, castors."""
+    reset()
+    parts = []
+    W, D, H = 0.60, 0.40, 0.85
+    for x in (-W / 2 + 0.02, W / 2 - 0.02):
+        for y in (-D / 2 + 0.02, D / 2 - 0.02):
+            bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.011, depth=H - 0.08, location=(x, y, 0.08 + (H - 0.08) / 2))
+            parts.append(bpy.context.active_object); material(parts[-1], "M_CartSteel")
+            bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.035, depth=0.025, location=(x, y, 0.035), rotation=(math.radians(90), 0, 0))
+            parts.append(bpy.context.active_object); material(parts[-1], "M_Rubber")
+    for z in (0.25, H - 0.02):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, z))
+        t = bpy.context.active_object
+        t.scale = (W, D, 0.012)
+        bpy.ops.object.transform_apply(scale=True)
+        parts.append(t); material(t, "M_CartSteel")
+        for sx, sy, lx, ly in ((0, 1, W, 0.004), (0, -1, W, 0.004), (1, 0, 0.004, D), (-1, 0, 0.004, D)):
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(sx * W / 2, sy * D / 2, z + 0.02))
+            l = bpy.context.active_object
+            l.scale = (lx, ly, 0.04)
+            bpy.ops.object.transform_apply(scale=True)
+            parts.append(l); material(l, "M_CartSteel")
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.12, minor_radius=0.01, location=(-W / 2 - 0.03, 0, H - 0.05), rotation=(0, math.radians(90), 0))
+    h = bpy.context.active_object
+    bm = bmesh.new(); bm.from_mesh(h.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.x > 0.0], context="VERTS")  # half ring = push handle
+    bm.to_mesh(h.data); bm.free()
+    parts.append(h); material(h, "M_CartSteel")
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    cart = bpy.context.active_object
+    cart.name = "SM_MedCart"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    export("med_cart.obj")
+
+
 def export(name):
     # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
     # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
@@ -551,6 +632,7 @@ BUILDERS = {
     "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp,
     "annotator_mask": annotator_mask, "annotator_coif": annotator_coif, "ledger": ledger, "pencil": pencil,
     "oversleeve": lambda: sleeve("SM_Oversleeve", 0.24, 0.042, 0.034, "M_Duck", "oversleeve.obj"),
+    "clipboard": clipboard, "med_cart": med_cart,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.055, 0.046, "M_CoatWool", "coat_sleeve.obj"),
 }
 for k, f in BUILDERS.items():

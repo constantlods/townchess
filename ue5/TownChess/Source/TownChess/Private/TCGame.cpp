@@ -14,6 +14,7 @@
 #include "Misc/Paths.h"
 #include "Misc/Parse.h"
 #include "TCBoard.h"
+#include "TCClipboard.h"
 #include "TCCoreClient.h"
 #include "TCLocalCore.h"
 #include "TCLog.h"
@@ -339,6 +340,11 @@ void ATCPlayerController::OnKey(FKey Key)
 		else if (Key == EKeys::Escape) B->ChoosePromotion(TEXT(""));
 		return;
 	}
+	if (Key == EKeys::Tab && !bTypingCode)
+	{
+		if (ATCClipboard* Clip = Cast<ATCClipboard>(UGameplayStatics::GetActorOfClass(GetWorld(), ATCClipboard::StaticClass()))) Clip->Toggle();
+		return;
+	}
 	if (bTypingCode)
 	{
 		if (Key == EKeys::BackSpace) JoinCode.LeftChopInline(1);
@@ -516,7 +522,9 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 	}
 	for (const FTCGameEvent& E : S.LastEvents) if (E.Type == TEXT("check") && S.IsActive()) Status = TEXT("CHECK  -  ") + Status;
 	Text(Status, Canvas->ClipX * 0.5f, 30.f, S.IsFinished() ? FLinearColor(0.95f, 0.8f, 0.55f) : Ink, S.IsFinished() ? 1.6f : 1.2f, true);
-	if (!S.OpeningName.IsEmpty()) Text(FString::Printf(TEXT("%s  %s"), *S.OpeningEco, *S.OpeningName), Canvas->ClipX * 0.5f, 64.f, Dim, 0.85f, true);
+	// the opening and the moves live on the clipboard (Tab), not across the top of the screen
+	if (!S.OpeningName.IsEmpty() && bScreenRecord) Text(FString::Printf(TEXT("%s  %s"), *S.OpeningEco, *S.OpeningName), Canvas->ClipX * 0.5f, 64.f, Dim, 0.85f, true);
+	Text(TEXT("[Tab] game record"), Canvas->ClipX - 20.f, Canvas->ClipY - 34.f, FLinearColor(0.5f, 0.47f, 0.42f, 0.8f), 0.75f, false);
 	if (S.Disconnected.Contains(Them)) Text(TEXT("Opponent disconnected - waiting"), Canvas->ClipX * 0.5f, 88.f, FLinearColor(0.9f, 0.6f, 0.3f), 0.9f, true);
 
 	float Y = 140.f;
