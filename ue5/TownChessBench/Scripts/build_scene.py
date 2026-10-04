@@ -618,7 +618,7 @@ POSES = {
 }
 
 
-def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, pose="rest"):
+def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, pose_name="rest"):
     """Authors a single-frame seated pose for the UE5 mannequin.
 
     Starts from MM_Idle frame 0, infers the bone hierarchy from local vs component transforms, applies
@@ -670,7 +670,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
     X, Z = (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)
     deltas = {"thigh_l": _axis(X, 90), "thigh_r": _axis(X, 90), "calf_l": _axis(X, -90), "calf_r": _axis(X, -90)}
-    for bone, (ax, az) in POSES[pose].items():  # component-space rotation applied to each bone's orientation, top-down
+    for bone, (ax, az) in POSES[pose_name].items():  # component-space rotation applied to each bone's orientation, top-down
         deltas[bone] = _qmul(_axis(Z, az), _axis(X, ax))
     pelvis_drop = float(os.environ.get("TC_PELVIS_DROP", 47.0))
 
@@ -1066,7 +1066,7 @@ def build():
         if key not in seated_cache:
             try:
                 seated_cache[key] = (build_seated_pose(body_mesh, idle, f"{ROOT}/Anims", f"A_TC_Seated_{body_mesh.get_name()}_{pose}",
-                                                       own_proportions=bool(mh_body), pose=pose), dict(SEATED))
+                                                       own_proportions=bool(mh_body), pose_name=pose), dict(SEATED))
             except Exception:
                 log("WARNING seated pose failed\n" + traceback.format_exc())
                 seated_cache[key] = (None, dict(SEATED))
