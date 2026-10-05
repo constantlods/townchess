@@ -777,7 +777,7 @@ POSES = {
     # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
     "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0),
                "hand_l": (0, 0, float(os.environ.get("TC_HAND_ROLL", -95))), "hand_r": (0, 0, -float(os.environ.get("TC_HAND_ROLL", -95)))},
-    "clasp": {"spine_01": (-10, 0), "spine_03": (-16, 0), "neck_01": (-4, 0), "head": (-10, 0),
+    "clasp": {"spine_01": (-4, 0), "spine_03": (-7, 0), "neck_01": (2, 0), "head": (4, 0),  # slight lean in, head level
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
               "hand_l": (0, -15), "hand_r": (0, 15)},
 }
