@@ -1455,7 +1455,7 @@ def build():
                     sm.set_material(i, mi_buckle if "buckle" in str(sl.material_slot_name).lower() else mi_web)
                 EAL.save_loaded_asset(sm)
             # measured: the belt landed at z 58 (under the table); the chest is ~32 cm higher on the animated skeleton
-            attach_static("Straitjacket", straps[0], smc, "spine_03", *bone_relative("spine_03", [0.0, 2.0, 32.0]), "TC_Opponent_caged")
+            attach_static("Straitjacket", straps[0], smc, "spine_03", *bone_relative("spine_03", [0.0, 2.0, 26.0]), "TC_Opponent_caged")
 
     # 0. The player's own arms (first person): the reference shows real hands with sleeves resting on the board,
     #    not floating gloves. Eyes at the camera (x=-87, z=top+42); ATCGameMode hides the head (tag TC_PlayerBody).
