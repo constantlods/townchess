@@ -1469,7 +1469,7 @@ def build():
         if pb:
             log("player body at", [round(v, 1) for v in ploc])
             SEATED["player_body"] = True  # the XR stand-in gloves give way to real arms
-            hd = hand_decal_materials()
+            hd = hand_decal_materials() if os.environ.get("TC_HAND_DECALS", "1") == "1" else None
             hands = SEATED.get("player_hands")
             if hd and hands:
                 for side, (hand, elbow) in hands.items():
