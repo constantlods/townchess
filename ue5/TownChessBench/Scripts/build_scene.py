@@ -371,7 +371,10 @@ def board_squares_material(defaults):
         e = E(unreal.MaterialExpressionScalarParameter, x, y); e.set_editor_property("parameter_name", name); e.set_editor_property("default_value", v); return e
     def k(v, x, y):
         e = E(unreal.MaterialExpressionConstant, x, y); e.set_editor_property("r", v); return e
-    uv = E(unreal.MaterialExpressionTextureCoordinate, -2400, 0)
+    lp = E(unreal.MaterialExpressionLocalPosition, -2800, 0)
+    lxy = E(unreal.MaterialExpressionComponentMask, -2650, 0); lxy.set_editor_property("r", True); lxy.set_editor_property("g", True); C(lp, "", lxy, "")
+    lo = E(unreal.MaterialExpressionAdd, -2520, 0); C(lxy, "", lo, "A"); lo.set_editor_property("const_b", 23.2)  # 4 squares x 5.8 cm
+    uv = E(unreal.MaterialExpressionDivide, -2400, 0); C(lo, "", uv, "A"); uv.set_editor_property("const_b", 46.4)  # 0..1 over the 8 x 8 squares
     uv8 = E(unreal.MaterialExpressionMultiply, -2200, 0); C(uv, "", uv8, "A"); uv8.set_editor_property("const_b", 8.0)
     cell = E(unreal.MaterialExpressionFloor, -2000, 0); C(uv8, "", cell, "")
     fx = E(unreal.MaterialExpressionComponentMask, -1850, -60); fx.set_editor_property("r", True); C(cell, "", fx, "")
@@ -456,7 +459,11 @@ def blood_decals():
     MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
     MEL.connect_material_property(bc, "A", unreal.MaterialProperty.MP_OPACITY)
     MEL.connect_material_property(nm, "RGB", unreal.MaterialProperty.MP_NORMAL)
-    MEL.connect_material_property(rg, "R", unreal.MaterialProperty.MP_ROUGHNESS)
+    # thick blood is glossy, but a near-mirror reflects the dark room and reads black: keep it satin (0.32..0.8)
+    rs = E(unreal.MaterialExpressionMultiply, -550, 350); C2 = MEL.connect_material_expressions
+    C2(rg, "R", rs, "A"); rs.set_editor_property("const_b", 0.48)
+    ra = E(unreal.MaterialExpressionAdd, -420, 350); C2(rs, "", ra, "A"); ra.set_editor_property("const_b", 0.32)
+    MEL.connect_material_property(ra, "", unreal.MaterialProperty.MP_ROUGHNESS)
     MEL.recompile_material(m)
     EAL.save_loaded_asset(m)
     out = {}
@@ -1070,9 +1077,9 @@ def build():
     chess = import_model("chess_set")
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
     mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.45, 0.34, 0.22), tint=(0.86, 0.72, 0.52), rough=0.7,
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.66, "GrimeContrast": 2.5, "MicroRough": 0.25, "GrimeStreaks": 0.0})
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.95, "GrimeContrast": 2.5, "MicroRough": 0.3, "GrimeStreaks": 0.0})
     mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.5, tint=(0.11, 0.095, 0.085),
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.75, "GrimeContrast": 2.0, "MicroRough": 0.15, "GrimeStreaks": 0.0})
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.95, "GrimeContrast": 2.0, "MicroRough": 0.2, "GrimeStreaks": 0.0})
     mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.36, 0.25, 0.16), tint=(0.8, 0.63, 0.44),
                            scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.3, "GrimeContrast": 2.5, "MicroRough": 0.2})
     assign(chess, mi_pw, lambda n: "white" in n)
