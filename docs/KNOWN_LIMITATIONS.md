@@ -380,5 +380,7 @@ normalises the order. Pinned in `regressions.test.ts` ("sanitizeCastling FEN edg
 **Character art gaps (visual, not rules).** The Annotator's Blender oversleeves are attached to the forearm bones but
 do not show in captures (the seated pose puts the elbows below the table top; under investigation). The caged
 patient, the Annotator and the player's own first-person arms all use the same MetaHuman (Epic's Walter preset), and
-the player's arms wear the patient's shirt. Each character needs its own MetaHuman (one cloud auto-rig per character
+the player's arms wear the patient's shirt. The generated hand vein/dirt decals (`ue5/tools/textures/hands.py`) are off by default: in pipeline run 2 they were
+bisected as the cause of a 2x exposure jump (frame mean 39 -> 85) and looked weak on curved skin; hand veins wait for the
+MetaHuman 8K skin textures (an owner action in the editor). Each character needs its own MetaHuman (one cloud auto-rig per character
 in the owner's editor) before player character/hands selection can ship.

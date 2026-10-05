@@ -912,7 +912,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
     new_w, new_l = solve(deltas)
     ARM_TARGETS = {"clasp": {"hand": (3.0, 18.0, -21.0), "elbow_z": -31.0, "elbow_x": 19.0},  # hands under the chin, cage visible
-                   "player": {"hand": (24.0, 60.0, -31.0), "elbow_z": -36.0, "elbow_x": 24.0}}  # head sits ~34 cm over the table
+                   "player": {"hand": (22.0, 46.0, -32.0), "elbow_z": -40.0, "elbow_x": 22.0}}  # in reach (60 cm forward gave IK error 174/561)  # head sits ~34 cm over the table
     if pose_name in ARM_TARGETS and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
         # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
         head = new_w["head"][0]
@@ -1247,7 +1247,7 @@ def build():
     # ---- Wear and clutter on the table: dried blood, papers, a book stack (the reference's table is a lived-in mess)
     blood = blood_decals()
     placements = [  # variant, x, y, size (cm), yaw: board squares, the near frame, the table
-        ("Pool", 6, 8, 11, 20), ("Spatter", -4, -10, 14, 75), ("Spatter", 16, 14, 9, 200), ("Smear", -18, -2, 16, 0),
+        ("Spatter", 6, 8, 11, 20), ("Spatter", -4, -10, 14, 75), ("Spatter", 16, 14, 9, 200), ("Smear", -18, -2, 16, 0),
         ("Pool", -30, 34, 18, 140), ("Spatter", 30, -30, 12, 300), ("Smear", -28, -40, 22, 160), ("Spatter", 20, 40, 10, 40)]
     for k, (v, x, y, sz, yaw) in enumerate(placements):
         if v not in blood:
@@ -1469,7 +1469,9 @@ def build():
         if pb:
             log("player body at", [round(v, 1) for v in ploc])
             SEATED["player_body"] = True  # the XR stand-in gloves give way to real arms
-            hd = hand_decal_materials() if os.environ.get("TC_HAND_DECALS", "1") == "1" else None
+            # off by default: bisected as the cause of a 2x exposure jump (mean 39 -> 85) and visually weak; the real
+            # fix for hand veins is MetaHuman 8K skin (owner action). TC_HAND_DECALS=1 brings them back for testing.
+            hd = hand_decal_materials() if os.environ.get("TC_HAND_DECALS", "0") == "1" else None
             hands = SEATED.get("player_hands")
             if hd and hands:
                 for side, (hand, elbow) in hands.items():
@@ -1505,7 +1507,7 @@ def build():
     mi_pages = make_mi(master, "MI_Pages", {"BaseColor": None}, tint=(0.78, 0.72, 0.6), rough=0.95)
     opp_a, smc_a = spawn_opponent("annotator", mhn, outfit_mi=mi_coat, pose="clasp")  # forearms on the table: the clerk at his desk
     if smc_a and "head" in SEATED:
-        plate = prop_with("annotator_mask", {"Steel": mi_steel, "Copper": mi_copper, "Pupil": mi_black})
+        plate = prop_with("annotator_mask", {"Steel": mi_steel, "Copper": mi_steel, "Pupil": mi_black})  # steel rivets (copper read pink)
         coif = prop_with("annotator_coif", {"Linen": mi_coif})
         noff = [float(v) for v in os.environ.get("TC_NASION_OFFSET", "0,9.5,7").split(",")]  # head bone -> nasion
         if coif:
