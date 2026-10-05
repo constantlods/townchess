@@ -134,6 +134,7 @@ FTCPieceVisual ATCBoard::SpawnPiece(const FString& Code, const FVector& Local)
 	P.Mesh = NewObject<UStaticMeshComponent>(this);
 	P.Mesh->SetupAttachment(P.Root);
 	P.Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	P.Mesh->SetReceivesDecals(false);  // blood/wear decals belong to the board; on a piece they stretch into streaks
 	P.Mesh->RegisterComponent();
 	SetPieceMesh(P, Code);
 	return P;

@@ -458,7 +458,7 @@ def blood_decals():
     MEL.connect_material_expressions(age, "", mul, "B")
     MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
     MEL.connect_material_property(bc, "A", unreal.MaterialProperty.MP_OPACITY)
-    MEL.connect_material_property(nm, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    # (the generated relief map shaded the blood near-black under the lamp; colour + gloss only for now)
     # thick blood is glossy, but a near-mirror reflects the dark room and reads black: keep it satin (0.32..0.8)
     rs = E(unreal.MaterialExpressionMultiply, -550, 350); C2 = MEL.connect_material_expressions
     C2(rg, "R", rs, "A"); rs.set_editor_property("const_b", 0.48)
@@ -1108,7 +1108,15 @@ def build():
                 meshes[colour + kind] = m
         setp(board, "piece_meshes", meshes)
         setp(board, "board_mesh_yaw", 90.0)  # a1 must be a dark square ("light on the right"), checked by screenshot
-        squares = board_squares_material(defaults)
+        # playing surface: our baked composite of CC0 maple/walnut scans (ue5/tools/textures/board.py) on the board's 0..1 grid
+        bd = os.path.join(TEXTURES_DIR, "board")
+        squares = None
+        if os.path.exists(os.path.join(bd, "T_Board_BaseColor.jpg")):
+            squares = make_mi(master, "MI_BoardSquares", {
+                "BaseColor": import_texture(os.path.join(bd, "T_Board_BaseColor.jpg"), f"{ROOT}/Textures/Board", "T_Board_BaseColor", "color"),
+                "Normal": import_texture(os.path.join(bd, "T_Board_Normal.jpg"), f"{ROOT}/Textures/Board", "T_Board_Normal", "normal"),
+                "ARM": import_texture(os.path.join(bd, "T_Board_ARM.jpg"), f"{ROOT}/Textures/Board", "T_Board_ARM", "linear")},
+                rough=0.85, scalars={"MicroRough": 0.08})
         wood_board = import_prop("chess_board") if squares else None
         if wood_board:
             mi_frame = surface_material(master, "wood_cabinet_worn_long", name="MI_BoardFrame", tiling=2.0, tint=(0.55, 0.42, 0.32),
@@ -1188,7 +1196,7 @@ def build():
             continue
         dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, top + 3), unreal.Rotator(-90, yaw, 0))
         dec.decal.set_decal_material(blood[v])
-        setp(dec.decal, "decal_size", unreal.Vector(8, sz, sz))
+        setp(dec.decal, "decal_size", unreal.Vector(3, sz, sz))  # shallow: stays on the board/table surface
         setp(dec.decal, "sort_order", k)
         dec.set_folder_path("Wear")
     if "Drips" in blood:  # running over the table's front edge, facing the player
