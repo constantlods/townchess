@@ -30,6 +30,7 @@ The critique that drives the passes is in [HOSTILE_VISUAL_REVIEW.md](HOSTILE_VIS
 
 | 32-35 | Hand vein/dirt decals (generated), dark-iron cage material, straitjacket webbing straps | Straps read; hand decals weak and later bisected as the cause of a 2x exposure jump (off by default) |
 | 36-39 | Annotator at his desk (forearms on the table), dark steel plate, coat sleeves; pipeline run 2 fixes | Exposure back to mean ~37 (reference ~27); left player hand still a fist; cage still bronze-tan (rust tint lowered next) |
+| 40-41 | Gameplay feel (drag and drop, 0.2 s ease-out moves, captures in parallel, hover, snap-back, wood sounds); quality preset (Epic + hardware ray tracing on RTX); reference-style HUD (Courier Prime, translucent bordered plates, clocks under the plates, status at the bottom), now captured with the scene (`-TCHud=1`) | `41-hud.png`: the HUD reads like the reference's thin typewriter UI and stays off the opponent's face; the scene itself is unchanged from pass 39 |
 
 ## Remaining gaps, ranked (what the next passes do)
 
