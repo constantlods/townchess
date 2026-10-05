@@ -1263,7 +1263,7 @@ def build():
         setp(dec.decal, "decal_size", unreal.Vector(3, sz, sz))  # shallow: stays on the board/table surface
         setp(dec.decal, "sort_order", k)
         dec.set_folder_path("Wear")
-    if "Drips" in blood:  # running over the table's front edge, facing the player
+    if "Drips" in blood and os.environ.get("TC_EDGE_DRIPS") == "1":  # off: it projected onto the player's forearm
         dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(-48, -14, top - 6), unreal.Rotator(0, 0, 0))
         dec.decal.set_decal_material(blood["Drips"])
         setp(dec.decal, "decal_size", unreal.Vector(10, 16, 12))
