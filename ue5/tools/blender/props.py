@@ -81,7 +81,7 @@ def cage_mask():
             bm.faces.new((verts[j][i], verts[j][i + 1], verts[j + 1][i + 1], verts[j + 1][i]))
     grid = obj_from_bm("Mask_Grid", bm)
     w = grid.modifiers.new("wire", "WIREFRAME")
-    w.thickness = 0.0028
+    w.thickness = 0.0042  # forged iron wire, not thin toy bars (visual judge)
     w.use_even_offset = True
     w.use_replace = True
     bv = grid.modifiers.new("soften", "BEVEL")  # round the bar edges a little; keeps square openings

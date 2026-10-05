@@ -1378,7 +1378,10 @@ def build():
     if smc and "head" in SEATED:
         cage = import_prop("cage_mask")
         if cage:
-            cage[0].set_material(0, mi_rust)
+            # dark forged iron, rust in patches (not an even orange coat)
+            mi_iron = surface_material(master, "rusty_metal_02", name="MI_CageIron", tiling=2.0, metal=1.0, tint=(0.32, 0.29, 0.27), rough=0.75,
+                                       grime_color=(1.6, 1.0, 0.6), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.55, "GrimeContrast": 3.0, "MicroRough": 0.2})
+            cage[0].set_material(0, mi_iron)
             EAL.save_loaded_asset(cage[0])
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,4.5,-1").split(",")]  # forward (+Y), up (+Z) from the head bone
             attach_static("CageMask", cage[0], smc, "head", *head_relative(off), "TC_Opponent_caged")
