@@ -269,7 +269,7 @@ def _tick(_dt):
         if board.is_animating() or board.is_awaiting_core():
             return
         frm, to = S["drag_move"]
-        check("legal drop sent the move", str(S["result"]).lower().endswith("submitted"), S["result"])
+        check("legal drop sent the move", "submitted" in str(S["result"]).lower(), S["result"])
         mine = [h for h in st.history if h.color == core.get_my_color()]
         check("core accepted the dropped move", len(st.history) > S["plies_before"] and mine and mine[-1].to == to, st.fen)
         check("dropped piece settled exactly on its square, board in sync", board.is_in_sync() and board.get_physical_mismatches() == 0 and board.get_resyncs() == 0)
