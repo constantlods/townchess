@@ -1,91 +1,141 @@
-# Project audit (oversight agent, stage 3, 2026-10-04 run 2)
+# Project audit (oversight agent, stage 3, 2026-10-05 pipeline run 2)
 
-Scope: every owner message in the session transcript (chat, queued messages, earlier-session summary), checked against
-`feature/photorealistic-renderer` at `f895b14` (3 commits ahead of GitHub, unpushed), the docs, the stage 1/2 reports
-and GitHub. 64 commits since the last audit (`b818c9e`). Status: **done-verified** (re-checked here),
-**done-unverified** (claimed, no independent evidence), **in progress**, **not started**, **dropped**.
+Scope: every owner message in the session transcript (chat and the earlier-session summary), checked against
+`feature/photorealistic-renderer` at `7eda444`. HEAD is 1 commit ahead of GitHub (`7eda444`, the screenshots, not
+pushed). There are 18 commits since the last audit (`f895b14`). Inputs: chess.md run 2, visual.md run 2, the lead's
+fixes after the visual report, the Windows `build-level.log` (2026-10-05 03:55Z), and pixel statistics of
+`39-caged.png` and `39-annotator.png`.
 
-Test suite re-run by this audit: **475/475 with `TC_STOCKFISH` set**, 474 + 1 skipped without it (the real-Stockfish
-`describe.skipIf(!REAL)` block). Floor for the next run: 475. "475/475" is only true with the engine present.
+Status labels:
+- **done-verified**: re-checked here.
+- **done-unverified**: claimed, with no independent evidence.
+- **in progress**, **not started**, **blocked (owner)**, **dropped**.
+
+Tests (stage 1, not re-run here, since no `packages/` change after `e981f32`): **475/475 with `TC_STOCKFISH`**, and
+474 + 1 skipped without it. The floor stays at 475.
 
 ## 1. New findings (newest first)
 
-- **F1 The owner's top ask (veins, blood) is still mostly open.** In `31-main.png` the hands show faint tendons but no
-  veins, dirt, nail grime or blood; the left hand is still a fist by the lamp base (visual judge fix 4 not done: no
-  `hands.py`, no player skin override, no cuff/sleeve). Blood on the board still includes a straight-edged red band
-  across rank 6 (fix 3 only partly done: edge fade and darken, no relief, no joints/studs/pieces).
-- **F2 A commit message overstates the result.** `5c1df9d` "dark iron with patchy rust": the only geometry change is
-  wire 2.8 -> 4.2 mm (still flat strips, no rivets/brow band), and in `31-opponent-closeup.png` the cage still reads
-  as even copper-orange. Judge it under neutral light or fix the material; do not log it as done.
-- **F3 Opponent pose not fixed.** `88b8093`/`a497008` claim a forward lean with clasped hands; in 31-main the arms are
-  still crossed flat on the table, far from the chin. Visual judge fix 5 is open.
-- **F4 One MetaHuman for everyone.** `build_scene.py` ~1383-1420 spawns the caged patient, the player's arms and the
-  Annotator from the same `mhn` (Walter). The player even wears the patient's shirt material (`mi_gown_early`). This
-  blocks "player picks character/hands" (14a) and the Annotator's own identity (15).
-- **F5 Black seat changed without visual proof.** `6f6cff1` turns the board 180 for Black. The autotest checks are
-  falsifiable (a1 side, first rank nearest, `is_in_sync`), but no run log or Black-seat screenshot after the change is
-  recorded, and world-placed blood decals/clipboard are not shown to follow the turned board.
-- **F6 DLSS is untracked and contradicted by the docs.** The owner allowed DLSS (2026-10-04 08:05); the lead said it
-  needs the owner to add NVIDIA's free DLSS plugin from Fab. RENDERING.md still says "No DLSS" twice and no roadmap
-  row exists. Record: real plugin only, RTX preset only, TSR stays the default for the RX 6650 XT (the original
-  "no fake DLSS" rule still applies).
-- **F7 Stale docs.** VISUAL_REBUILD_ROADMAP stops at pass 10 (`b65c658`); passes 11-31 (clipboard, blood, board,
-  cinematic MetaHuman, judge fixes) are unlogged and its gap list is obsolete. ROADMAP has no rows for the clipboard
-  (built), the roster (built), player hands selection, DLSS or the agent pipeline. KNOWN_LIMITATIONS line 372 still
-  says BUG-007 is pinned as `it.fails` (it is now a normal test). The visual judge's capture-dithering finding
-  (`SCS_FINAL_TONE_CURVE_HDR` 8-bit readback, build_scene.py:1533) is unaddressed, so skin detail can't be judged.
-- **F8 Process.** Merge `9d10a31` is authored `root@Fpc.pve2` again (second time). Remote branch `agents/stockfish-league`
-  is merged but not deleted; `claude/horror-chess-prototype` (= main) remains; three local agent worktrees are stale.
-  Tracked screenshots are 84 MB (4 MB PNGs, ~12 MB per pass); switch to JPEG or LFS before this grows further.
+- **F1 The lead's run-2 summary to the owner overstates two fixes.**
+  - Claim: "your arms now reach the board's corners". Fact: `build-level.log` 03:55Z gives `player l ... error 24.8`
+    (was 174) and `player r ... error 123.5` (was 561). The right arm is still far off its target (the clasp arms solve to 5.8 and 38.8), and in
+    39-caged the left hand is still a fist, now on the a1 corner of the frame.
+  - Claim: "the blood strip on rank 6 is gone". Fact: `a78d7a1` only swaps `"Pool"` for `"Spatter"` at the same
+    `(6, 8)` placement. The visual judge located the clipping on the receiving side (the board-squares plane), and
+    that was not touched. In 39-caged, the stain on f/g at ranks 5-6 still shows a straight upper edge.
+  - Claim (03:12Z): the cage is "matte dark iron now". Fact: `MI_CageIron` still has `grime_color=(2.6, 1.3, 0.55)`
+    (build_scene.py:1441), and the cage reads bronze/tan in 39-caged. Judge fix 3 is not done.
+  - Report the measured values to the owner, not "done".
+- **F2 The exposure "bisect" is one-sided, and its root cause is unknown.** The only new data point is a build with
+  the decals off at the current commit (`bisect-nodecals.png`, mean 39.0). It is compared with 85 from earlier
+  builds that also differ in straps and Annotator changes. There was no `TC_HAND_DECALS=1` rebuild at `a78d7a1` to
+  show that 85 comes back. Exposure is meant to be fixed (`auto_exposure_min = max = TC_EV`, build_scene.py:1625).
+    - A translucent deferred decal should not change the frame mean by 2x, so the real cause is still unexplained
+      and can recur.
+    - The measured result is real: frame mean 37.4 / 37.0 and saturation 140, against the reference's 27 / 150.
+    - The frame is still about 0.5 stop over the reference: the judge's light and EV changes were not applied.
+- **F3 The owner's top ask (veins, blood detail) went backwards this run.** With the hand decals off, the player's
+  hands have no vein or dirt detail at all (39-caged). This is now routed entirely to the owner's 8K skin action.
+  - The owner asked for free and code alternatives. Fixing the decal material, or a skin-texture override in
+    `hands.py`, remains an option the lead can take without the owner.
+  - Still open from run 2: no cuff or sleeve, no nail grime, no blood on pieces or hands, no relief in the blood.
+- **F4 Visual judge fixes not done:**
+  - **4/7 (hands):** only partly done (F1, F3).
+  - **5 (Annotator):** the rivets are steel now, but the plate still reads light tan/brass, not dark steel. The
+    checker eye grid and the flat patch card are unchanged. The oversleeves are still invisible (LIM-011).
+  - **6 (poses):** the patient and the Annotator still have identical hands, pixel for pixel in 39-caged and
+    39-annotator, and the hands still hide the black king and queen. There is no lean.
+  - **7 (Black seat):** there is still no screenshot. The board turn passes `autotest.ps1 -Test rematch` (8/8,
+    ROADMAP line 262), so F5 from run 1 is functionally closed but has no visual proof.
+  - **8 (clutter):** not done.
+  - The capture still reads back `SCS_FINAL_TONE_CURVE_HDR` (build_scene.py:1617), so skin detail can still not be
+    judged.
+- **F5 "Play a full game with the mouse" was silently dropped from the owner asks.** The lead's last three updates
+  (03:12Z, 03:43Z, 04:00Z) list only 8K skin, DLSS and branches. ROADMAP line 265 still has the interactive mouse
+  game as **Pending / owner**. Add it back to the owner list.
+- **F6 Stale docs.**
+  - VISUAL_REBUILD_ROADMAP logs passes only up to 28-31. Passes 32-39 (cage iron, hand decals and their removal,
+    straitjacket, Annotator pose and plate, the exposure regression) are missing.
+  - Its "Remaining gaps" list is obsolete. It still says "owner decision pending: Annotator vs caged patient" and
+    "XR gloves with no forearms"; both were settled long ago.
+  - Run 1's doc items (F6, F7) were otherwise fixed in `28b3976`: DLSS is tracked in RENDERING.md, the BUG-007
+    wording is fixed, LIM-011 and the ROADMAP rows exist.
+- **F7 Repo hygiene.**
+  - Tracked screenshots grew from 84 MB to **119 MB** (59 PNGs).
+  - The capture writes PNGs without truncating the file: each PNG keeps 0.26-0.8 MB of stale bytes after `IEND`.
+    For example, `39-caged.png` is 3,090,912 bytes, but its IEND sits at 2,825,282. That is why every capture has one
+    of exactly two file sizes.
+  - Fix: delete the file before export, or re-encode. Switch to JPEG or LFS.
+  - There are still three stale agent worktrees in `.claude/worktrees/`.
+  - All 18 new commits are authored constantlods (the identity issue from run 1 is fixed).
+- Checked and clean:
+  - No secrets in the diff since `f895b14`: no keys, the owner's pasted SSH key absent, no signed URLs, no tokens.
+  - The largest tracked file is 8.3 MB.
+  - Windows work stayed in `C:\TownChess` (reads of the build log and scripts only).
+  - GameCore authority and the test floor are intact (chess.md).
 
 ## 2. Owner requests
 
 | # | Request | Status | Evidence | Gap |
 |---|---|---|---|---|
-| 1 | Native UE5 game first, Windows first | done-verified | `ue5/TownChess` | none |
-| 2 | GameCore sole chess authority | done-verified | league moves go through `room.move` (chess.md) | none |
-| 3 | Regression test per chess bug; count never drops | done-verified | BUG-007 pinned `c791d46`, fixed `7cdc067`; 446 -> 475 | KNOWN_LIMITATIONS wording (F7) |
-| 5 | M2 gameplay DoD | done-verified (Linux) | ROADMAP 5b | - |
-| 6 | Windows sidecar proofs | done-verified (scripted) | ROADMAP 5b, packaged game vs bundled Stockfish 16/16 | crash recovery and correlated logs still not scripted |
-| 7 | Owner plays a full game with the mouse | **not verified** | ROADMAP 5b "Pending" | unchanged since last audit |
-| 8 | Windows PC rules + change log | done-verified | WINDOWS_SETUP rows 9-13 + incident note | No new breach found in this period (tool calls scanned). Pre-audit read of `%LOCALAPPDATA%\EpicGamesLauncher\...\EpicGamesLauncher.log` (04:47Z) is not in the incident note |
-| 9 | No secrets committed | done-verified | tree + new history grep: no keys, tokens, signed URLs, Windows user | `192.168.0.208` in PERFORMANCE.md (LAN, low) |
-| 10 | No large binaries | done-verified | largest file 8 MB (grime normal PNG); `tools/sim/out*/` ignored | screenshot growth (F8) |
-| 11 | Critique -> render -> compare loop, documented | in progress | stage 2 report, passes 23-31 | loop log stale (F7) |
-| 12 | MetaHuman opponent in the cage mask | done-verified | `31-main.png`, `31-opponent-closeup.png` | pose (F3), cage material (F2), clean T-shirt |
-| 13 | Helper agents (critique, GitHub, rules, oversight) | done | `.claude/agents/*`, docs/AGENT_PIPELINE.md | - |
-| 14a | Player picks own character/hands; opponent choice | opponent picker done (`672864c`); **player side not started, not tracked** | - | blocked by F4 |
-| 14b | Board flips by itself between games | done-unverified | `3ff9de2`, `6f6cff1` | F5 |
-| 14c/d | Clipboard cart with moves + opening, toggle; critique first | done-verified (screenshot) | `4093007`, `13-clipboard-raised.png`, CLIPBOARD_CRITIQUE.md | covers h-file edge; no settings toggle for the on-screen copy; not in ROADMAP |
-| 14e | Simulations: classic games, CPU vs CPU by Elo, bug-watching agent | done-verified | chess.md: 51 games, 0 anomalies, Stockfish referee | not in CI; no draw-path coverage (all games mated) |
-| 14f | Stockfish/league engines in the game | done-verified | `27d4d00`, sf1350..sfmax, bundled with GPL text (`e5f361d`) | other engines (Lc0) not evaluated |
-| 15 | Keep caged patient, add the Annotator | in progress | roster `0afe50a`, `12-annotator.png` | no fresh capture; oversleeves don't read (visual.md); shares Walter MetaHuman (F4); not in KNOWN_LIMITATIONS |
-| 16 | Voice/animation pipeline | research only | VOICE_OPTIONS.md | - |
-| 17 | Physical interaction (M3) | not started | ROADMAP M3 | - |
-| 18 | AAA realism matching the reference: blood on the board, veins in the hands | in progress | passes 27-31; stage 2 scores 2-6/10 | F1, F2, F3 |
-| 19 | Free assets only, code alternatives | done-verified | FREE_ASSETS.md (all CC0/OFL/MetaHuman/GPL recorded), generators `blood.py`, `board.py`, `props.py` | `docs/reference/concept-reference.jpg` source still unrecorded (R5) |
-| 20 | Four-stage pipeline (critic, visual judge, GitHub keeper) | done, run 1 in progress | `340cdfc`, chess.md, visual.md, this file | stage 4 not yet run |
-| 21 | Chess agent for rules and engines | done-verified | chess.md found a real bug (BUG-007) and the sim F2; both fixed (`7cdc067`, `f895b14`) | - |
-| 22 | DLSS if needed | **blocked on owner** (Fab download), **not tracked** | lead's message 08:49Z | F6 |
+| 0 | Latest: "okay continue with the build" (10-05 03:19Z) | **followed** | Annotator milestone (`476d73d`..`be79b31`), then pipeline run 2 | summaries overclaim (F1) |
+| 1 | Native UE5 game, Windows first | done-verified | `ue5/TownChess`, packaged smoke | - |
+| 2 | GameCore sole chess authority | done-verified | chess.md run 2 | - |
+| 3 | Regression test per chess bug; count never drops | done-verified | 475 (floor met), BUG-007 is a normal test | - |
+| 5/6 | M2 gameplay DoD, Windows sidecar proofs | done-verified (scripted) | ROADMAP 5b | crash recovery is not scripted |
+| 7 | Owner plays a full game with the mouse | **pending, dropped from the owner asks** | ROADMAP line 265 | F5 |
+| 8 | Windows PC rules + change log | done-verified | WINDOWS_SETUP; no new system changes seen | - |
+| 9/10 | No secrets, no large binaries | done-verified | grep + size scan | screenshot growth (F7) |
+| 11 | Critique -> render -> compare loop, documented | in progress | visual.md run 2, shots 32-39 | loop log stale (F6) |
+| 12 | MetaHuman opponent in the cage mask | done-verified | 39-caged | cage not iron (F1); T-shirt; no lean |
+| 13/20 | Helper agents, four-stage pipeline | done; run 2 at stage 3 | chess.md, visual.md, this file | stage 4 pending |
+| 14a | Player picks character/hands | not started, tracked | ROADMAP line 264, LIM-011 | needs per-character MetaHumans |
+| 14b | Board flips between games | done-verified (autotest) | ROADMAP line 262 (8/8) | no Black-seat screenshot |
+| 14c/d | Clipboard cart with moves + opening, toggle | done-verified | `13-clipboard-raised.png`, ROADMAP line 260 | - |
+| 14e | Simulated classic games / CPU vs CPU by Elo, bug watcher | done-verified | 60 games, 0 anomalies (chess.md) | no draw-path game yet; not in CI |
+| 14f | Stockfish/league engines | done-verified | `27d4d00`, GPL as a separate process | - |
+| 15 | Keep the caged patient, add the Annotator | in progress | 39-annotator | plate reads tan; oversleeves invisible; shared pose and MetaHuman (F4) |
+| 16/17 | Voice/animation; physical interaction (M3) | research / not started | VOICE_OPTIONS.md, ROADMAP M3 | - |
+| 18 | AAA realism like the reference: blood on the board, hand veins | in progress, **hands regressed** | 39-caged, frame mean 37 vs 27 | F1-F4 |
+| 19 | Free assets only, code alternatives | done-verified | FREE_ASSETS.md; straps, plate and decals generated in-repo | concept-reference.jpg source (R5) |
+| 21 | Chess agent for rules/engines | done-verified | BUG-007 found and fixed | - |
+| 22 | DLSS if needed | **blocked (owner)**, tracked | RENDERING.md lines 57/103 | Fab plugin |
+| 23 | MetaHuman 8K skin for hand veins | **blocked (owner)** | lead's asks 03:12Z / 04:00Z | code fallback exists (F3) |
+| 24 | Delete merged branches | **blocked (owner OK)** | remote still has `agents/stockfish-league`, `claude/horror-chess-prototype` | - |
 
-## 3. Wrong or risky (carried over, still open)
+## 3. Wrong or risky (carried over)
 
-- **R3** Character direction: owner decided "keep caged patient and add annotator too". Resolved as a roster; the
-  cage-mask likeness risk to a famous film character remains and should be re-checked as the patient gets more detail.
-- **R5** `docs/reference/concept-reference.jpg` is public with no source/licence recorded.
-- **R7** Stale branches (F8). No branch protection on `main`.
+- **R3** The cage-mask likeness to a famous film character. Re-check it as the patient gains detail (the
+  straitjacket raises it).
+- **R5** `docs/reference/concept-reference.jpg` is public with no recorded source or licence.
+- **R7** Stale branches and worktrees (F7). There is no branch protection on `main`.
 
 ## 4. Next actions (priority order)
 
-1. **Hands (owner's top ask):** fix the capture's 8-bit readback first, then a vein/dirt/nail/blood skin override for
-   the player only, the left hand on the frame, a cuff and sleeve; capture a hands close-up as evidence.
-2. **Blood:** remove the straight-edged band, add relief, joint/stud/edge decals and blood on 3-4 pieces; board
-   close-up as evidence.
-3. **Opponent:** real lean + chin clasp, cage material that reads as iron, canvas shirt; recapture the Annotator.
-4. **Separate MetaHumans** for player arms, patient and Annotator (free presets), then player character/hands
-   selection (14a) into ROADMAP.
-5. Black-seat autotest run log + screenshot (F5); state the result in ROADMAP 5b.
-6. Docs: log passes 11-31 and new gaps in VISUAL_REBUILD_ROADMAP; ROADMAP rows for clipboard, roster, 14a, DLSS,
-   pipeline; RENDERING.md DLSS decision; KNOWN_LIMITATIONS BUG-007 wording.
-7. Owner: add NVIDIA DLSS from Fab (then wire it to the RTX preset only); play one full game with the mouse (item 7).
-8. Housekeeping: delete merged `agents/stockfish-league` (owner OK), set the git identity for merges, JPEG screenshots.
+1. **Correct the record.**
+   - Tell the owner the measured state: right-arm IK error 123.5, the spatter still on the board receiver, the cage
+     still tan.
+   - Put "play one full game with the mouse" back on the owner list (F5).
+2. **Exposure.**
+   - Do the decals-on control rebuild (`TC_HAND_DECALS=1`) at HEAD to confirm the bisect.
+   - Find out why a decal moves a fixed exposure.
+   - Then apply the judge's EV and light settings to reach frame ~27-30 and board ~55.
+   - Switch the capture to a linear/HDR readback so skin can be judged.
+3. **Hands without waiting for the owner:**
+   - fix or replace the decal path (a skin override on the player-only material);
+   - get the right arm into reach (error < 20);
+   - open the left hand onto the frame;
+   - add a cuff and sleeve;
+   - capture a hands close-up.
+4. **Blood:** fix the board receiver clipping (or keep decals off the squares), add relief, and put blood on 3-4
+   pieces. Take a board close-up.
+5. **Characters:**
+   - `MI_CageIron` grime_color below 1, and round wire;
+   - a dark Annotator plate, a drilled eye pattern, a bevelled patch;
+   - separate poses (patient leans in, hands clear of the king and queen; Annotator holds the pencil).
+6. **Docs:** log passes 32-39 and rewrite "Remaining gaps" in VISUAL_REBUILD_ROADMAP. Add a Black-seat screenshot.
+7. **Owner:** 8K skin, DLSS plugin, branch deletion OK, the mouse game.
+8. **Housekeeping:**
+   - truncate PNGs on export and move to JPEG or LFS;
+   - remove the stale worktrees;
+   - delete the branches once the owner OKs it.
