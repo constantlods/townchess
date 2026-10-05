@@ -1459,7 +1459,7 @@ def build():
                     for mat in ("M_TC_HandDirt", "M_TC_HandVeins"):
                         dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(*c), unreal.Rotator(-90, yaw, 0))
                         dec.decal.set_decal_material(hd[mat])
-                        setp(dec.decal, "decal_size", unreal.Vector(12, 6, 5))  # depth, half-width, half-length (cm)
+                        setp(dec.decal, "decal_size", unreal.Vector(3, 5, 4))  # shallow: only the top of the hand, not the sides of the forearm
                         dec.set_actor_label(f"HandDetail_{side}_{mat[5:]}")
                         dec.set_folder_path("Player")
                 log("hand detail decals on", sorted(hands))
