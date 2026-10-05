@@ -1425,7 +1425,7 @@ def build():
         if cage:
             # dark forged iron, rust in patches (not an even orange coat)
             # plain dark iron (the rust scan's orange overpowered any tint: oversight run 1); rust only in grime patches
-            mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=1.0, rough=0.62, tint=(0.16, 0.15, 0.14),
+            mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=0.85, rough=0.82, tint=(0.07, 0.065, 0.06),  # matte old iron, no silver mirror
                               grime_color=(2.6, 1.3, 0.55), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.5, "GrimeContrast": 3.0,
                                                                      "GrimeRoughness": 0.9, "MicroRough": 0.25})
             cage[0].set_material(0, mi_iron)
