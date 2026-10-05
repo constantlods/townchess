@@ -38,8 +38,8 @@ type Player = { id: string; kind: 'house'; opts: SearchOptions } | { id: string;
 const HOUSE: Player[] = [
   { id: 'house-1 (depth 1, noisy)', kind: 'house', opts: { maxDepth: 1, timeMs: 200, noise: 120, nodeLimit: 4000 } },
   { id: 'house-2 (novice)', kind: 'house', opts: { maxDepth: 2, timeMs: 400, noise: 60, nodeLimit: 15000 } },
-  { id: 'house-3 (patient)', kind: 'house', opts: { maxDepth: 3, timeMs: 400, noise: 25, nodeLimit: 40000 } },
-  { id: 'house-4 (warden)', kind: 'house', opts: { maxDepth: 5, timeMs: 600, noise: 0, nodeLimit: 80000 } },  // sim budget; the game's warden thinks longer
+  { id: 'house-3 (patient)', kind: 'house', opts: { maxDepth: 3, timeMs: 400, noise: 25, nodeLimit: 12000 } },
+  { id: 'house-4 (warden)', kind: 'house', opts: { maxDepth: 5, timeMs: 600, noise: 0, nodeLimit: 25000 } },  // sim budget: nodeLimit, not timeMs, bounds the house search (search.ts); the game's warden thinks longer
 ];
 const SF_ELOS = [1350, 1600, 1900, 2200, 2500, 2850];
 
