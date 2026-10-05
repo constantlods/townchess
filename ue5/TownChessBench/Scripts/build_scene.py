@@ -498,6 +498,43 @@ def blood_decals():
     return out
 
 
+def hand_decal_materials():
+    """Veins (normal only, opacity = vein mask) and dirt (colour + roughness) for the backs of the player's hands
+    (ue5/tools/textures/hands.py). Two materials, because a translucent decal shares one opacity for every channel."""
+    d = os.path.join(TEXTURES_DIR, "hands")
+    if not os.path.exists(os.path.join(d, "T_HandVeins_Normal.png")):
+        return None
+    T = lambda f, n, k: import_texture(os.path.join(d, f), f"{ROOT}/Textures/Hands", n, k)
+    veins_n, veins_m = T("T_HandVeins_Normal.png", "T_HandVeins_Normal", "normal"), T("T_HandVeins_Mask.png", "T_HandVeins_Mask", "gray")
+    dirt_c, dirt_r = T("T_HandDirt_BaseColor.png", "T_HandDirt_BaseColor", "color"), T("T_HandDirt_Roughness.png", "T_HandDirt_Roughness", "gray")
+    out = {}
+    for name in ("M_TC_HandVeins", "M_TC_HandDirt"):
+        path = f"{ROOT}/Materials/{name}"
+        if EAL.does_asset_exist(path):
+            EAL.delete_asset(path)
+        m = AT.create_asset(name, f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+        m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+        def samp(t, st, x, y):
+            e = MEL.create_material_expression(m, unreal.MaterialExpressionTextureSample, x, y)
+            e.set_editor_property("texture", t); e.set_editor_property("sampler_type", st); return e
+        if name == "M_TC_HandVeins":
+            n = samp(veins_n, unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, -500, 0)
+            k = samp(veins_m, unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE, -500, 250)
+            MEL.connect_material_property(n, "RGB", unreal.MaterialProperty.MP_NORMAL)
+            MEL.connect_material_property(k, "R", unreal.MaterialProperty.MP_OPACITY)
+        else:
+            c = samp(dirt_c, unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, -500, 0)
+            r = samp(dirt_r, unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE, -500, 250)
+            MEL.connect_material_property(c, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+            MEL.connect_material_property(c, "A", unreal.MaterialProperty.MP_OPACITY)
+            MEL.connect_material_property(r, "R", unreal.MaterialProperty.MP_ROUGHNESS)
+        MEL.recompile_material(m)
+        EAL.save_loaded_asset(m)
+        out[name] = m
+    return out
+
+
 def import_prop(name):
     """Our Blender-authored props (ue5/tools/blender/props.py -> ue5/assets/props/*.obj)."""
     src = os.path.join(PROPS, f"{name}.obj")
@@ -915,6 +952,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             deltas[f"upperarm_{side}"] = _qmul(_axis(Z, uz), _axis(X, ux))
             deltas[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
         new_w, new_l = solve(deltas)
+        SEATED[f"{pose_name}_hands"] = {s_: (new_w[f"hand_{s_}"][0], new_w[f"lowerarm_{s_}"][0]) for s_ in ("l", "r")}
         log(pose_name, "hands", [round(v, 1) for v in new_w["hand_l"][0]], [round(v, 1) for v in new_w["hand_r"][0]],
             "elbows", [round(v, 1) for v in new_w["lowerarm_l"][0]], [round(v, 1) for v in new_w["lowerarm_r"][0]])
 
@@ -1386,8 +1424,10 @@ def build():
         cage = import_prop("cage_mask")
         if cage:
             # dark forged iron, rust in patches (not an even orange coat)
-            mi_iron = surface_material(master, "rusty_metal_02", name="MI_CageIron", tiling=2.0, metal=1.0, tint=(0.32, 0.29, 0.27), rough=0.75,
-                                       grime_color=(1.6, 1.0, 0.6), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.55, "GrimeContrast": 3.0, "MicroRough": 0.2})
+            # plain dark iron (the rust scan's orange overpowered any tint: oversight run 1); rust only in grime patches
+            mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=1.0, rough=0.62, tint=(0.16, 0.15, 0.14),
+                              grime_color=(2.6, 1.3, 0.55), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.5, "GrimeContrast": 3.0,
+                                                                     "GrimeRoughness": 0.9, "MicroRough": 0.25})
             cage[0].set_material(0, mi_iron)
             EAL.save_loaded_asset(cage[0])
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,4.5,-1").split(",")]  # forward (+Y), up (+Z) from the head bone
@@ -1405,6 +1445,24 @@ def build():
         if pb:
             log("player body at", [round(v, 1) for v in ploc])
             SEATED["player_body"] = True  # the XR stand-in gloves give way to real arms
+            hd = hand_decal_materials()
+            hands = SEATED.get("player_hands")
+            if hd and hands:
+                for side, (hand, elbow) in hands.items():
+                    # component -> world for yaw -90: (x, y) -> (y, -x); the back of the hand is ~6 cm past the wrist
+                    w = (ploc[0] + hand[1], ploc[1] - hand[0], ploc[2] + hand[2])
+                    e = (ploc[0] + elbow[1], ploc[1] - elbow[0], ploc[2] + elbow[2])
+                    fx, fy = w[0] - e[0], w[1] - e[1]
+                    L = max(math.hypot(fx, fy), 1e-3)
+                    c = (w[0] + fx / L * 6.0, w[1] + fy / L * 6.0, w[2] + 8.0)
+                    yaw = math.degrees(math.atan2(fy, fx))
+                    for mat in ("M_TC_HandDirt", "M_TC_HandVeins"):
+                        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(*c), unreal.Rotator(-90, yaw, 0))
+                        dec.decal.set_decal_material(hd[mat])
+                        setp(dec.decal, "decal_size", unreal.Vector(12, 6, 5))  # depth, half-width, half-length (cm)
+                        dec.set_actor_label(f"HandDetail_{side}_{mat[5:]}")
+                        dec.set_folder_path("Player")
+                log("hand detail decals on", sorted(hands))
 
     # 2. The Annotator: slate-green coat, tan oversleeves, linen coif, two-leaf riveted plate, ledger and pencil
     # flat cloth colours (the linen scan's yellow cast turned slate green into lime) + our grime layer for wear
