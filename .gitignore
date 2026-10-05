@@ -10,3 +10,4 @@ server-data/
 tools/.cache/
 tools/sim/out*/
 tools/sim/*.log
+tools/.venv/

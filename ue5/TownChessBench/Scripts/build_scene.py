@@ -336,6 +336,67 @@ def blood_decal_material(grime_tex):
     return m
 
 
+TEXTURES_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "textures"))
+
+
+def blood_decals():
+    """Decal materials from our generated blood (ue5/tools/textures/blood.py): colour+coverage, relief and gloss maps,
+    darkened towards old dried blood. Returns {variant: material instance}."""
+    path = f"{ROOT}/Materials/M_TC_Blood"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    m = AT.create_asset("M_TC_Blood", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    E = lambda cls, x, y: MEL.create_material_expression(m, cls, x, y)
+    def tex(name, stype, x, y):
+        e = E(unreal.MaterialExpressionTextureSampleParameter2D, x, y)
+        e.set_editor_property("parameter_name", name)
+        e.set_editor_property("sampler_type", stype)
+        return e
+    white = unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture")
+    bc = tex("BaseColor", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, -800, -200)
+    bc.set_editor_property("texture", white)
+    nm = tex("Normal", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, -800, 100)
+    nm.set_editor_property("texture", unreal.load_asset("/Engine/EngineMaterials/DefaultNormal"))
+    rg = tex("Roughness", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE, -800, 350)
+    rg.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/Black"))
+    age = E(unreal.MaterialExpressionScalarParameter, -800, -380)
+    age.set_editor_property("parameter_name", "Darken")
+    age.set_editor_property("default_value", 0.55)
+    mul = E(unreal.MaterialExpressionMultiply, -500, -250)
+    MEL.connect_material_expressions(bc, "RGB", mul, "A")
+    MEL.connect_material_expressions(age, "", mul, "B")
+    MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    MEL.connect_material_property(bc, "A", unreal.MaterialProperty.MP_OPACITY)
+    MEL.connect_material_property(nm, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    MEL.connect_material_property(rg, "R", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.recompile_material(m)
+    EAL.save_loaded_asset(m)
+    out = {}
+    d = os.path.join(TEXTURES_DIR, "blood")
+    for v in ("Spatter", "Pool", "Smear", "Drips"):
+        maps = {}
+        for kind, param, tkind in (("BaseColor", "BaseColor", "color"), ("Normal", "Normal", "normal"), ("Roughness", "Roughness", "gray")):
+            f = os.path.join(d, f"T_Blood_{v}_{kind}.png")
+            if os.path.exists(f):
+                maps[param] = import_texture(f, f"{ROOT}/Textures/Blood", f"T_Blood_{v}_{kind}", tkind)
+        if "BaseColor" not in maps:
+            continue
+        name = f"MI_Blood_{v}"
+        if EAL.does_asset_exist(f"{ROOT}/Materials/{name}"):
+            EAL.delete_asset(f"{ROOT}/Materials/{name}")
+        mi = AT.create_asset(name, f"{ROOT}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        MEL.set_material_instance_parent(mi, m)
+        for k, t in maps.items():
+            MEL.set_material_instance_texture_parameter_value(mi, k, t)
+        MEL.update_material_instance(mi)
+        EAL.save_loaded_asset(mi)
+        out[v] = mi
+    log("blood decals", sorted(out))
+    return out
+
+
 def import_prop(name):
     """Our Blender-authored props (ue5/tools/blender/props.py -> ue5/assets/props/*.obj)."""
     src = os.path.join(PROPS, f"{name}.obj")
@@ -1009,11 +1070,22 @@ def build():
                 log("WARNING font face import failed", ttf)
         tag(clip)
     # ---- Wear and clutter on the table: dried blood, papers, a book stack (the reference's table is a lived-in mess)
-    blood = blood_decal_material(defaults["grime"])
-    for k, (x, y, sz, yaw) in enumerate(((-18, 30, 22, 30), (24, -18, 14, 110), (-30, -46, 26, 200), (8, 34, 10, 60), (-6, -14, 9, 300))):
-        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, top + 2), unreal.Rotator(-90, yaw, 0))
-        dec.decal.set_decal_material(blood)
-        setp(dec.decal, "decal_size", unreal.Vector(6, sz, sz))
+    blood = blood_decals()
+    placements = [  # variant, x, y, size (cm), yaw: board squares, the near frame, the table
+        ("Pool", 6, 8, 11, 20), ("Spatter", -4, -10, 14, 75), ("Spatter", 16, 14, 9, 200), ("Smear", -18, -2, 16, 0),
+        ("Pool", -30, 34, 18, 140), ("Spatter", 30, -30, 12, 300), ("Smear", -28, -40, 22, 160), ("Spatter", 20, 40, 10, 40)]
+    for k, (v, x, y, sz, yaw) in enumerate(placements):
+        if v not in blood:
+            continue
+        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, top + 3), unreal.Rotator(-90, yaw, 0))
+        dec.decal.set_decal_material(blood[v])
+        setp(dec.decal, "decal_size", unreal.Vector(8, sz, sz))
+        setp(dec.decal, "sort_order", k)
+        dec.set_folder_path("Wear")
+    if "Drips" in blood:  # running over the table's front edge, facing the player
+        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(-48, -14, top - 6), unreal.Rotator(0, 0, 0))
+        dec.decal.set_decal_material(blood["Drips"])
+        setp(dec.decal, "decal_size", unreal.Vector(10, 16, 12))
         dec.set_folder_path("Wear")
     mi_paper = make_mi(master, "MI_LoosePaper", {"BaseColor": None}, tint=(0.62, 0.56, 0.44), rough=0.95, grime_color=(0.4, 0.3, 0.2),
                        scalars={"GrimeTiling": 2.5, "GrimeThreshold": 0.4, "GrimeContrast": 2.0})
