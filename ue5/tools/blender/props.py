@@ -609,6 +609,74 @@ def med_cart():
     export("med_cart.obj")
 
 
+
+def chess_board():
+    """Wooden board matching the game's board actor: 55.3 cm square, 8 x 5.8 cm squares, playing surface at z = 1.71 cm
+    (the height the Poly Haven pieces are modelled at). Frame of worn dark wood with a raised lip, brass corner plates
+    and domed studs; the playing surface is one 8 x 8 grid UV-mapped 0..1 so the game's material draws the squares."""
+    reset()
+    S, N = 0.058, 8
+    half_play, half_all = S * N / 2, 0.2765
+    surf, lip = 0.0171, 0.0192
+    parts = []
+    def box(name, size, loc, mat, bevel=0.0015):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+        b = bpy.context.active_object
+        b.scale = size
+        bpy.ops.object.transform_apply(scale=True)
+        if bevel:
+            bv = b.modifiers.new("bevel", "BEVEL"); bv.width = bevel; bv.segments = 3
+            apply_mods(b)
+        material(b, mat)
+        parts.append(b)
+        return b
+    box("Base", (half_all * 2, half_all * 2, surf - 0.002), (0, 0, (surf - 0.002) / 2), "M_BoardFrame", 0.003)
+    w = half_all - half_play
+    for sx, sy, lx, ly in ((0, 1, half_all * 2, w), (0, -1, half_all * 2, w), (1, 0, w, half_play * 2), (-1, 0, w, half_play * 2)):
+        cx = sx * (half_play + w / 2)
+        cy = sy * (half_play + w / 2)
+        box("Frame", (lx, ly, lip - (surf - 0.002)), (cx, cy, (surf - 0.002) + (lip - (surf - 0.002)) / 2), "M_BoardFrame", 0.0025)
+    # playing surface: one subdivided plane, UV 0..1 over the 8 x 8 squares
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=N + 1, y_subdivisions=N + 1, size=half_play * 2, location=(0, 0, surf))
+    g = bpy.context.active_object
+    me = g.data
+    uv = me.uv_layers.active or me.uv_layers.new()
+    for loop in me.loops:
+        co = me.vertices[loop.vertex_index].co
+        uv.data[loop.index].uv = ((co.x + half_play) / (2 * half_play), (co.y + half_play) / (2 * half_play))
+    material(g, "M_BoardSquares")
+    parts.append(g)
+    # brass: corner plates and domed studs along the frame
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            box("Corner", (0.05, 0.05, 0.0012), (sx * (half_all - 0.025), sy * (half_all - 0.025), lip + 0.0006), "M_Brass", 0.0008)
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042, segments=16, ring_count=8, location=(sx * (half_all - 0.018), sy * (half_all - 0.018), lip + 0.0012))
+            r = bpy.context.active_object; r.scale = (1, 1, 0.45); material(r, "M_Brass"); parts.append(r)
+    for k in range(1, 4):
+        t = -half_play + k * (half_play * 2) / 4
+        for sx, sy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            x = sx * (half_play + w / 2) if sx else t
+            y = sy * (half_play + w / 2) if sy else t
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0032, segments=14, ring_count=7, location=(x, y, lip + 0.0008))
+            r = bpy.context.active_object; r.scale = (1, 1, 0.45); material(r, "M_Brass"); parts.append(r)
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    b = bpy.context.active_object
+    b.name = "SM_ChessBoard"
+    # smart-UV everything except the playing grid (keeps its 0..1 squares mapping)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bm = bmesh.from_edit_mesh(b.data)
+    grid_mat = next(i for i, m in enumerate(b.data.materials) if m.name == "M_BoardSquares")
+    for f in bm.faces:
+        f.select = f.material_index != grid_mat
+    bmesh.update_edit_mesh(b.data)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.005)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    export("chess_board.obj")
+
+
 def export(name):
     # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
     # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
@@ -632,7 +700,7 @@ BUILDERS = {
     "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp,
     "annotator_mask": annotator_mask, "annotator_coif": annotator_coif, "ledger": ledger, "pencil": pencil,
     "oversleeve": lambda: sleeve("SM_Oversleeve", 0.24, 0.042, 0.034, "M_Duck", "oversleeve.obj"),
-    "clipboard": clipboard, "med_cart": med_cart,
+    "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.055, 0.046, "M_CoatWool", "coat_sleeve.obj"),
 }
 for k, f in BUILDERS.items():

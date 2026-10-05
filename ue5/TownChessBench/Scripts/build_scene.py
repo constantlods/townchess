@@ -339,6 +339,92 @@ def blood_decal_material(grime_tex):
 TEXTURES_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "textures"))
 
 
+def board_squares_material(defaults):
+    """The board's playing surface: 8 x 8 squares from UV0 (0..1 over the squares), alternating maple and dark walnut
+    scans with a per-square grain offset, dark seams between squares, our grime layer and a darker dark-square tint.
+    CheckerFlip swaps the parity if the import flipped V (a1 must be dark)."""
+    def tex_maps(name):
+        d = os.path.join(ASSETS, "textures", name)
+        if not os.path.isdir(d):
+            return None
+        maps = {}
+        for f in sorted(os.listdir(d)):
+            stem = os.path.splitext(f)[0]
+            if stem.endswith("_diff"):
+                maps["d"] = import_texture(os.path.join(d, f), f"{ROOT}/Textures/{name}", "T_" + stem, "color")
+            elif stem.endswith("_nor_dx"):
+                maps["n"] = import_texture(os.path.join(d, f), f"{ROOT}/Textures/{name}", "T_" + stem, "normal")
+            elif stem.endswith("_arm"):
+                maps["a"] = import_texture(os.path.join(d, f), f"{ROOT}/Textures/{name}", "T_" + stem, "linear")
+        return maps if "d" in maps else None
+    light, dark = tex_maps("white_maple_veneer"), tex_maps("dark_wood")
+    if not (light and dark):
+        log("WARNING board woods missing (run fetch_polyhaven.py)")
+        return None
+    path = f"{ROOT}/Materials/M_TC_BoardSquares"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    m = AT.create_asset("M_TC_BoardSquares", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+    E = lambda cls, x, y: MEL.create_material_expression(m, cls, x, y)
+    C = MEL.connect_material_expressions
+    def scalar(name, v, x, y):
+        e = E(unreal.MaterialExpressionScalarParameter, x, y); e.set_editor_property("parameter_name", name); e.set_editor_property("default_value", v); return e
+    def k(v, x, y):
+        e = E(unreal.MaterialExpressionConstant, x, y); e.set_editor_property("r", v); return e
+    uv = E(unreal.MaterialExpressionTextureCoordinate, -2400, 0)
+    uv8 = E(unreal.MaterialExpressionMultiply, -2200, 0); C(uv, "", uv8, "A"); uv8.set_editor_property("const_b", 8.0)
+    cell = E(unreal.MaterialExpressionFloor, -2000, 0); C(uv8, "", cell, "")
+    fx = E(unreal.MaterialExpressionComponentMask, -1850, -60); fx.set_editor_property("r", True); C(cell, "", fx, "")
+    fy = E(unreal.MaterialExpressionComponentMask, -1850, 60); fy.set_editor_property("g", True); C(cell, "", fy, "")
+    sm = E(unreal.MaterialExpressionAdd, -1700, 0); C(fx, "", sm, "A"); C(fy, "", sm, "B")
+    sm2 = E(unreal.MaterialExpressionAdd, -1580, 0); C(sm, "", sm2, "A"); C(scalar("CheckerFlip", 0.0, -1700, 120), "", sm2, "B")
+    par = E(unreal.MaterialExpressionFmod, -1450, 0); C(sm2, "", par, "A"); C(k(2.0, -1580, 120), "", par, "B")
+    # per-square grain offset so no two squares share the same piece of wood
+    jit = E(unreal.MaterialExpressionMultiply, -1700, 260); C(cell, "", jit, "A"); jit.set_editor_property("const_b", 0.371)
+    tuv = E(unreal.MaterialExpressionMultiply, -1700, 380); C(uv, "", tuv, "A"); tuv.set_editor_property("const_b", 2.0)
+    suv = E(unreal.MaterialExpressionAdd, -1550, 320); C(tuv, "", suv, "A"); C(jit, "", suv, "B")
+    def samp(t, stype, x, y):
+        e = E(unreal.MaterialExpressionTextureSample, x, y); e.set_editor_property("texture", t); e.set_editor_property("sampler_type", stype); C(suv, "", e, "UVs"); return e
+    COL, NRM, MSK = unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, unreal.MaterialSamplerType.SAMPLERTYPE_MASKS
+    ld, dd = samp(light["d"], COL, -1300, -400), samp(dark["d"], COL, -1300, -200)
+    tint_l = E(unreal.MaterialExpressionVectorParameter, -1300, -560); tint_l.set_editor_property("parameter_name", "LightTint"); tint_l.set_editor_property("default_value", unreal.LinearColor(0.82, 0.66, 0.46, 1))
+    tint_d = E(unreal.MaterialExpressionVectorParameter, -1300, -60); tint_d.set_editor_property("parameter_name", "DarkTint"); tint_d.set_editor_property("default_value", unreal.LinearColor(0.42, 0.28, 0.18, 1))
+    lm = E(unreal.MaterialExpressionMultiply, -1100, -450); C(ld, "RGB", lm, "A"); C(tint_l, "", lm, "B")
+    dm = E(unreal.MaterialExpressionMultiply, -1100, -200); C(dd, "RGB", dm, "A"); C(tint_d, "", dm, "B")
+    col = E(unreal.MaterialExpressionLinearInterpolate, -900, -300); C(lm, "", col, "A"); C(dm, "", col, "B"); C(par, "", col, "Alpha")
+    # seams: distance to the nearest square edge
+    fr = E(unreal.MaterialExpressionFrac, -2000, 600); C(uv8, "", fr, "")
+    om = E(unreal.MaterialExpressionOneMinus, -1850, 700); C(fr, "", om, "")
+    mn = E(unreal.MaterialExpressionMin, -1700, 650); C(fr, "", mn, "A"); C(om, "", mn, "B")
+    mx = E(unreal.MaterialExpressionComponentMask, -1550, 600); mx.set_editor_property("r", True); C(mn, "", mx, "")
+    my = E(unreal.MaterialExpressionComponentMask, -1550, 700); my.set_editor_property("g", True); C(mn, "", my, "")
+    edge = E(unreal.MaterialExpressionMin, -1400, 650); C(mx, "", edge, "A"); C(my, "", edge, "B")
+    seam = E(unreal.MaterialExpressionSmoothStep, -1250, 650); C(edge, "", seam, "Value"); C(k(0.006, -1400, 760), "", seam, "Min"); C(k(0.022, -1400, 820), "", seam, "Max")
+    seamc = E(unreal.MaterialExpressionLinearInterpolate, -1050, 600); C(k(0.3, -1250, 760), "", seamc, "A"); C(k(1.0, -1250, 820), "", seamc, "B"); C(seam, "", seamc, "Alpha")
+    col2 = E(unreal.MaterialExpressionMultiply, -750, -250); C(col, "", col2, "A"); C(seamc, "", col2, "B")
+    # grime: blotches and streaks from our mask, darker brown, matte
+    guv = E(unreal.MaterialExpressionMultiply, -1300, 900); C(uv, "", guv, "A"); guv.set_editor_property("const_b", 1.6)
+    gt = E(unreal.MaterialExpressionTextureSample, -1100, 900); gt.set_editor_property("texture", defaults["grime"]); gt.set_editor_property("sampler_type", MSK); C(guv, "", gt, "UVs")
+    gs = E(unreal.MaterialExpressionSubtract, -900, 900); C(gt, "R", gs, "A"); gs.set_editor_property("const_b", 0.38)
+    gm = E(unreal.MaterialExpressionMultiply, -780, 900); C(gs, "", gm, "A"); gm.set_editor_property("const_b", 2.4)
+    g = E(unreal.MaterialExpressionSaturate, -660, 900); C(gm, "", g, "")
+    dirty = E(unreal.MaterialExpressionMultiply, -600, -100); C(col2, "", dirty, "A"); C(k(0.45, -750, -60), "", dirty, "B")
+    fin = E(unreal.MaterialExpressionLinearInterpolate, -400, -200); C(col2, "", fin, "A"); C(dirty, "", fin, "B"); C(g, "", fin, "Alpha")
+    MEL.connect_material_property(fin, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    if "n" in light and "n" in dark:
+        ln_, dn_ = samp(light["n"], NRM, -1300, 200), samp(dark["n"], NRM, -1300, 360)
+        nl = E(unreal.MaterialExpressionLinearInterpolate, -900, 250); C(ln_, "RGB", nl, "A"); C(dn_, "RGB", nl, "B"); C(par, "", nl, "Alpha")
+        MEL.connect_material_property(nl, "", unreal.MaterialProperty.MP_NORMAL)
+    if "a" in light and "a" in dark:
+        la, da = samp(light["a"], MSK, -1300, 500), samp(dark["a"], MSK, -1300, 650)
+        rl = E(unreal.MaterialExpressionLinearInterpolate, -900, 520); C(la, "G", rl, "A"); C(da, "G", rl, "B"); C(par, "", rl, "Alpha")
+        rr = E(unreal.MaterialExpressionLinearInterpolate, -700, 520); C(rl, "", rr, "A"); C(k(0.9, -900, 640), "", rr, "B"); C(g, "", rr, "Alpha")
+        MEL.connect_material_property(rr, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.recompile_material(m)
+    EAL.save_loaded_asset(m)
+    return m
+
+
 def blood_decals():
     """Decal materials from our generated blood (ue5/tools/textures/blood.py): colour+coverage, relief and gloss maps,
     darkened towards old dried blood. Returns {variant: material instance}."""
@@ -1015,6 +1101,22 @@ def build():
                 meshes[colour + kind] = m
         setp(board, "piece_meshes", meshes)
         setp(board, "board_mesh_yaw", 90.0)  # a1 must be a dark square ("light on the right"), checked by screenshot
+        squares = board_squares_material(defaults)
+        wood_board = import_prop("chess_board") if squares else None
+        if wood_board:
+            mi_frame = surface_material(master, "wood_cabinet_worn_long", name="MI_BoardFrame", tiling=2.0, tint=(0.55, 0.42, 0.32),
+                                        scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "MicroRough": 0.15}) \
+                if os.path.isdir(os.path.join(ASSETS, "textures", "wood_cabinet_worn_long")) else surface_material(master, "wood_table_worn", name="MI_BoardFrame", tint=(0.45, 0.34, 0.26))
+            mi_brass_b = make_mi(master, "MI_BoardBrass", {"BaseColor": None}, metal=1.0, rough=0.38, tint=(0.72, 0.52, 0.26),
+                                 grime_color=(0.3, 0.25, 0.18), scalars={"GrimeTiling": 5.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0, "MicroRough": 0.2})
+            sm = wood_board[0]
+            for i, sl in enumerate(sm.static_materials):
+                n = str(sl.material_slot_name).lower()
+                sm.set_material(i, squares if "square" in n else mi_brass_b if "brass" in n else mi_frame)
+            EAL.save_loaded_asset(sm)
+            setp(board, "board_mesh", sm)
+            setp(board, "board_mesh_yaw", float(os.environ.get("TC_BOARD_YAW", 0.0)))
+            log("wooden board in use")
         log("board pieces", sorted(meshes.keys()))
     else:
         place_model(chess, (0, 0, 0), yaw=cyaw, label="Chess", sit_on=top)
