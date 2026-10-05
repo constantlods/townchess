@@ -12,6 +12,7 @@ Scenarios (-TCTest=):
   script     plays the moves listed in -TCMoves=uci,uci,... for our side (the other side is a scripted browser or the
              engine), checking sync after every move; used for the special-rules game against a browser opponent
   reconnect  joins the active game after a restart and verifies the rebuilt board, turn and clocks, then plays on
+  drag       drag and drop with the board API the mouse uses: an illegal drop snaps back; a legal drop is accepted
   rematch    resigns the first game and asks for a rematch: the new game must seat us on the other colour, and the
              board, camera and seat-mirrored props must follow by themselves ("the board flips between games")
 """
@@ -212,7 +213,7 @@ def _tick(_dt):
             check("connected, authenticated and joined a game", True, f"{st.id} as {core.get_my_color()}")
             check("board built from authoritative FEN", board.is_in_sync(), st.fen)
             screenshot("start")
-            S["phase"] = {"cpu": "reject", "reconnect": "verify_reconnect", "rematch": "rematch_resign"}.get(TEST, "play")
+            S["phase"] = {"cpu": "reject", "reconnect": "verify_reconnect", "rematch": "rematch_resign", "drag": "drag_illegal"}.get(TEST, "play")
             S["wait_until"] = now + 1.0
         return
 
@@ -236,6 +237,41 @@ def _tick(_dt):
         check("board unchanged after rejection", dict(board.get_shown_layout()) == S["layout_before"] and board.is_in_sync())
         check("history unchanged after rejection", len(core.get_state().history) == S["len_before"])
         S["phase"] = "play"
+        return
+
+    if S["phase"] == "drag_illegal":
+        # drag a pawn to an illegal square and drop it: nothing may change, the piece snaps back
+        if not core.is_my_turn() or board.is_animating():
+            return
+        S["layout_before"] = dict(board.get_shown_layout())
+        frm = "e2" if core.get_my_color() == "w" else "e7"
+        check("drag starts on an own piece", board.begin_drag(frm))
+        board.update_drag(board.square_world("e5"))
+        board.end_drag("e5")
+        S["phase"] = "drag_illegal_wait"
+        S["wait_until"] = now + 1.0
+        return
+
+    if S["phase"] == "drag_illegal_wait":
+        check("illegal drop changed nothing", dict(board.get_shown_layout()) == S["layout_before"] and len(st.history) == 0)
+        check("dropped piece snapped back to its square", board.get_physical_mismatches() == 0 and not board.is_dragging())
+        frm, to = ("e2", "e4") if core.get_my_color() == "w" else ("e7", "e5")
+        S["drag_move"] = (frm, to)
+        board.begin_drag(frm)
+        board.update_drag(board.square_world(to) + unreal.Vector(1.2, -0.8, 0))  # dropped slightly off-centre, like a hand
+        S["result"] = board.end_drag(to)
+        S["phase"] = "drag_legal_wait"
+        S["wait_until"] = now + 2.0
+        return
+
+    if S["phase"] == "drag_legal_wait":
+        if board.is_animating() or board.is_awaiting_core():
+            return
+        frm, to = S["drag_move"]
+        check("legal drop sent the move", str(S["result"]).lower().endswith("submitted"), S["result"])
+        check("core accepted the dropped move", len(st.history) >= 1 and st.history[0].from_ == frm if hasattr(st.history[0], "from_") else len(st.history) >= 1, st.fen)
+        check("dropped piece settled exactly on its square, board in sync", board.is_in_sync() and board.get_physical_mismatches() == 0 and board.get_resyncs() == 0)
+        finish(True)
         return
 
     if S["phase"] == "rematch_resign":
