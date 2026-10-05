@@ -1496,7 +1496,7 @@ def build():
     mi_coif = make_mi(master, "MI_Coif", {"BaseColor": None}, tint=(0.22, 0.2, 0.17), rough=0.95, scalars=cloth)
 
     # hand-formed steel with light patina (the spec's mask is maintained, not rusted through): plain metal + grime layer
-    mi_steel = make_mi(master, "MI_MaskSteel", {"BaseColor": None}, metal=1.0, rough=0.5, tint=(0.22, 0.215, 0.21),  # worked steel, not porcelain
+    mi_steel = make_mi(master, "MI_MaskSteel", {"BaseColor": None}, metal=1.0, rough=0.66, tint=(0.1, 0.098, 0.095),  # worked steel: dark and rough enough not to mirror the lamp
                        grime_color=(0.45, 0.38, 0.3), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.5,
                                                                "MicroRough": 0.25, "GrimeRoughness": 0.7})
     mi_copper = surface_material(master, "rusty_metal_02", name="MI_Copper", tiling=3.0, metal=1.0, tint=(0.95, 0.5, 0.32), rough=0.45)
@@ -1514,7 +1514,7 @@ def build():
             attach_static("AnnotatorMask", plate, smc_a, "head", *head_relative([noff[0], noff[1] + 1.2, noff[2]]), "TC_Opponent_annotator")
         over = prop_with("oversleeve", {"Duck": mi_duck})
         coat = prop_with("coat_sleeve", {"Wool": mi_coat})
-        for side, flip in (("l", 0.0), ("r", 180.0)):  # right-side bones point back along the arm on this skeleton
+        for side, flip in (("l", 180.0), ("r", 0.0)):  # measured: the first guess pointed the sleeves up the arm, into the coat
             if over:
                 attach_static(f"Oversleeve_{side}", over, smc_a, f"lowerarm_{side}", unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, flip), "TC_Opponent_annotator")
             if coat:
