@@ -40,7 +40,7 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-008](#lim-008) | Lenient FEN castling field (X-FEN/Shredder letters ignored) | Low | Open, documented |
 | [LIM-009](#lim-009) | What a journal restore does not bring back | Low/informational | Open, documented |
 | [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
-| [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Open (2026-10-04) |
+| [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Fixed |
 
 ---
 
@@ -357,7 +357,7 @@ normalises the order. Pinned in `regressions.test.ts` ("sanitizeCastling FEN edg
 
 ## BUG-007
 
-**The league's crash retry re-binds an engine process to a game that has already ended.**
+**The league's crash retry re-binds an engine process to a game that has already ended.** Fixed: `release()` bumps a per-game generation; a request started before the release never re-binds (the BUG-007 test is now a normal test).
 
 - **Where:** `UciLeague.bestMove` in `packages/server/src/uciEngine.ts` (commit 27d4d00).
 - **What happens:** `Hub.finished` calls `league.release(roomId)` when a game ends, which can happen while an engine

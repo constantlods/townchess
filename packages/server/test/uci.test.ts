@@ -140,14 +140,18 @@ describe('UCI league pool', () => {
   // BUG-007 (docs/KNOWN_LIMITATIONS.md): the crash-retry path re-acquires an engine for a room that was released while
   // the request was in flight (game over by resign/flag/abort during the engine's think). The fresh process stays bound
   // to the finished room forever; four such leaks fill maxEngines and every league move silently falls back to the house engine.
-  it.fails('BUG-007: a game released mid-request is not re-bound by the crash retry (no leaked process)', async () => {
+  it('BUG-007: a game released mid-request is not re-bound by the crash retry (no leaked process)', async () => {
     const lg = new UciLeague(fake('crash-once'), { log: quiet });
     cleanups.push(() => lg.close());
     const pending = lg.bestMove('R1', 'sf1350', START, 50); // binds R1 synchronously, then the first `go` crashes
     lg.release('R1');                                        // the game ends while the engine is starting / thinking
     await pending;
+    expect(lg.engineOf('R1')).toBeNull();                    // nothing stays bound to the finished game
+    expect(lg.processes).toBeLessThanOrEqual(1);             // at most one healthy process, back in the idle pool
+    // the slot is reusable: the next game gets an engine and processes do not pile up (the leak filled maxEngines)
+    await lg.bestMove('R2', 'sf1350', START, 50);
     expect(lg.engineOf('R1')).toBeNull();
-    expect(lg.processes).toBe(0);
+    expect(lg.processes).toBeLessThanOrEqual(1);
   });
 
   it('BUG-007 control: release without a crash leaves no binding and at most one idle process', async () => {

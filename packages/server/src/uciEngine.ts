@@ -262,12 +262,16 @@ export class UciLeague {
   /** Best move for `roomId`'s position (start FEN + moves) at `level`, or null on any failure (caller falls back). */
   async bestMove(roomId: string, level: LeagueLevelId, fen: string, movetimeMs: number, moves: readonly string[] = []): Promise<string | null> {
     // A crashed process is replaced and the request retried once; a timeout is not retried (the clock is running).
+    // A game released while this request is in flight (resign/flag/abort during the think) is never re-bound (BUG-007).
+    const gen = this.gens.get(roomId) ?? 0;
+    const stale = () => (this.gens.get(roomId) ?? 0) !== gen;
     for (let attempt = 1; attempt <= 2; attempt++) {
-      if (!this.available) return null;
+      if (!this.available || stale()) return null;
       let eng: UciEngine | null = null;
       try {
         eng = await this.acquire(roomId);
         if (!eng) { this.log(`no engine process free for ${roomId} (max ${this.maxEngines})`); return null; }
+        if (stale()) { this.unbind(roomId, eng); return null; }
         await eng.setOptions({ ...BASE_OPTIONS, ...leagueOptions(level) });
         return await eng.bestMove(fen, { movetimeMs }, moves);
       } catch (e) {
@@ -285,10 +289,17 @@ export class UciLeague {
 
   /** The game is over: its process goes back to the idle list (it gets `ucinewgame` before its next game). */
   release(roomId: string) {
+    this.gens.set(roomId, (this.gens.get(roomId) ?? 0) + 1); // in-flight requests for this game must not re-bind it
     const e = this.byRoom.get(roomId);
-    if (!e) return;
-    this.byRoom.delete(roomId);
-    if (e.alive && !this.closed) this.idle.push(e); else void e.quit();
+    if (e) this.unbind(roomId, e);
+  }
+
+  /** Per-game release counter: a request started before a release is stale (BUG-007). */
+  private gens = new Map<string, number>();
+
+  private unbind(roomId: string, e: UciEngine) {
+    if (this.byRoom.get(roomId) === e) this.byRoom.delete(roomId);
+    if (e.alive && !this.closed) { if (!this.idle.includes(e)) this.idle.push(e); } else void e.quit();
   }
 
   /** Quit every engine process (`quit`, then kill). Idempotent: later calls return the same promise. */
