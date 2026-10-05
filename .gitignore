@@ -6,7 +6,8 @@ server-data/
 *.log
 
 # Claude Code agent worktrees
-.claude/
+.claude/*
+!.claude/agents/
 tools/.cache/
 tools/sim/out*/
 tools/sim/*.log
