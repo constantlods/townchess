@@ -1503,7 +1503,7 @@ def build():
     mi_black = make_mi(master, "MI_Pupil", {"BaseColor": None}, tint=(0.01, 0.01, 0.01), rough=0.9)
     mi_oxblood = surface_material(master, "brown_leather", name="MI_LedgerCloth", tiling=3.0, tint=(0.36, 0.09, 0.08), rough=0.85)
     mi_pages = make_mi(master, "MI_Pages", {"BaseColor": None}, tint=(0.78, 0.72, 0.6), rough=0.95)
-    opp_a, smc_a = spawn_opponent("annotator", mhn, outfit_mi=mi_coat)
+    opp_a, smc_a = spawn_opponent("annotator", mhn, outfit_mi=mi_coat, pose="clasp")  # forearms on the table: the clerk at his desk
     if smc_a and "head" in SEATED:
         plate = prop_with("annotator_mask", {"Steel": mi_steel, "Copper": mi_copper, "Pupil": mi_black})
         coif = prop_with("annotator_coif", {"Linen": mi_coif})
