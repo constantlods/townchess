@@ -13,7 +13,7 @@ MODELS = [
     "chess_set", "desk_lamp_arm_01", "wooden_table_02", "metal_office_desk", "wheelchair_01",
     "mounted_fluorescent_lights", "modular_industrial_pipes_01", "book_encyclopedia_set_01",
     "alarm_clock_01", "binder_notebook", "drawer_cabinet", "painted_wooden_chair_01", "lightbulb_01",
-    "old_bed_frame",
+    "old_bed_frame", "decorative_book_set_01",
 ]
 TEXTURES = [
     "wood_table_worn", "concrete_floor_worn_001", "painted_plaster_wall", "cracked_concrete_wall",

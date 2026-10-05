@@ -680,6 +680,39 @@ def chess_board():
     export("chess_board.obj")
 
 
+
+def brass_bowl():
+    """Hammered brass bowl, 17 cm across (the reference's bowl under the lamp). Origin at the base."""
+    reset()
+    prof = [(0.0, 0.0), (0.045, 0.0), (0.06, 0.006), (0.075, 0.02), (0.083, 0.038), (0.085, 0.05), (0.082, 0.052)]
+    bm = bmesh.new()
+    rings = []
+    seg = 64
+    for r, z in prof:
+        ring = []
+        for k in range(seg):
+            a = 2 * math.pi * k / seg
+            dent = 1.0 + 0.012 * math.sin(a * 7 + z * 90) * math.sin(a * 3)  # hammered
+            ring.append(bm.verts.new((math.cos(a) * r * dent, math.sin(a) * r * dent, z)))
+        rings.append(ring)
+    for i in range(len(rings) - 1):
+        for k in range(seg):
+            bm.faces.new((rings[i][k], rings[i][(k + 1) % seg], rings[i + 1][(k + 1) % seg], rings[i + 1][k]))
+    ob = obj_from_bm("SM_BrassBowl", bm)
+    so = ob.modifiers.new("solid", "SOLIDIFY"); so.thickness = 0.0025
+    sub = ob.modifiers.new("sub", "SUBSURF"); sub.levels = 1
+    apply_mods(ob)
+    bpy.context.view_layer.objects.active = ob
+    ob.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.shade_smooth()
+    material(ob, "M_Brass")
+    export("brass_bowl.obj")
+
+
 def export(name):
     # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
     # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
@@ -703,7 +736,7 @@ BUILDERS = {
     "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp,
     "annotator_mask": annotator_mask, "annotator_coif": annotator_coif, "ledger": ledger, "pencil": pencil,
     "oversleeve": lambda: sleeve("SM_Oversleeve", 0.24, 0.042, 0.034, "M_Duck", "oversleeve.obj"),
-    "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board,
+    "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.055, 0.046, "M_CoatWool", "coat_sleeve.obj"),
 }
 for k, f in BUILDERS.items():
