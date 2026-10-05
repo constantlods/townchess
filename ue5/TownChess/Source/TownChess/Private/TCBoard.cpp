@@ -316,7 +316,8 @@ void ATCBoard::OnCoreRejected(const FString& Reason)
 ETCClickResult ATCBoard::ClickSquare(const FString& Square)
 {
 	UTCCoreClient* C = Core();
-	if (!C || !C->IsMyTurn() || Anims.Num() > 0 || PendingRequest || !PromotionFrom.IsEmpty()) return ETCClickResult::Ignored;
+	if (!C || !C->IsMyTurn() || PendingRequest || !PromotionFrom.IsEmpty()) return ETCClickResult::Ignored;
+	if (Anims.Num() > 0) FinishAnims();
 	const FString Mine = C->GetMyColor();
 	const FTCPieceVisual* At = Pieces.Find(Square);
 	const bool bOwn = At && At->Code.StartsWith(Mine);
@@ -467,10 +468,23 @@ void ATCBoard::RefreshMarkers()
 
 // ─────────────────────────────── drag and drop ───────────────────────────────
 
+void ATCBoard::FinishAnims()
+{
+	// the player wants to act now: land every running animation at once (the shown board is already authoritative)
+	for (FAnim& A : Anims)
+	{
+		if (!A.PromoteCode.IsEmpty()) { ApplyPieceMesh(A.PromoteRoot.Get(), A.PromoteMesh.Get(), A.PromoteCode); continue; }
+		if (A.Target.IsValid()) A.Target->SetRelativeLocation(A.To);
+	}
+	Anims.Empty();
+	RefreshMarkers();
+}
+
 bool ATCBoard::BeginDrag(const FString& Square)
 {
 	UTCCoreClient* C = Core();
-	if (!C || !C->IsMyTurn() || Anims.Num() > 0 || PendingRequest || !PromotionFrom.IsEmpty()) return false;
+	if (!C || !C->IsMyTurn() || PendingRequest || !PromotionFrom.IsEmpty()) return false;
+	if (Anims.Num() > 0) FinishAnims();  // never make the player wait for an animation to grab a piece
 	const FTCPieceVisual* At = Pieces.Find(Square);
 	if (!At || !At->Root || !At->Code.StartsWith(C->GetMyColor())) return false;
 	DragFrom = Square;

@@ -144,6 +144,7 @@ private:
 	FString Selected, PromotionFrom, PromotionTo, DragFrom, DroppedFrom, Hover;
 	int32 NextGroup = 1;
 	void SnapBack(const FString& Square);
+	void FinishAnims();
 	bool PendingRequest = false;
 	int32 WhiteCaptured = 0, BlackCaptured = 0;
 	int32 AnimatedMoves = 0, Resyncs = 0;

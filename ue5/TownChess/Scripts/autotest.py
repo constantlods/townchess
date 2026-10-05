@@ -244,6 +244,7 @@ def _tick(_dt):
         if not core.is_my_turn() or board.is_animating():
             return
         S["layout_before"] = dict(board.get_shown_layout())
+        S["plies_before"] = len(st.history)
         frm = "e2" if core.get_my_color() == "w" else "e7"
         check("drag starts on an own piece", board.begin_drag(frm))
         board.update_drag(board.square_world("e5"))
@@ -253,7 +254,7 @@ def _tick(_dt):
         return
 
     if S["phase"] == "drag_illegal_wait":
-        check("illegal drop changed nothing", dict(board.get_shown_layout()) == S["layout_before"] and len(st.history) == 0)
+        check("illegal drop changed nothing", dict(board.get_shown_layout()) == S["layout_before"] and len(st.history) == S["plies_before"])
         check("dropped piece snapped back to its square", board.get_physical_mismatches() == 0 and not board.is_dragging())
         frm, to = ("e2", "e4") if core.get_my_color() == "w" else ("e7", "e5")
         S["drag_move"] = (frm, to)
@@ -269,7 +270,8 @@ def _tick(_dt):
             return
         frm, to = S["drag_move"]
         check("legal drop sent the move", str(S["result"]).lower().endswith("submitted"), S["result"])
-        check("core accepted the dropped move", len(st.history) >= 1 and st.history[0].from_ == frm if hasattr(st.history[0], "from_") else len(st.history) >= 1, st.fen)
+        mine = [h for h in st.history if h.color == core.get_my_color()]
+        check("core accepted the dropped move", len(st.history) > S["plies_before"] and mine and mine[-1].to == to, st.fen)
         check("dropped piece settled exactly on its square, board in sync", board.is_in_sync() and board.get_physical_mismatches() == 0 and board.get_resyncs() == 0)
         finish(True)
         return
