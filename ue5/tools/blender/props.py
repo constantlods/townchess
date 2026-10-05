@@ -659,21 +659,24 @@ def chess_board():
             y = sy * (half_play + w / 2) if sy else t
             bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0032, segments=14, ring_count=7, location=(x, y, lip + 0.0008))
             r = bpy.context.active_object; r.scale = (1, 1, 0.45); material(r, "M_Brass"); parts.append(r)
+    # unwrap every part except the playing grid on its own, BEFORE joining (the grid keeps its 0..1 squares mapping)
+    for o in parts:
+        if o is g:
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.005)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
     for o in parts:
         o.select_set(True)
     bpy.context.view_layer.objects.active = parts[0]
     bpy.ops.object.join()
     b = bpy.context.active_object
     b.name = "SM_ChessBoard"
-    # smart-UV everything except the playing grid (keeps its 0..1 squares mapping)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bm = bmesh.from_edit_mesh(b.data)
-    grid_mat = next(i for i, m in enumerate(b.data.materials) if m.name == "M_BoardSquares")
-    for f in bm.faces:
-        f.select = f.material_index != grid_mat
-    bmesh.update_edit_mesh(b.data)
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.005)
-    bpy.ops.object.mode_set(mode="OBJECT")
     export("chess_board.obj")
 
 

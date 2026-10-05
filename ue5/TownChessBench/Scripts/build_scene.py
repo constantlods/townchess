@@ -449,7 +449,7 @@ def blood_decals():
     rg.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/Black"))
     age = E(unreal.MaterialExpressionScalarParameter, -800, -380)
     age.set_editor_property("parameter_name", "Darken")
-    age.set_editor_property("default_value", 0.55)
+    age.set_editor_property("default_value", 1.0)
     mul = E(unreal.MaterialExpressionMultiply, -500, -250)
     MEL.connect_material_expressions(bc, "RGB", mul, "A")
     MEL.connect_material_expressions(age, "", mul, "B")
@@ -1070,9 +1070,9 @@ def build():
     chess = import_model("chess_set")
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
     mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.45, 0.34, 0.22), tint=(0.86, 0.72, 0.52), rough=0.7,
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.5, "MicroRough": 0.25})
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.66, "GrimeContrast": 2.5, "MicroRough": 0.25, "GrimeStreaks": 0.0})
     mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.5, tint=(0.11, 0.095, 0.085),
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.75, "GrimeContrast": 2.0, "MicroRough": 0.15})
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.75, "GrimeContrast": 2.0, "MicroRough": 0.15, "GrimeStreaks": 0.0})
     mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.36, 0.25, 0.16), tint=(0.8, 0.63, 0.44),
                            scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.3, "GrimeContrast": 2.5, "MicroRough": 0.2})
     assign(chess, mi_pw, lambda n: "white" in n)
