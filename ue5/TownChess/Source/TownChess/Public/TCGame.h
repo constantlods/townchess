@@ -43,6 +43,7 @@ private:
 	UFUNCTION() void OnConnection(const FString& State);
 	UFUNCTION() void OnState(const FTCGameState& State, const FString& Reason);
 	void ApplySeat(const FString& Color);
+	void ApplyQualityPreset();
 
 	FString ServerUrl, Auto, Username, SeatApplied, OpponentShown;
 	int32 SmokePlies = 0, SmokeChecked = -1, SmokeFailures = 0;

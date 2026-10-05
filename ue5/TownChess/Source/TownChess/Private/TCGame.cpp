@@ -9,6 +9,7 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "DynamicRHI.h"
+#include "RHIGlobals.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -58,6 +59,29 @@ FString ATCGameMode::GetServerLabel() const
 }
 
 /** The character group an actor belongs to: TC_Opponent_<id> (roster) or TC_PlayerBody (first-person arms). */
+/** Quality on start: hardware-ray-traced Lumen and RT shadows plus Epic scalability on GPUs that support ray tracing
+ *  (the owner's RTX); software Lumen at High elsewhere (the RX 6650 XT target). -tcquality=low|medium|high|epic|cinematic
+ *  overrides; DLSS is switched on when its plugin is present (its cvars are simply ignored otherwise). */
+void ATCGameMode::ApplyQualityPreset()
+{
+	FString Q;
+	const bool bRT = GRHISupportsRayTracing && GRHISupportsRayTracingShaders;
+	if (!FParse::Value(FCommandLine::Get(), TEXT("-tcquality="), Q)) Q = bRT ? TEXT("epic") : TEXT("high");
+	const int32 Level = Q == TEXT("low") ? 0 : Q == TEXT("medium") ? 1 : Q == TEXT("high") ? 2 : Q == TEXT("cinematic") ? 4 : 3;
+	auto Exec = [this](const FString& C) { GEngine->Exec(GetWorld(), *C); };
+	for (const TCHAR* G : { TEXT("ViewDistanceQuality"), TEXT("AntiAliasingQuality"), TEXT("ShadowQuality"), TEXT("GlobalIlluminationQuality"),
+		TEXT("ReflectionQuality"), TEXT("PostProcessQuality"), TEXT("TextureQuality"), TEXT("EffectsQuality"), TEXT("ShadingQuality") })
+	{
+		Exec(FString::Printf(TEXT("sg.%s %d"), G, Level));
+	}
+	const bool bHW = bRT && Level >= 3;
+	Exec(FString::Printf(TEXT("r.Lumen.HardwareRayTracing %d"), bHW ? 1 : 0));
+	Exec(FString::Printf(TEXT("r.Lumen.Reflections.HardwareRayTracing %d"), bHW ? 1 : 0));
+	Exec(FString::Printf(TEXT("r.RayTracing.Shadows %d"), bHW ? 1 : 0));
+	Exec(TEXT("r.NGX.DLSS.Enable 1"));
+	UE_LOG(LogTownChess, Log, TEXT("quality: %s (level %d), hardware ray tracing %s"), *Q, Level, bHW ? TEXT("on") : TEXT("off"));
+}
+
 static FName OpponentTagOf(const AActor* A)
 {
 	for (const FName& T : A->Tags)
@@ -109,6 +133,7 @@ void ATCGameMode::BeginPlay()
 	// Opponent roster: every character is built into the level, tagged TC_Opponent_<id>. Show the selected one
 	// (-tcopponent=<id>, default "caged") and hide the rest. MetaHuman faces/outfits are separate skeletal mesh actors
 	// that follow their own body's skeleton (leader pose), which is runtime state and so is linked here.
+	ApplyQualityPreset();
 	// First-person arms: the player's own MetaHuman body sits at the camera; its head (and neck) must not be drawn.
 	for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); It; ++It)
 	{
