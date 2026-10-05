@@ -40,6 +40,7 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-008](#lim-008) | Lenient FEN castling field (X-FEN/Shredder letters ignored) | Low | Open, documented |
 | [LIM-009](#lim-009) | What a journal restore does not bring back | Low/informational | Open, documented |
 | [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
+| [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Open (2026-10-04) |
 
 ---
 
@@ -353,3 +354,21 @@ normalises the order. Pinned in `regressions.test.ts` ("sanitizeCastling FEN edg
 - **Capacity.** At most 4 engine processes per core; a fifth league game is refused with `ERROR busy`.
 - **Availability is decided by file discovery.** A binary that exists but cannot start is only detected on first
   use; after three failed starts in a row the league levels stop being offered (until the core restarts).
+
+## BUG-007
+
+**The league's crash retry re-binds an engine process to a game that has already ended.**
+
+- **Where:** `UciLeague.bestMove` in `packages/server/src/uciEngine.ts` (commit 27d4d00).
+- **What happens:** `Hub.finished` calls `league.release(roomId)` when a game ends, which can happen while an engine
+  request is in flight (resign, flag fall or abort during the engine's think, or during the first move's process
+  start). If that request then hits a crash, the retry loop calls `acquire(roomId)` again for the released room and
+  starts a fresh process bound to it. Nothing ever releases it: `finished` has already run. The process stays alive
+  and counts towards `maxEngines` (4); after four such leaks `acquire` returns null for every game, so every league
+  move silently falls back to the house engine (Warden) until the core restarts. The hub discards the retried move
+  (`room.status !== 'active'`), so the game itself is not affected.
+- **Reproduction:** `new UciLeague(fake('crash-once'))`; `p = lg.bestMove('R1', 'sf1350', START, 50)`;
+  `lg.release('R1')`; `await p` -> `lg.engineOf('R1')` is a live engine and `lg.processes` is 1 (expected null / 0).
+- **Pinned by:** `BUG-007` (`it.fails`) plus a no-crash control in `packages/server/test/uci.test.ts`.
+- **Fix idea (for the lead):** remember released room ids (or a per-request generation) and do not retry, or release
+  again, when the room was released during the request.
