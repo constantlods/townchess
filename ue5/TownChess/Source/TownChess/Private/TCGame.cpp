@@ -423,19 +423,37 @@ void ATCPlayerController::OnKey(FKey Key)
 	ATCBoard* B = Board();
 	if (B && B->HasPendingPromotion())
 	{
-		const float Pw = 120.f * U2, Cx = Canvas->ClipX * 0.5f - 2.f * Pw, Cy = Canvas->ClipY * 0.5f;
-		Plate(Cx - 16.f * U2, Cy - 76.f * U2, 4.f * Pw + 22.f * U2, 132.f * U2, 0.7f, 0.4f);
-		Text(TEXT("PROMOTE TO"), Canvas->ClipX * 0.5f, Cy - 62.f * U2, Ink, 1.1f, true);
-		Button(TEXT("promo_q"), TEXT("Queen  Q"), Cx, Cy - 16.f * U2, 112.f);
-		Button(TEXT("promo_r"), TEXT("Rook  R"), Cx + Pw, Cy - 16.f * U2, 112.f);
-		Button(TEXT("promo_b"), TEXT("Bishop B"), Cx + 2.f * Pw, Cy - 16.f * U2, 112.f);
-		Button(TEXT("promo_n"), TEXT("Knight N"), Cx + 3.f * Pw, Cy - 16.f * U2, 112.f);
+		const FString K = Key.GetFName().ToString().ToLower();
+		if (K == TEXT("q") || K == TEXT("r") || K == TEXT("b") || K == TEXT("n")) B->ChoosePromotion(K);
+		else if (Key == EKeys::Escape) B->ChoosePromotion(TEXT(""));
+		return;
 	}
+	if (Key == EKeys::Tab && !bTypingCode)
+	{
+		if (ATCClipboard* Clip = Cast<ATCClipboard>(UGameplayStatics::GetActorOfClass(GetWorld(), ATCClipboard::StaticClass()))) Clip->Toggle();
+		return;
+	}
+	if (bTypingCode)
+	{
+		if (Key == EKeys::BackSpace) JoinCode.LeftChopInline(1);
+		else if (Key == EKeys::Enter) { bTypingCode = false; if (UTCCoreClient* C = Core()) C->JoinGame(JoinCode.ToUpper()); }
+		else if (Key == EKeys::Escape) bTypingCode = false;
+		else
+		{
+			const FString K = Key.GetFName().ToString();
+			if (K.Len() == 1 && JoinCode.Len() < 11) JoinCode += K.ToUpper();
+			else if (K == TEXT("Hyphen") || K == TEXT("Subtract")) JoinCode += TEXT("-");
+			static const TMap<FString, FString> Digits = {{TEXT("Zero"), TEXT("0")}, {TEXT("One"), TEXT("1")}, {TEXT("Two"), TEXT("2")}, {TEXT("Three"), TEXT("3")}, {TEXT("Four"), TEXT("4")}, {TEXT("Five"), TEXT("5")}, {TEXT("Six"), TEXT("6")}, {TEXT("Seven"), TEXT("7")}, {TEXT("Eight"), TEXT("8")}, {TEXT("Nine"), TEXT("9")}};
+			if (const FString* D = Digits.Find(K)) JoinCode += *D;
+		}
+		return;
+	}
+	if (Key == EKeys::Escape && B) B->ClearSelection();
 }
 
 // ─────────────────────────────── HUD ───────────────────────────────
 
-// ── reference UI style: typewriter caps, dark translucent plates, thin warm borders, hover highlight ──
+// reference UI style: typewriter caps, dark translucent plates, thin warm borders, hover highlight
 
 UFont* ATCHUD::UiFont()
 {
@@ -657,11 +675,12 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 	}
 	if (B && B->HasPendingPromotion())
 	{
-		const float Cx = Canvas->ClipX * 0.5f - 2.f * 110.f;
-		Text(TEXT("Promote to"), Canvas->ClipX * 0.5f, Canvas->ClipY * 0.5f - 60.f, Ink, 1.2f, true);
-		Button(TEXT("promo_q"), TEXT("Queen (Q)"), Cx, Canvas->ClipY * 0.5f - 20.f, 100.f);
-		Button(TEXT("promo_r"), TEXT("Rook (R)"), Cx + 110.f, Canvas->ClipY * 0.5f - 20.f, 100.f);
-		Button(TEXT("promo_b"), TEXT("Bishop (B)"), Cx + 220.f, Canvas->ClipY * 0.5f - 20.f, 100.f);
-		Button(TEXT("promo_n"), TEXT("Knight (N)"), Cx + 330.f, Canvas->ClipY * 0.5f - 20.f, 100.f);
+		const float Pw = 120.f * U2, Cx = Canvas->ClipX * 0.5f - 2.f * Pw, Cy = Canvas->ClipY * 0.5f;
+		Plate(Cx - 16.f * U2, Cy - 76.f * U2, 4.f * Pw + 22.f * U2, 132.f * U2, 0.7f, 0.4f);
+		Text(TEXT("PROMOTE TO"), Canvas->ClipX * 0.5f, Cy - 62.f * U2, Ink, 1.1f, true);
+		Button(TEXT("promo_q"), TEXT("Queen  Q"), Cx, Cy - 16.f * U2, 112.f);
+		Button(TEXT("promo_r"), TEXT("Rook  R"), Cx + Pw, Cy - 16.f * U2, 112.f);
+		Button(TEXT("promo_b"), TEXT("Bishop B"), Cx + 2.f * Pw, Cy - 16.f * U2, 112.f);
+		Button(TEXT("promo_n"), TEXT("Knight N"), Cx + 3.f * Pw, Cy - 16.f * U2, 112.f);
 	}
 }
