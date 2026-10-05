@@ -452,12 +452,20 @@ def blood_decals():
     rg.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/Black"))
     age = E(unreal.MaterialExpressionScalarParameter, -800, -380)
     age.set_editor_property("parameter_name", "Darken")
-    age.set_editor_property("default_value", 1.0)
+    age.set_editor_property("default_value", 0.7)  # towards dried brown
     mul = E(unreal.MaterialExpressionMultiply, -500, -250)
     MEL.connect_material_expressions(bc, "RGB", mul, "A")
     MEL.connect_material_expressions(age, "", mul, "B")
     MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
-    MEL.connect_material_property(bc, "A", unreal.MaterialProperty.MP_OPACITY)
+    # fade to nothing towards the decal's edges, so no mark can ever read as a square
+    uvd = E(unreal.MaterialExpressionTextureCoordinate, -1200, 500)
+    ctr = E(unreal.MaterialExpressionConstant2Vector, -1200, 600); ctr.set_editor_property("r", 0.5); ctr.set_editor_property("g", 0.5)
+    dst = E(unreal.MaterialExpressionDistance, -1050, 550); MEL.connect_material_expressions(uvd, "", dst, "A"); MEL.connect_material_expressions(ctr, "", dst, "B")
+    fsub = E(unreal.MaterialExpressionSubtract, -900, 550); MEL.connect_material_expressions(dst, "", fsub, "A"); fsub.set_editor_property("const_b", 0.5)
+    fneg = E(unreal.MaterialExpressionMultiply, -780, 550); MEL.connect_material_expressions(fsub, "", fneg, "A"); fneg.set_editor_property("const_b", -8.0)
+    fsat = E(unreal.MaterialExpressionSaturate, -660, 550); MEL.connect_material_expressions(fneg, "", fsat, "")
+    op = E(unreal.MaterialExpressionMultiply, -540, 450); MEL.connect_material_expressions(bc, "A", op, "A"); MEL.connect_material_expressions(fsat, "", op, "B")
+    MEL.connect_material_property(op, "", unreal.MaterialProperty.MP_OPACITY)
     # (the generated relief map shaded the blood near-black under the lamp; colour + gloss only for now)
     # thick blood is glossy, but a near-mirror reflects the dark room and reads black: keep it satin (0.32..0.8)
     rs = E(unreal.MaterialExpressionMultiply, -550, 350); C2 = MEL.connect_material_expressions
@@ -769,7 +777,7 @@ POSES = {
     # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
     "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0),
                "hand_l": (0, 0, float(os.environ.get("TC_HAND_ROLL", -95))), "hand_r": (0, 0, -float(os.environ.get("TC_HAND_ROLL", -95)))},
-    "clasp": {"spine_01": (12, 0), "spine_03": (18, 0), "neck_01": (-6, 0), "head": (10, 0),
+    "clasp": {"spine_01": (-10, 0), "spine_03": (-16, 0), "neck_01": (-4, 0), "head": (-10, 0),
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
               "hand_l": (0, -15), "hand_r": (0, 15)},
 }
@@ -1116,7 +1124,7 @@ def build():
                 "BaseColor": import_texture(os.path.join(bd, "T_Board_BaseColor.jpg"), f"{ROOT}/Textures/Board", "T_Board_BaseColor", "color"),
                 "Normal": import_texture(os.path.join(bd, "T_Board_Normal.jpg"), f"{ROOT}/Textures/Board", "T_Board_Normal", "normal"),
                 "ARM": import_texture(os.path.join(bd, "T_Board_ARM.jpg"), f"{ROOT}/Textures/Board", "T_Board_ARM", "linear")},
-                rough=0.85, scalars={"MicroRough": 0.08})
+                rough=0.85, tint=(0.6, 0.57, 0.53), scalars={"MicroRough": 0.08})
         wood_board = import_prop("chess_board") if squares else None
         if wood_board:
             mi_frame = surface_material(master, "wood_cabinet_worn_long", name="MI_BoardFrame", tiling=2.0, tint=(0.55, 0.42, 0.32),
@@ -1445,7 +1453,7 @@ def build():
 
     # ---- Lighting: warm practical lamp (key), cool fluorescent fill, cool rim.
     lamp_head = (lamp_bulb[0], lamp_bulb[1], lamp_bulb[2] - 3)  # just under the bulb, inside the shade
-    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (10, -5, top)), 700, 2400, 600, 65, src=2.5, vol=1.2))
+    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (10, -5, top)), 450, 2800, 600, 65, src=2.5, vol=1.2))
     bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 9), 60, 2400, 60, src=2.0, shadows=False)  # lights the shade and base
     tag(bulb)
     rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 150, 5600, 120, 15, 900, vol=0.2)
@@ -1457,7 +1465,7 @@ def build():
     # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)
     # the player's hands are hero assets in the reference: a soft warm light from the lamp side keeps them readable
     tag(rect("Hands_Key", (-30, -40, top + 40), (0, -50, 30), 220, 2600, 70, 40, 160, vol=0.2))
-    rect("Lamp_TableBounce", (10, 0, top + 2), (0, 90, 0), 300, 2600, 120, 90, 260, vol=0.4)
+    # (the table bounce light over-lit the board: 11.7% clipped pixels; removed, Lumen GI does the bounce)
     # corridor light behind the bars: a cold glow that separates the opponent from the back wall
     rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)
 
@@ -1527,6 +1535,11 @@ def build():
         "lumen_final_gather_quality": 2.0, "lumen_reflection_quality": 1.0,
         "lumen_scene_lighting_quality": 1.0, "lumen_scene_detail": 1.5,
         "scene_fringe_intensity": 0.15,
+        # grading towards the reference (visual judge: our saturation 189/255 vs 150): desaturated, cooler shadows
+        "color_saturation": unreal.Vector4(0.72, 0.72, 0.72, 1.0),
+        "color_saturation_shadows": unreal.Vector4(0.85, 0.9, 1.0, 0.9),
+        "color_gain_shadows": unreal.Vector4(0.92, 0.97, 1.05, 1.0),
+        "color_contrast": unreal.Vector4(1.06, 1.06, 1.06, 1.0),
     }.items():
         try:
             s.set_editor_property("override_" + k, True)
