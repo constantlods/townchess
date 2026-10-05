@@ -596,7 +596,7 @@ void ATCHUD::DrawUi()
 	if (!C) return;
 	if (!bBound) { C->OnMoveRejected.AddDynamic(this, &ATCHUD::OnRejected); C->OnError.AddDynamic(this, &ATCHUD::OnError); bBound = true; }
 	if (C->HasGame() && C->GetState().Status != TEXT("waiting")) DrawGame(C); else DrawMenu(C);
-	if (FPlatformTime::Seconds() < ToastUntil) Text(Toast, Canvas->ClipX * 0.5f, Canvas->ClipY - 70.f, FLinearColor(0.95f, 0.35f, 0.25f), 1.1f, true);
+	if (FPlatformTime::Seconds() < ToastUntil) Text(Toast, Canvas->ClipX * 0.5f, Canvas->ClipY - 104.f * Ui(), FLinearColor(0.95f, 0.35f, 0.25f), 1.0f, true);
 	if (C->GetConnection() != ETCConnection::Welcomed)
 	{
 		const ATCGameMode* GM = Cast<ATCGameMode>(UGameplayStatics::GetGameMode(this));
@@ -645,13 +645,16 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 		const FString Who = OpponentName(GM ? GM->GetOpponent() : FString()).ToUpper();
 		const FString Name = P.AiLevel.IsEmpty() ? P.Username : FString::Printf(TEXT("%s (%s)"), *Who, *P.AiLevel);
 		const FString Sub = P.Rating >= 0 ? FString::Printf(TEXT("%s  %d"), Col == TEXT("w") ? TEXT("White") : TEXT("Black"), P.Rating) : (Col == TEXT("w") ? TEXT("White") : TEXT("Black"));
-		const float U = Ui(), W = 250.f * U;
+		const float U = Ui();
+		float Tw = 0, Th = 0;
+		Canvas->TextSize(UiFont(), Name, Tw, Th, 0.85f * U, 0.85f * U);
+		const float W = FMath::Max(250.f * U, Tw + 28.f * U);  // the plate grows with long names ("The Annotator (master)")
 		const float Bx = bRight ? X - W : X;
 		Plate(Bx, 24.f * U, W, 58.f * U, 0.55f, 0.3f);
 		Text(Name, Bx + 12.f * U, 30.f * U, Ink, 0.85f);
 		Text(Sub, Bx + 12.f * U, 54.f * U, Dim, 0.72f);
 		const bool bRun = S.IsActive() && S.Turn == Col;
-		Text(S.IsTimed() ? ClockText(C->GetDisplayClockMs(Col)) : TEXT("--:--"), Bx + W * 0.5f, 90.f * U, bRun ? FLinearColor(1.f, 0.9f, 0.7f) : Dim, 1.7f, true);
+		if (S.IsTimed()) Text(ClockText(C->GetDisplayClockMs(Col)), Bx + W * 0.5f, 90.f * U, bRun ? FLinearColor(1.f, 0.9f, 0.7f) : Dim, 1.7f, true);
 	};
 	PlayerPlate(MeP, Me, 30.f * Ui(), false);
 	PlayerPlate(ThemP, Them, Canvas->ClipX - 30.f * Ui(), true);
@@ -669,7 +672,7 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 		Status = GM && GM->GetOpponent() == TEXT("annotator") ? TEXT("The Annotator is writing...") : TEXT("The patient is thinking...");
 	}
 	for (const FTCGameEvent& E : S.LastEvents) if (E.Type == TEXT("check") && S.IsActive()) Status = TEXT("CHECK  -  ") + Status;
-	Text(Status, Canvas->ClipX * 0.5f, 30.f * Ui(), S.IsFinished() ? FLinearColor(0.95f, 0.8f, 0.55f) : Ink, S.IsFinished() ? 1.6f : 1.2f, true);
+	Text(Status, Canvas->ClipX * 0.5f, Canvas->ClipY - (S.IsFinished() ? 120.f : 64.f) * Ui(), S.IsFinished() ? FLinearColor(0.95f, 0.8f, 0.55f) : Ink, S.IsFinished() ? 1.6f : 1.0f, true);
 	// the opening and the moves live on the clipboard (Tab), not across the top of the screen
 	if (!S.OpeningName.IsEmpty() && bScreenRecord) Text(FString::Printf(TEXT("%s  %s"), *S.OpeningEco, *S.OpeningName), Canvas->ClipX * 0.5f, 64.f * Ui(), Dim, 0.85f, true);
 	Text(TEXT("[TAB] GAME RECORD"), Canvas->ClipX - 230.f * Ui(), Canvas->ClipY - 40.f * Ui(), FLinearColor(0.5f, 0.47f, 0.42f, 0.8f), 0.75f, false);
