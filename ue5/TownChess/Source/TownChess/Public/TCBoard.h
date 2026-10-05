@@ -51,8 +51,22 @@ public:
 	/** Yaw of each colour's pieces (knights face the opponent). */
 	UPROPERTY(EditAnywhere, Category = "TownChess") float WhitePieceYaw = 0.f;
 	UPROPERTY(EditAnywhere, Category = "TownChess") float BlackPieceYaw = 180.f;
-	UPROPERTY(EditAnywhere, Category = "TownChess") float MoveSeconds = 0.55f;
-	UPROPERTY(EditAnywhere, Category = "TownChess") float LiftHeight = 6.f;
+	/** Move feel (chess.com-like): quick and low; the captured piece leaves as the mover lands, in parallel. */
+	UPROPERTY(EditAnywhere, Category = "TownChess") float MoveSeconds = 0.2f;
+	UPROPERTY(EditAnywhere, Category = "TownChess") float LiftHeight = 1.8f;
+	/** A piece the player dropped on its square settles in this time once the core accepts it. */
+	UPROPERTY(EditAnywhere, Category = "TownChess") float DropSettleSeconds = 0.07f;
+	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<class USoundBase> MoveSound;
+	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<class USoundBase> CaptureSound;
+
+	/** Drag and drop (mouse): press on an own piece, it follows the pointer, release on a square. Presentation only:
+	 *  a drop sends the same request as two clicks; the piece only lands when the core accepts it. */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") bool BeginDrag(const FString& Square);
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void UpdateDrag(const FVector& WorldOnBoard);
+	UFUNCTION(BlueprintCallable, Category = "TownChess") ETCClickResult EndDrag(const FString& Square);
+	UFUNCTION(BlueprintPure, Category = "TownChess") bool IsDragging() const { return !DragFrom.IsEmpty(); }
+	/** Square under the pointer (highlight); "" for none. */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void SetHover(const FString& Square);
 
 	/** Board interaction (mouse or automation). Never moves a piece itself; it can only send a request. */
 	UFUNCTION(BlueprintCallable, Category = "TownChess") ETCClickResult ClickSquare(const FString& Square);
@@ -115,7 +129,10 @@ private:
 	{
 		TWeakObjectPtr<USceneComponent> Target;
 		FVector From, To;
-		float T = 0.f, Duration = 0.5f, Lift = 6.f;
+		float T = 0.f, Duration = 0.5f, Lift = 6.f, Delay = 0.f;
+		/** Effects of one move share a group and play together (mover and capture in parallel). */
+		int32 Group = 0;
+		USoundBase* Sound = nullptr;
 		/** Promotion swap: bound to the promoted piece itself at queue time, never looked up by square later (a move
 		 *  queued behind it, e.g. an immediate recapture, may already own that square). */
 		TWeakObjectPtr<USceneComponent> PromoteRoot;
@@ -124,7 +141,9 @@ private:
 	};
 	TArray<FAnim> Anims;
 	FTCGameState Shown;
-	FString Selected, PromotionFrom, PromotionTo;
+	FString Selected, PromotionFrom, PromotionTo, DragFrom, DroppedFrom, Hover;
+	int32 NextGroup = 1;
+	void SnapBack(const FString& Square);
 	bool PendingRequest = false;
 	int32 WhiteCaptured = 0, BlackCaptured = 0;
 	int32 AnimatedMoves = 0, Resyncs = 0;

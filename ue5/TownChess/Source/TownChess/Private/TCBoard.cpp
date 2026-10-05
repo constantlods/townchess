@@ -3,6 +3,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TCCoreClient.h"
 #include "TCLog.h"
@@ -180,6 +182,9 @@ void ATCBoard::Rebuild(const FTCGameState& State)
 void ATCBoard::AnimateMove(const FTCMoveRecord& Move)
 {
 	++AnimatedMoves;
+	const int32 Group = NextGroup++;
+	bool bCapture = false;
+	for (const FTCMoveEffect& Fx : Move.Effects) bCapture |= Fx.Kind == ETCEffectKind::Capture;
 	for (const FTCMoveEffect& Fx : Move.Effects)
 	{
 		if (Fx.Kind == ETCEffectKind::Capture)
@@ -190,8 +195,10 @@ void ATCBoard::AnimateMove(const FTCMoveRecord& Move)
 			A.Target = P.Root;
 			A.From = LocalOf(Fx.From); // not the current location: an earlier queued move may still be carrying it there
 			A.To = GraveyardSlot(Fx.Color);
-			A.Duration = MoveSeconds * 0.8f;
-			A.Lift = LiftHeight;
+			A.Duration = MoveSeconds * 1.2f;
+			A.Lift = LiftHeight * 2.f;
+			A.Delay = MoveSeconds * 0.8f;  // leaves as the capturing piece lands
+			A.Group = Group;
 			Anims.Add(A);
 			Captured.Add(P);
 		}
@@ -205,6 +212,16 @@ void ATCBoard::AnimateMove(const FTCMoveRecord& Move)
 			A.To = LocalOf(Fx.To);
 			A.Duration = MoveSeconds;
 			A.Lift = Fx.Piece == TEXT("n") ? LiftHeight * 1.6f : LiftHeight;
+			if (!DroppedFrom.IsEmpty() && DroppedFrom == Fx.From && P.Root)
+			{
+				// the player dropped this piece on its square: settle from where the hand left it, no second flight
+				A.From = P.Root->GetRelativeLocation();
+				A.Duration = DropSettleSeconds;
+				A.Lift = 0.f;
+				DroppedFrom.Empty();
+			}
+			A.Group = Group;
+			A.Sound = bCapture ? CaptureSound.Get() : MoveSound.Get();
 			Anims.Add(A);
 			Pieces.Add(Fx.To, P);
 		}
@@ -227,19 +244,26 @@ void ATCBoard::Tick(float Dt)
 {
 	Super::Tick(Dt);
 	if (Anims.Num() == 0) return;
-	FAnim& A = Anims[0];
-	if (!A.PromoteCode.IsEmpty())
+	// every effect of the front move's group plays at once (mover and capture together)
+	const int32 G = Anims[0].Group;
+	for (int32 i = 0; i < Anims.Num() && Anims[i].Group == G; ++i)
 	{
-		ApplyPieceMesh(A.PromoteRoot.Get(), A.PromoteMesh.Get(), A.PromoteCode);
-		Anims.RemoveAt(0);
-	}
-	else
-	{
+		FAnim& A = Anims[i];
+		if (!A.PromoteCode.IsEmpty())
+		{
+			bool bOthers = false;  // the promotion swap waits until the pawn has landed
+			for (int32 j = 0; j < i; ++j) bOthers |= Anims[j].Group == G && Anims[j].PromoteCode.IsEmpty() && Anims[j].T < 1.f;
+			if (!bOthers) { ApplyPieceMesh(A.PromoteRoot.Get(), A.PromoteMesh.Get(), A.PromoteCode); A.T = 1.f; }
+			continue;
+		}
+		if (A.Delay > 0.f) { A.Delay -= Dt; continue; }
+		const bool bWasRunning = A.T < 1.f;
 		A.T = FMath::Min(1.f, A.T + Dt / FMath::Max(A.Duration, 0.01f));
-		const float E = FMath::InterpEaseInOut(0.f, 1.f, A.T, 2.f);
+		const float E = 1.f - FMath::Pow(1.f - A.T, 3.f);  // ease-out: quick start, soft landing
 		if (A.Target.IsValid()) A.Target->SetRelativeLocation(FMath::Lerp(A.From, A.To, E) + FVector(0, 0, A.Lift * FMath::Sin(PI * E)));
-		if (A.T >= 1.f) Anims.RemoveAt(0);
+		if (bWasRunning && A.T >= 1.f && A.Sound && A.Target.IsValid()) UGameplayStatics::PlaySoundAtLocation(this, A.Sound, A.Target->GetComponentLocation(), 0.8f);
 	}
+	Anims.RemoveAll([G](const FAnim& A) { return A.Group == G && A.T >= 1.f && A.Delay <= 0.f; });
 	if (Anims.Num() == 0)
 	{
 		// the shown board must equal the authority; if it ever does not, the authority wins
@@ -283,6 +307,7 @@ void ATCBoard::OnCoreState(const FTCGameState& State, const FString& Reason)
 
 void ATCBoard::OnCoreRejected(const FString& Reason)
 {
+	if (!DroppedFrom.IsEmpty()) { SnapBack(DroppedFrom); DroppedFrom.Empty(); }
 	// the core said no: nothing moves; drop the selection and wait for the next input
 	PendingRequest = false;
 	ClearSelection();
@@ -418,6 +443,14 @@ void ATCBoard::RefreshMarkers()
 		if (E.Type != TEXT("check") && E.Type != TEXT("checkmate")) continue;
 		for (const auto& KV : Pieces) if (KV.Value.Code == S.Turn + TEXT("k")) AddMarker(LocalOf(KV.Key), CheckColor, SquareSize * 0.46f, 0.12f);
 	}
+	// hover: own pieces you could pick up, or a legal destination of the selected piece
+	if (!Hover.IsEmpty() && C->IsMyTurn())
+	{
+		const FTCPieceVisual* At = Pieces.Find(Hover);
+		bool bShow = At && At->Code.StartsWith(C->GetMyColor());
+		for (const FString& M : S.LegalMoves) bShow |= !Selected.IsEmpty() && M.StartsWith(Selected + Hover);
+		if (bShow && Hover != Selected) AddMarker(LocalOf(Hover), FLinearColor(0.95f, 0.85f, 0.6f, 1.f), SquareSize * 0.47f, 0.06f);
+	}
 	if (!Selected.IsEmpty())
 	{
 		AddMarker(LocalOf(Selected), SelectedColor, SquareSize * 0.46f, 0.15f);
@@ -429,4 +462,67 @@ void ATCBoard::RefreshMarkers()
 			AddMarker(LocalOf(D), bCapture ? CaptureColor : MoveColor, bCapture ? SquareSize * 0.44f : SquareSize * 0.14f, 0.2f);
 		}
 	}
+}
+
+
+// ─────────────────────────────── drag and drop ───────────────────────────────
+
+bool ATCBoard::BeginDrag(const FString& Square)
+{
+	UTCCoreClient* C = Core();
+	if (!C || !C->IsMyTurn() || Anims.Num() > 0 || PendingRequest || !PromotionFrom.IsEmpty()) return false;
+	const FTCPieceVisual* At = Pieces.Find(Square);
+	if (!At || !At->Root || !At->Code.StartsWith(C->GetMyColor())) return false;
+	DragFrom = Square;
+	Selected = Square;  // legal destinations show while dragging
+	RefreshMarkers();
+	return true;
+}
+
+void ATCBoard::UpdateDrag(const FVector& WorldOnBoard)
+{
+	if (DragFrom.IsEmpty()) return;
+	const FTCPieceVisual* At = Pieces.Find(DragFrom);
+	if (!At || !At->Root) return;
+	FVector L = GetActorTransform().InverseTransformPosition(WorldOnBoard);
+	L.Z = LocalOf(DragFrom).Z + 2.5f;  // lifted off the board while carried
+	At->Root->SetRelativeLocation(L);
+}
+
+ETCClickResult ATCBoard::EndDrag(const FString& Square)
+{
+	const FString From = DragFrom;
+	DragFrom.Empty();
+	if (From.IsEmpty()) return ETCClickResult::Ignored;
+	if (Square.IsEmpty() || Square == From)
+	{
+		SnapBack(From);  // a press and release on the same square is a click: keep the selection
+		return ETCClickResult::Selected;
+	}
+	Selected = From;
+	const ETCClickResult R = ClickSquare(Square);
+	if (R == ETCClickResult::Submitted) DroppedFrom = From;  // stays where it was dropped until the core answers
+	else if (R != ETCClickResult::NeedsPromotion) SnapBack(From);
+	return R;
+}
+
+void ATCBoard::SnapBack(const FString& Square)
+{
+	const FTCPieceVisual* At = Pieces.Find(Square);
+	if (!At || !At->Root) return;
+	FAnim A;
+	A.Target = At->Root;
+	A.From = At->Root->GetRelativeLocation();
+	A.To = LocalOf(Square);
+	A.Duration = 0.1f;
+	A.Lift = 0.f;
+	A.Group = NextGroup++;
+	Anims.Add(A);
+}
+
+void ATCBoard::SetHover(const FString& Square)
+{
+	if (Square == Hover) return;
+	Hover = Square;
+	if (Anims.Num() == 0) RefreshMarkers();
 }

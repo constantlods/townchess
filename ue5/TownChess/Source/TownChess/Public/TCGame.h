@@ -72,6 +72,9 @@ public:
 	bool bTypingCode = false;
 private:
 	void OnClick();
+	void OnRelease();
+	virtual void PlayerTick(float Dt) override;
+	bool PointerOnBoard(FString& Square, FVector& World) const;
 	void OnKey(FKey Key);
 	UFUNCTION() void OnState(const FTCGameState& State, const FString& Reason);
 	FString CameraFor;

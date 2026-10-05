@@ -1165,6 +1165,12 @@ def build():
             if colour and kind and (colour + kind) not in meshes:
                 meshes[colour + kind] = m
         setp(board, "piece_meshes", meshes)
+        snd_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "sounds"))
+        for prop, f in (("move_sound", "S_TC_Move.wav"), ("capture_sound", "S_TC_Capture.wav")):
+            if os.path.exists(os.path.join(snd_dir, f)):
+                snd = next((o for o in import_file(os.path.join(snd_dir, f), f"{ROOT}/Audio") if isinstance(o, unreal.SoundWave)), None)
+                if snd:
+                    setp(board, prop, snd)  # our synthesised wooden knocks (ue5/tools/audio/clack.py)
         setp(board, "board_mesh_yaw", 90.0)  # a1 must be a dark square ("light on the right"), checked by screenshot
         # playing surface: our baked composite of CC0 maple/walnut scans (ue5/tools/textures/board.py) on the board's 0..1 grid
         bd = os.path.join(TEXTURES_DIR, "board")

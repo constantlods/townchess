@@ -311,6 +311,7 @@ void ATCPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATCPlayerController::OnClick);
+	InputComponent->BindKey(EKeys::LeftMouseButton, IE_Released, this, &ATCPlayerController::OnRelease);
 	InputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this, &ATCPlayerController::OnKey);
 }
 
@@ -349,7 +350,45 @@ void ATCPlayerController::OnClick()
 	const float T = (B->SurfaceZ() - Origin.Z) / Dir.Z;
 	if (T <= 0) return;
 	const FString Sq = B->SquareAtWorld(Origin + Dir * T);
-	if (!Sq.IsEmpty()) B->ClickSquare(Sq);
+	if (Sq.IsEmpty()) return;
+	// press on an own piece starts a drag (release on another square = move; release in place = select);
+	// pressing elsewhere is the second click of click-to-move
+	if (!B->BeginDrag(Sq)) B->ClickSquare(Sq);
+}
+
+bool ATCPlayerController::PointerOnBoard(FString& Square, FVector& World) const
+{
+	float X, Y;
+	ATCBoard* B = Board();
+	FVector Origin, Dir;
+	if (!B || !GetMousePosition(X, Y) || !DeprojectScreenPositionToWorld(X, Y, Origin, Dir) || FMath::IsNearlyZero(Dir.Z)) return false;
+	const float T = (B->SurfaceZ() - Origin.Z) / Dir.Z;
+	if (T <= 0) return false;
+	World = Origin + Dir * T;
+	Square = B->SquareAtWorld(World);
+	return true;
+}
+
+void ATCPlayerController::OnRelease()
+{
+	ATCBoard* B = Board();
+	if (!B || !B->IsDragging()) return;
+	FString Sq;
+	FVector W;
+	PointerOnBoard(Sq, W);
+	if (B->EndDrag(Sq) == ETCClickResult::NeedsPromotion) { /* the HUD shows the promotion picker */ }
+}
+
+void ATCPlayerController::PlayerTick(float Dt)
+{
+	Super::PlayerTick(Dt);
+	ATCBoard* B = Board();
+	if (!B) return;
+	FString Sq;
+	FVector W;
+	const bool bOn = PointerOnBoard(Sq, W);
+	if (B->IsDragging() && bOn) B->UpdateDrag(W + FVector(0, 0, 0.f));
+	B->SetHover(bOn ? Sq : FString());
 }
 
 void ATCPlayerController::OnKey(FKey Key)
