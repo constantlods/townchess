@@ -54,7 +54,7 @@ All of these were measured; see [PERFORMANCE.md](PERFORMANCE.md).
 - It is the only candidate whose renderer matches the target: Lumen, Nanite, VSM, Substrate skin, Control Rig and
   Full-Body IK, Niagara and Pixel Streaming.
 - RDNA2 ray tracing is present, so hardware Lumen can be tested rather than assumed.
-- TSR is UE5's own upscaler and is vendor-neutral. It is the default temporal reconstruction here. **No DLSS.** AMD's
+- TSR is UE5's own upscaler and is vendor-neutral. It is the default temporal reconstruction here. **No DLSS yet (tracked: NVIDIA's free DLSS plugin for UE 5.8 needs the owner's Fab download; then it is enabled for the RTX preset).** AMD's
   FSR plugin for UE5 will only be used if it measurably beats TSR on this card.
 
 **Decision: UE5 stays the primary candidate.** The next step is the small benchmark scene, not a migration.
@@ -100,7 +100,7 @@ So the Epic account is also what unlocks the asset quality, not just the engine.
   surfaces (the mask) whose reflections it could improve.
 - **TSR is the temporal reconstruction.** It is vendor-neutral and built into UE5. 1440p output from 67% internal
   resolution (about 1715×965) gives roughly 65 fps. AMD FSR has not been evaluated in UE yet: AMD's UE plugin would
-  have to support Linux/Vulkan, and that needs checking. **No DLSS.**
+  have to support Linux/Vulkan, and that needs checking. **No DLSS yet (tracked: NVIDIA's free DLSS plugin for UE 5.8 needs the owner's Fab download; then it is enabled for the RTX preset).**
 - **Proxmox layout.** UE runs in a dedicated VM (131) with the GPU passed through, not on the host. The host then
   can't use the GPU while the VM is running.
 

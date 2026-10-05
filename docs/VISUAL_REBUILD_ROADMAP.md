@@ -22,6 +22,12 @@ The critique that drives the passes is in [HOSTILE_VISUAL_REVIEW.md](HOSTILE_VIS
 | 09 | Opponent rebuilt from Epic's Walter preset (owner ran the cloud steps in the editor); mask lowered onto the face | The older face behind the cage reads well; the torso rendered as a hole (outfit meshes missing) |
 | 10 | Outfit meshes spawned as leader-pose followers | Older man in the cage mask, hands on the table (`10-metahuman-walter.png`) |
 
+| 11-13 | Opponent roster (caged patient, the Annotator: Blender plate mask, coif, ledger); game-record clipboard on a cart | Roster switching works; clipboard legible at 1080p |
+| 14-22 | Reference pass: exposure, bars, WARD B, blood (procedural), aged board; clasp pose solved by search; the player's own MetaHuman arms; camera pitch -19 | Composition matches the reference: real hands at the board corners |
+| 23 | Cinematic MetaHuman build (full skin shader) | Close-up face with real skin detail |
+| 24-27 | Generated blood decals; Blender wooden board; baked 4K inlaid maple/walnut squares; pieces ignore decals | Inlaid board with blood in the joints; red, not ink-black |
+| 28-31 | Visual-judge fixes: grading (sat 0.72), lamp 450 lm, board toned down, blood edge fade, forward lean (arms folded on the table), thicker cage wire, brass bowl | Board and tones closer; cage still copper-orange; hands still lack veins/dirt (open) |
+
 ## Remaining gaps, ranked (what the next passes do)
 
 1. **The opponent's styling.** The T-shirt is clean white; it needs stained, drab institutional clothing, sleeves,

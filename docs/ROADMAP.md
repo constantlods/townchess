@@ -257,6 +257,11 @@ Per-ply checks (every scenario):
 | Antivirus: Defender real-time protection on, build run unmodified | Pass: no detections involving the build or `node.exe` (read-only query) | `test_package.ps1` |
 | Packaged game vs the bundled Stockfish (league level `sf1600`, Annotator opponent): the core finds `engines\stockfish.exe`; the smoke run plays its **own** new game (a journal-restored game is resigned and left first) | Pass (16/16 plies, 0 failures, no Stockfish process left) | `-tcsmoke=16 -tcauto=cpu:sf1600:w:untimed` |
 | Simulator: historical games + CPU vs CPU (house tiers, Stockfish UCI_Elo 1350-2850) cross-checked per ply against Stockfish's move generator | Pass (19 games, 0 anomalies, all mates confirmed by the referee) | `tools/sim/simulate.ts` |
+| Game record on an asylum clipboard (cart at frame right, Tab lifts it to a reading pose) | Built; legible at 1080p (screenshot 13-clipboard-raised) | `ATCClipboard` |
+| Opponent roster (caged patient, the Annotator) with an in-menu picker | Built; switching verified by capture | `-tcopponent=`, Opponent button |
+| Board turns for Black (player keeps the dressed seat) on rematch | Pass (8/8) | `autotest.ps1 -Test rematch` |
+| Four-stage agent pipeline (chess guardian, visual judge, oversight, GitHub keeper) | Running; run 1 found and fixed BUG-007 | `docs/AGENT_PIPELINE.md` |
+| Player character/hands selection | Not started (needs per-character MetaHumans, LIM-011) | — |
 | **Owner's interactive launch through the root `TownChess.exe` stub: HUD and real mouse input** | **Pending** (the stub hung with no child in the non-interactive SSH session; the tests launch `TownChess/Binaries/Win64/TownChess.exe` directly) | owner |
 
 Bugs found and fixed while testing:

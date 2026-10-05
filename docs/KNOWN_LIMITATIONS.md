@@ -40,6 +40,7 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-008](#lim-008) | Lenient FEN castling field (X-FEN/Shredder letters ignored) | Low | Open, documented |
 | [LIM-009](#lim-009) | What a journal restore does not bring back | Low/informational | Open, documented |
 | [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
+| [LIM-011](#lim-011) | Annotator's oversleeves do not render; all characters share one MetaHuman (Walter) | Low (visual) | Open |
 | [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Fixed |
 
 ---
@@ -369,6 +370,15 @@ normalises the order. Pinned in `regressions.test.ts` ("sanitizeCastling FEN edg
   (`room.status !== 'active'`), so the game itself is not affected.
 - **Reproduction:** `new UciLeague(fake('crash-once'))`; `p = lg.bestMove('R1', 'sf1350', START, 50)`;
   `lg.release('R1')`; `await p` -> `lg.engineOf('R1')` is a live engine and `lg.processes` is 1 (expected null / 0).
-- **Pinned by:** `BUG-007` (`it.fails`) plus a no-crash control in `packages/server/test/uci.test.ts`.
+- **Pinned by:** `BUG-007` in `packages/server/test/uci.test.ts`, now a normal test (fixed in 7cdc067): no binding to the finished game and the slot is reused.
 - **Fix idea (for the lead):** remember released room ids (or a per-request generation) and do not retry, or release
   again, when the room was released during the request.
+
+
+## LIM-011
+
+**Character art gaps (visual, not rules).** The Annotator's Blender oversleeves are attached to the forearm bones but
+do not show in captures (the seated pose puts the elbows below the table top; under investigation). The caged
+patient, the Annotator and the player's own first-person arms all use the same MetaHuman (Epic's Walter preset), and
+the player's arms wear the patient's shirt. Each character needs its own MetaHuman (one cloud auto-rig per character
+in the owner's editor) before player character/hands selection can ship.

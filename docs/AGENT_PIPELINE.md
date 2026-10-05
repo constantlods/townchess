@@ -12,3 +12,11 @@ before it, so problems flow into one place and nothing is pushed unchecked. Defi
 
 Stages 1-3 commit but never push; stage 4 is the only one that pushes. The lead reads the reports, fixes, and the next
 milestone runs the pipeline again.
+
+## Evidence rules (from oversight run 1)
+
+- Test counts are quoted for both runs: with `TC_STOCKFISH` (all tests) and without it (the live-engine test is skipped).
+- Commit messages describe what a screenshot shows, not what was intended (a "dark iron" change that still renders
+  copper is reported as such).
+- Screenshots: only the passes worth keeping are committed (main view plus the close-ups that changed); scratch
+  captures stay on the build PC (`C:\TownChess\shots`), to keep the repository from growing ~12 MB per pass.
