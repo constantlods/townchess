@@ -30,6 +30,8 @@ HERO_TEXTURES = {
     "lacquered_cherry_wood": ("4k",),        # lacquer roughness/normal reference for the pieces
     "rust_coarse_01": ("4k",),               # rust on the lamp, cart and bed frames
 }
+# hero surfaces closest to the camera get higher resolutions (texture streaming keeps memory bounded)
+HERO = {"chess_set": "8k", "wooden_table_02": "4k", "wood_table_worn": "4k", "rusty_metal_02": "4k", "brown_leather": "4k"}
 TEX_MAPS = {"Diffuse": "diff", "nor_dx": "nor_dx", "arm": "arm", "Displacement": "disp"}
 
 
@@ -78,7 +80,8 @@ def fetch_texture(out, t, wanted):
 def main():
     out, res = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "2k")
     for m in MODELS:
-        fbx = files(m)["fbx"][res]["fbx"]
+        r = HERO.get(m, res)
+        fbx = files(m)["fbx"][r]["fbx"]
         base = os.path.join(out, "models", m)
         get(fbx["url"], os.path.join(base, os.path.basename(fbx["url"])))
         for rel, inc in fbx.get("include", {}).items():
@@ -94,7 +97,7 @@ def main():
                 get(f[key][res][fmt]["url"], os.path.join(out, "textures", t, f"{t}_{short}.{fmt}"))
         print("texture", t, flush=True)
     for t, wanted in HERO_TEXTURES.items():
-        print("hero texture", t, fetch_texture(t, wanted), flush=True)
+        print("hero texture", t, fetch_texture(out, t, wanted), flush=True)
 
 
 if __name__ == "__main__":
