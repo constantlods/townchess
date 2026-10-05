@@ -1227,9 +1227,6 @@ def build():
                                                              grime_color=(0.25, 0.22, 0.18), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "MicroRough": 0.25}))
             EAL.save_loaded_asset(sm)
         tag(place_model(bowl, (-8, -46, 0), yaw=0, label="Bowl", sit_on=top)[0])
-    if os.path.isdir(os.path.join(ASSETS, "models", "decorative_book_set_01")):
-        tb = import_model("decorative_book_set_01")
-        tag(place_model(tb, (44, 58, 0), yaw=-100, label="TableBooks", scale=0.9, sit_on=top)[0])
     mug = import_prop("tin_mug")
     tag(place_model(mug, (30, 38, 0), yaw=-120, label="Mug", sit_on=top)[0])
     for sm in mug:
