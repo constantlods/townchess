@@ -10,6 +10,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetRenderingLibrary.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "DynamicRHI.h"
 #include "RHIGlobals.h"
 #include "Misc/CommandLine.h"
@@ -570,6 +572,25 @@ void ATCHUD::PressButton(const FString& Id)
 void ATCHUD::DrawHUD()
 {
 	Super::DrawHUD();
+	DrawUi();
+}
+
+void ATCHUD::DrawToRenderTarget(UTextureRenderTarget2D* Target)
+{
+	if (!Target) return;
+	UCanvas* const ViewportCanvas = Canvas;
+	UCanvas* RtCanvas = nullptr;
+	FVector2D Size;
+	FDrawToRenderTargetContext Ctx;
+	UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(this, Target, RtCanvas, Size, Ctx);  // draws over, no clear
+	Canvas = RtCanvas;
+	if (Canvas) DrawUi();
+	UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Ctx);
+	Canvas = ViewportCanvas;
+}
+
+void ATCHUD::DrawUi()
+{
 	Buttons.Reset();
 	UTCCoreClient* C = GetGameInstance()->GetSubsystem<UTCCoreClient>();
 	if (!C) return;

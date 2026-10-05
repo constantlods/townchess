@@ -10,6 +10,7 @@
 class ATCBoard;
 class UTCCoreClient;
 class UFont;
+class UTextureRenderTarget2D;
 
 /**
  * Startup and seat handling.
@@ -89,6 +90,8 @@ class TOWNCHESS_API ATCHUD : public AHUD
 	GENERATED_BODY()
 public:
 	virtual void DrawHUD() override;
+	/** Draws the HUD over an existing render target (reference screenshots: capture.py -TCHud=1). */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void DrawToRenderTarget(UTextureRenderTarget2D* Target);
 	/** Returns true if the click hit a HUD button (and performed it). */
 	bool HandleClick(const FVector2D& Pos);
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void PressButton(const FString& Id);
@@ -112,6 +115,7 @@ private:
 	float Ui() const;
 	UPROPERTY(Transient) TObjectPtr<UFont> Font;
 	void Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale = 1.f, bool bCenter = false);
+	void DrawUi();
 	void DrawMenu(UTCCoreClient* C);
 	void DrawGame(UTCCoreClient* C);
 	UFUNCTION() void OnRejected(const FString& Reason);

@@ -34,6 +34,7 @@ CAM_LOC = arg("TCCamLoc", "")   # close-up shots: x,y,z (cm) ...
 CAM_ROT = arg("TCCamRot", "")   # ... pitch,yaw,roll
 CAM_FOV = arg("TCFov", "")
 CAM_TARGET = arg("TCCamTarget", "")  # aim the close-up at this point (x,y,z) instead of giving a rotation
+HUD = arg("TCHud", "") == "1"  # draw the game HUD over the shot (what the player sees, not just the scene)
 CMDS = [c.replace("_", " ") for c in arg("TCCmds", "").split(";") if c]  # console commands, "_" for spaces (e.g. r.Fog_0)
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
 
@@ -108,6 +109,13 @@ def probe(world):
 
 def export():
     world, rt = state["cap"]
+    if HUD:
+        pc = unreal.GameplayStatics.get_player_controller(world, 0)
+        hud = pc.get_hud() if pc else None
+        if hud and hasattr(hud, "draw_to_render_target"):
+            hud.draw_to_render_target(rt)
+        else:
+            log("no TCHUD to draw")
     d, name = SHOT.replace("\\", "/").rsplit("/", 1)
     unreal.RenderingLibrary.export_render_target(world, rt, d, name)
     log(f"exported {SHOT}")
