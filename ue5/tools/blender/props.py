@@ -783,9 +783,9 @@ WHICH = sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else []
 BUILDERS = {
     "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp,
     "annotator_mask": annotator_mask, "annotator_coif": annotator_coif, "ledger": ledger, "pencil": pencil,
-    "oversleeve": lambda: sleeve("SM_Oversleeve", 0.24, 0.042, 0.034, "M_Duck", "oversleeve.obj"),
+    "oversleeve": lambda: sleeve("SM_Oversleeve", 0.25, 0.056, 0.047, "M_Duck", "oversleeve.obj"),  # fits over a MetaHuman forearm
     "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl, "restraint_straps": restraint_straps,
-    "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.055, 0.046, "M_CoatWool", "coat_sleeve.obj"),
+    "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.068, 0.06, "M_CoatWool", "coat_sleeve.obj"),  # fits over the upper arm
 }
 for k, f in BUILDERS.items():
     if not WHICH or k in WHICH:

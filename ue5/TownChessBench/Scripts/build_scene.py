@@ -1496,7 +1496,7 @@ def build():
     mi_coif = make_mi(master, "MI_Coif", {"BaseColor": None}, tint=(0.22, 0.2, 0.17), rough=0.95, scalars=cloth)
 
     # hand-formed steel with light patina (the spec's mask is maintained, not rusted through): plain metal + grime layer
-    mi_steel = make_mi(master, "MI_MaskSteel", {"BaseColor": None}, metal=1.0, rough=0.42, tint=(0.56, 0.56, 0.57),
+    mi_steel = make_mi(master, "MI_MaskSteel", {"BaseColor": None}, metal=1.0, rough=0.5, tint=(0.22, 0.215, 0.21),  # worked steel, not porcelain
                        grime_color=(0.45, 0.38, 0.3), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.5,
                                                                "MicroRough": 0.25, "GrimeRoughness": 0.7})
     mi_copper = surface_material(master, "rusty_metal_02", name="MI_Copper", tiling=3.0, metal=1.0, tint=(0.95, 0.5, 0.32), rough=0.45)
