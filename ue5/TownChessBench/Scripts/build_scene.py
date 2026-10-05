@@ -1247,7 +1247,7 @@ def build():
     # ---- Wear and clutter on the table: dried blood, papers, a book stack (the reference's table is a lived-in mess)
     blood = blood_decals()
     placements = [  # variant, x, y, size (cm), yaw: board squares, the near frame, the table
-        ("Spatter", 6, 8, 11, 20), ("Spatter", -4, -10, 14, 75), ("Spatter", 16, 14, 9, 200), ("Smear", -18, -2, 16, 0),
+        ("Spatter", -4, -10, 14, 75),  # (the decal at (6, 8) clipped to a straight-edged stain on f/g: removed) ("Spatter", 16, 14, 9, 200), ("Smear", -18, -2, 16, 0),
         ("Pool", -30, 34, 18, 140), ("Spatter", 30, -30, 12, 300), ("Smear", -28, -40, 22, 160), ("Spatter", 20, 40, 10, 40)]
     for k, (v, x, y, sz, yaw) in enumerate(placements):
         if v not in blood:
@@ -1438,7 +1438,7 @@ def build():
             # dark forged iron, rust in patches (not an even orange coat)
             # plain dark iron (the rust scan's orange overpowered any tint: oversight run 1); rust only in grime patches
             mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=0.85, rough=0.82, tint=(0.07, 0.065, 0.06),  # matte old iron, no silver mirror
-                              grime_color=(2.6, 1.3, 0.55), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.5, "GrimeContrast": 3.0,
+                              grime_color=(1.5, 0.75, 0.35), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.62, "GrimeContrast": 3.0,
                                                                      "GrimeRoughness": 0.9, "MicroRough": 0.25})
             cage[0].set_material(0, mi_iron)
             EAL.save_loaded_asset(cage[0])

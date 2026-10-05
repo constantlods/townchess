@@ -28,6 +28,9 @@ The critique that drives the passes is in [HOSTILE_VISUAL_REVIEW.md](HOSTILE_VIS
 | 24-27 | Generated blood decals; Blender wooden board; baked 4K inlaid maple/walnut squares; pieces ignore decals | Inlaid board with blood in the joints; red, not ink-black |
 | 28-31 | Visual-judge fixes: grading (sat 0.72), lamp 450 lm, board toned down, blood edge fade, forward lean (arms folded on the table), thicker cage wire, brass bowl | Board and tones closer; cage still copper-orange; hands still lack veins/dirt (open) |
 
+| 32-35 | Hand vein/dirt decals (generated), dark-iron cage material, straitjacket webbing straps | Straps read; hand decals weak and later bisected as the cause of a 2x exposure jump (off by default) |
+| 36-39 | Annotator at his desk (forearms on the table), dark steel plate, coat sleeves; pipeline run 2 fixes | Exposure back to mean ~37 (reference ~27); left player hand still a fist; cage still bronze-tan (rust tint lowered next) |
+
 ## Remaining gaps, ranked (what the next passes do)
 
 1. **The opponent's styling.** The T-shirt is clean white; it needs stained, drab institutional clothing, sleeves,

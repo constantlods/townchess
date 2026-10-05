@@ -6,6 +6,7 @@ param([string]$Name = 'shot', [string]$Res = '1920x1080', [string]$Preset = 'cin
 $shots = Join-Path $Workspace 'shots'
 New-Item -ItemType Directory -Force $shots | Out-Null
 $out = (Join-Path $shots "$Name.png").Replace('\', '/')
+Remove-Item $out -ErrorAction SilentlyContinue  # the exporter overwrites without truncating: stale bytes after IEND bloat the PNGs
 $script = (Join-Path $Repo 'ue5\TownChess\Scripts\capture.py').Replace('\', '/')
 $log = Join-Path $Logs "capture-$Name.log"
 $argv = @("`"$Project`"", '/Game/TownChess/L_Table', '-game', '-RenderOffscreen', '-nosound', '-unattended',
