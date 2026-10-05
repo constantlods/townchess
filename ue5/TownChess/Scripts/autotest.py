@@ -239,7 +239,7 @@ def _tick(_dt):
         return
 
     if S["phase"] == "rematch_resign":
-        S["first"] = (st.id, core.get_my_color(), pcm.get_camera_location().x)
+        S["first"] = (st.id, core.get_my_color(), board.square_world("a1").x)
         core.resign()
         S["phase"] = "rematch_ask"
         S["wait_until"] = now + 1.5
@@ -253,15 +253,17 @@ def _tick(_dt):
         return
 
     if S["phase"] == "rematch_verify":
-        first_id, first_color, first_cam_x = S["first"]
+        first_id, first_color, first_a1 = S["first"]
         if st.id == first_id or board.is_animating():
             return
-        _, pcm2 = world()
         color = core.get_my_color()
-        cam_x = pcm2.get_camera_location().x
+        a1 = board.square_world("a1").x
+        cx = board.get_actor_location().x
         check("rematch is a new game", st.id != first_id, f"{first_id} -> {st.id}")
         check("colours swapped on rematch", color != first_color and color in ("w", "b"), f"{first_color} -> {color}")
-        check("camera moved to the other side of the table", (first_cam_x < 0) != (cam_x < 0), f"camera x {first_cam_x:.0f} -> {cam_x:.0f}")
+        # the player keeps the dressed seat; the board turns so the player's own first rank is nearest
+        check("board turned for the new seat (a1 changed sides)", (first_a1 < cx) != (a1 < cx), f"a1 x {first_a1:.0f} -> {a1:.0f}")
+        check("own first rank nearest the player", (a1 < cx) == (color == "w"), f"a1 x {a1:.0f}, board x {cx:.0f}, playing {color}")
         check("board shown from the new seat matches the core", board.is_in_sync(), st.fen)
         screenshot("rematch")
         finish(True)

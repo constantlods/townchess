@@ -258,6 +258,14 @@ void ATCGameMode::ApplySeat(const FString& Color)
 	SeatApplied = Color;
 	ATCBoard* Board = Cast<ATCBoard>(UGameplayStatics::GetActorOfClass(GetWorld(), ATCBoard::StaticClass()));
 	const float Cx = Board ? Board->GetActorLocation().X : 0.f;
+	if (!FParse::Param(FCommandLine::Get(), TEXT("tcmirrorroom")))
+	{
+		// The player always sits in the dressed seat (lamp, cart, the room behind the opponent); as Black the board
+		// turns round so Black's pieces are nearest. The board maps squares through its own transform (drawing, clicks).
+		if (Board) Board->SetActorRotation(FRotator(0.f, Color == TEXT("b") ? 180.f : 0.f, 0.f));
+		UE_LOG(LogTownChess, Log, TEXT("seat: %s (board turned %d)"), Color == TEXT("w") ? TEXT("White") : TEXT("Black"), Color == TEXT("b") ? 180 : 0);
+		return;
+	}
 	for (const auto& KV : SeatOriginals)
 	{
 		if (!KV.Key.IsValid()) continue;
@@ -322,7 +330,8 @@ void ATCPlayerController::OnState(const FTCGameState& State, const FString& Reas
 	const FString Seat = C && !C->GetMyColor().IsEmpty() ? C->GetMyColor() : TEXT("w");
 	if (Seat == CameraFor) return;
 	CameraFor = Seat;
-	const FName Tag = Seat == TEXT("b") ? TEXT("TC_Camera_Black") : TEXT("TC_Camera_White");
+	// one dressed seat: the board turns for Black (ATCGameMode::ApplySeat); -tcmirrorroom restores the moving camera
+	const FName Tag = Seat == TEXT("b") && FParse::Param(FCommandLine::Get(), TEXT("tcmirrorroom")) ? TEXT("TC_Camera_Black") : TEXT("TC_Camera_White");
 	TArray<AActor*> Cams;
 	UGameplayStatics::GetAllActorsWithTag(GetWorld(), Tag, Cams);
 	if (Cams.Num()) SetViewTargetWithBlend(Cams[0], Reason == TEXT("init") ? 0.f : 1.2f, VTBlend_EaseInOut, 2.f);
