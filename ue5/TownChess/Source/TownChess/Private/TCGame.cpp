@@ -2,8 +2,10 @@
 
 #include "Camera/CameraActor.h"
 #include "Engine/Canvas.h"
+#include "CanvasItem.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Engine/FontFace.h"
 #include "Animation/SkeletalMeshActor.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
@@ -421,50 +423,70 @@ void ATCPlayerController::OnKey(FKey Key)
 	ATCBoard* B = Board();
 	if (B && B->HasPendingPromotion())
 	{
-		const FString K = Key.GetFName().ToString().ToLower();
-		if (K == TEXT("q") || K == TEXT("r") || K == TEXT("b") || K == TEXT("n")) B->ChoosePromotion(K);
-		else if (Key == EKeys::Escape) B->ChoosePromotion(TEXT(""));
-		return;
+		const float Pw = 120.f * U2, Cx = Canvas->ClipX * 0.5f - 2.f * Pw, Cy = Canvas->ClipY * 0.5f;
+		Plate(Cx - 16.f * U2, Cy - 76.f * U2, 4.f * Pw + 22.f * U2, 132.f * U2, 0.7f, 0.4f);
+		Text(TEXT("PROMOTE TO"), Canvas->ClipX * 0.5f, Cy - 62.f * U2, Ink, 1.1f, true);
+		Button(TEXT("promo_q"), TEXT("Queen  Q"), Cx, Cy - 16.f * U2, 112.f);
+		Button(TEXT("promo_r"), TEXT("Rook  R"), Cx + Pw, Cy - 16.f * U2, 112.f);
+		Button(TEXT("promo_b"), TEXT("Bishop B"), Cx + 2.f * Pw, Cy - 16.f * U2, 112.f);
+		Button(TEXT("promo_n"), TEXT("Knight N"), Cx + 3.f * Pw, Cy - 16.f * U2, 112.f);
 	}
-	if (Key == EKeys::Tab && !bTypingCode)
-	{
-		if (ATCClipboard* Clip = Cast<ATCClipboard>(UGameplayStatics::GetActorOfClass(GetWorld(), ATCClipboard::StaticClass()))) Clip->Toggle();
-		return;
-	}
-	if (bTypingCode)
-	{
-		if (Key == EKeys::BackSpace) JoinCode.LeftChopInline(1);
-		else if (Key == EKeys::Enter) { bTypingCode = false; if (UTCCoreClient* C = Core()) C->JoinGame(JoinCode.ToUpper()); }
-		else if (Key == EKeys::Escape) bTypingCode = false;
-		else
-		{
-			const FString K = Key.GetFName().ToString();
-			if (K.Len() == 1 && JoinCode.Len() < 11) JoinCode += K.ToUpper();
-			else if (K == TEXT("Hyphen") || K == TEXT("Subtract")) JoinCode += TEXT("-");
-			static const TMap<FString, FString> Digits = {{TEXT("Zero"), TEXT("0")}, {TEXT("One"), TEXT("1")}, {TEXT("Two"), TEXT("2")}, {TEXT("Three"), TEXT("3")}, {TEXT("Four"), TEXT("4")}, {TEXT("Five"), TEXT("5")}, {TEXT("Six"), TEXT("6")}, {TEXT("Seven"), TEXT("7")}, {TEXT("Eight"), TEXT("8")}, {TEXT("Nine"), TEXT("9")}};
-			if (const FString* D = Digits.Find(K)) JoinCode += *D;
-		}
-		return;
-	}
-	if (Key == EKeys::Escape && B) B->ClearSelection();
 }
 
 // ─────────────────────────────── HUD ───────────────────────────────
 
+// ── reference UI style: typewriter caps, dark translucent plates, thin warm borders, hover highlight ──
+
+UFont* ATCHUD::UiFont()
+{
+	if (!Font)
+	{
+		// Courier Prime (OFL): the clipboard's form face, which the level builder imports; built into a runtime font like ATCClipboard does
+		UFontFace* Face = nullptr;
+		for (TActorIterator<ATCClipboard> It(GetWorld()); It && !Face; ++It) Face = It->FormFace;
+		if (Face)
+		{
+			Font = NewObject<UFont>(this);
+			Font->FontCacheType = EFontCacheType::Runtime;
+			Font->LegacyFontSize = 20;
+			FTypefaceEntry& E = Font->GetMutableInternalCompositeFont().DefaultTypeface.Fonts.AddDefaulted_GetRef();
+			E.Name = TEXT("Regular");
+			E.Font = FFontData(Face);
+		}
+	}
+	return Font ? Font.Get() : GEngine->GetMediumFont();
+}
+
+float ATCHUD::Ui() const { return Canvas ? FMath::Clamp(Canvas->ClipY / 1080.f, 0.6f, 2.5f) : 1.f; }
+
 void ATCHUD::Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale, bool bCenter)
 {
-	UFont* Font = GEngine->GetMediumFont();
+	UFont* F = UiFont();
+	const float Sc = Scale * Ui();
 	float W = 0, H = 0;
-	Canvas->TextSize(Font, S, W, H, Scale, Scale);
-	DrawText(S, C, bCenter ? X - W * 0.5f : X, Y, Font, Scale);
+	Canvas->TextSize(F, S, W, H, Sc, Sc);
+	FCanvasTextItem Item(FVector2D(bCenter ? X - W * 0.5f : X, Y), FText::FromString(S), F, C);
+	Item.Scale = FVector2D(Sc, Sc);
+	Item.EnableShadow(FLinearColor(0, 0, 0, 0.6f), FVector2D(1, 1));
+	Canvas->DrawItem(Item);
+}
+
+void ATCHUD::Plate(float X, float Y, float W, float H, float Alpha, float BorderAlpha)
+{
+	DrawRect(FLinearColor(0.012f, 0.011f, 0.01f, Alpha), X, Y, W, H);
+	const FLinearColor B(0.62f, 0.55f, 0.42f, BorderAlpha);
+	DrawRect(B, X, Y, W, 1.f); DrawRect(B, X, Y + H - 1.f, W, 1.f); DrawRect(B, X, Y, 1.f, H); DrawRect(B, X + W - 1.f, Y, 1.f, H);
 }
 
 void ATCHUD::Button(const FString& Id, const FString& Label, float X, float Y, float W)
 {
-	const FVector2D Size(W, 34.f);
-	DrawRect(FLinearColor(0.02f, 0.02f, 0.018f, 0.78f), X, Y, Size.X, Size.Y);
-	DrawRect(FLinearColor(0.55f, 0.45f, 0.28f, 0.9f), X, Y + Size.Y - 2.f, Size.X, 2.f);
-	Text(Label, X + 12.f, Y + 7.f, FLinearColor(0.86f, 0.80f, 0.68f), 1.f);
+	const float U = Ui();
+	const FVector2D Size(W * U, 36.f * U);
+	float Mx = -1, My = -1;
+	if (APlayerController* PC = GetOwningPlayerController()) PC->GetMousePosition(Mx, My);
+	const bool bHover = Mx >= X && Mx <= X + Size.X && My >= Y && My <= Y + Size.Y;
+	Plate(X, Y, Size.X, Size.Y, bHover ? 0.82f : 0.58f, bHover ? 0.85f : 0.35f);
+	Text(Label, X + 14.f * U, Y + 8.f * U, bHover ? FLinearColor(1.f, 0.93f, 0.78f) : FLinearColor(0.86f, 0.80f, 0.68f), 0.9f);
 	Buttons.Add({Id, Label, FVector2D(X, Y), Size});
 }
 
@@ -545,28 +567,29 @@ void ATCHUD::DrawHUD()
 
 void ATCHUD::DrawMenu(UTCCoreClient* C)
 {
-	const float X = 60.f, Y0 = 90.f;
-	Text(TEXT("TOWNCHESS"), X, Y0 - 50.f, FLinearColor(0.86f, 0.78f, 0.6f), 2.2f);
+	const float U = Ui(), X = 70.f * U, Y0 = 150.f * U, Step = 44.f * U;
+	Plate(X - 24.f * U, Y0 - 100.f * U, 400.f * U, 560.f * U, 0.55f, 0.25f);
+	Text(TEXT("TOWNCHESS"), X, Y0 - 86.f * U, FLinearColor(0.62f, 0.55f, 0.45f), 0.8f);
+	Text(TEXT("FIND A GAME"), X, Y0 - 60.f * U, FLinearColor(0.9f, 0.84f, 0.72f), 1.25f);
 	if (C->HasGame() && C->GetState().Status == TEXT("waiting"))
 	{
 		Text(FString::Printf(TEXT("Your table: %s   -   waiting for an opponent"), *C->GetState().Id), X, Y0 + 10.f, FLinearColor(0.9f, 0.85f, 0.7f), 1.2f);
 		Button(TEXT("leave"), TEXT("Leave table"), X, Y0 + 50.f);
 		return;
 	}
-	Button(TEXT("cpu_w"), TEXT("Play The Annotator - White"), X, Y0 + 10.f, 320.f);
-	Button(TEXT("cpu_b"), TEXT("Play The Annotator - Black"), X, Y0 + 52.f, 320.f);
 	FString LevelLabel = Level;
 	for (const FTCAiLevel& L : C->GetAiLevels()) if (L.Id == Level) LevelLabel = L.Label;
-	Button(TEXT("level"), FString::Printf(TEXT("Strength: %s"), *LevelLabel), X, Y0 + 94.f, 320.f);
-	if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
-	{
-		Button(TEXT("opponent"), FString::Printf(TEXT("Opponent: %s"), *OpponentName(GM->GetOpponent())), X + 340.f, Y0 + 94.f, 320.f);
-	}
-	Button(TEXT("tc"), FString::Printf(TEXT("Clock: %s"), *TimeControl), X, Y0 + 136.f, 320.f);
-	Button(TEXT("private"), TEXT("Create private table"), X, Y0 + 196.f, 320.f);
-	Button(TEXT("casual"), TEXT("Find casual opponent"), X, Y0 + 238.f, 320.f);
+	const ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>();
+	float Y = Y0;
+	Button(TEXT("cpu_w"), TEXT("Play vs AI  -  White"), X, Y, 350.f); Y += Step;
+	Button(TEXT("cpu_b"), TEXT("Play vs AI  -  Black"), X, Y, 350.f); Y += Step;
+	Button(TEXT("level"), FString::Printf(TEXT("Strength   %s"), *LevelLabel), X, Y, 350.f); Y += Step;
+	if (GM) { Button(TEXT("opponent"), FString::Printf(TEXT("Opponent   %s"), *OpponentName(GM->GetOpponent())), X, Y, 350.f); Y += Step; }
+	Button(TEXT("tc"), FString::Printf(TEXT("Time Control   %s"), *TimeControl), X, Y, 350.f); Y += Step * 1.4f;
+	Button(TEXT("private"), TEXT("Private Match"), X, Y, 350.f); Y += Step;
+	Button(TEXT("casual"), TEXT("Find Match"), X, Y, 350.f); Y += Step;
 	const ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
-	Button(TEXT("join"), PC && PC->bTypingCode ? FString::Printf(TEXT("Join: %s_  (Enter)"), *PC->JoinCode) : TEXT("Join table by code"), X, Y0 + 280.f, 320.f);
+	Button(TEXT("join"), PC && PC->bTypingCode ? FString::Printf(TEXT("Code: %s_  (Enter)"), *PC->JoinCode) : TEXT("Join by Code"), X, Y, 350.f);
 }
 
 void ATCHUD::DrawGame(UTCCoreClient* C)
@@ -577,22 +600,22 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 	const FTCPlayer& MeP = Me == TEXT("w") ? S.White : S.Black;
 	const FTCPlayer& ThemP = Me == TEXT("w") ? S.Black : S.White;
 	const FLinearColor Ink(0.88f, 0.82f, 0.70f), Dim(0.62f, 0.58f, 0.5f);
-	const auto Plate = [&](const FTCPlayer& P, const FString& Col, float X, bool bRight)
+	const auto PlayerPlate = [&](const FTCPlayer& P, const FString& Col, float X, bool bRight)
 	{
 		const ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>();
 		const FString Who = OpponentName(GM ? GM->GetOpponent() : FString()).ToUpper();
 		const FString Name = P.AiLevel.IsEmpty() ? P.Username : FString::Printf(TEXT("%s (%s)"), *Who, *P.AiLevel);
 		const FString Sub = P.Rating >= 0 ? FString::Printf(TEXT("%s  %d"), Col == TEXT("w") ? TEXT("White") : TEXT("Black"), P.Rating) : (Col == TEXT("w") ? TEXT("White") : TEXT("Black"));
-		const float W = 300.f;
+		const float U = Ui(), W = 250.f * U;
 		const float Bx = bRight ? X - W : X;
-		DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.7f), Bx, 20.f, W, 78.f);
-		Text(Name, Bx + 12.f, 26.f, Ink, 1.f);
-		Text(Sub, Bx + 12.f, 48.f, Dim, 0.85f);
+		Plate(Bx, 24.f * U, W, 58.f * U, 0.55f, 0.3f);
+		Text(Name, Bx + 12.f * U, 30.f * U, Ink, 0.85f);
+		Text(Sub, Bx + 12.f * U, 54.f * U, Dim, 0.72f);
 		const bool bRun = S.IsActive() && S.Turn == Col;
-		Text(S.IsTimed() ? ClockText(C->GetDisplayClockMs(Col)) : TEXT("--:--"), Bx + W - 110.f, 34.f, bRun ? FLinearColor(1.f, 0.85f, 0.5f) : Dim, 1.6f);
+		Text(S.IsTimed() ? ClockText(C->GetDisplayClockMs(Col)) : TEXT("--:--"), Bx + W * 0.5f, 90.f * U, bRun ? FLinearColor(1.f, 0.9f, 0.7f) : Dim, 1.7f, true);
 	};
-	Plate(MeP, Me, 20.f, false);
-	Plate(ThemP, Them, Canvas->ClipX - 20.f, true);
+	PlayerPlate(MeP, Me, 30.f * Ui(), false);
+	PlayerPlate(ThemP, Them, Canvas->ClipX - 30.f * Ui(), true);
 
 	FString Status;
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
@@ -607,29 +630,30 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 		Status = GM && GM->GetOpponent() == TEXT("annotator") ? TEXT("The Annotator is writing...") : TEXT("The patient is thinking...");
 	}
 	for (const FTCGameEvent& E : S.LastEvents) if (E.Type == TEXT("check") && S.IsActive()) Status = TEXT("CHECK  -  ") + Status;
-	Text(Status, Canvas->ClipX * 0.5f, 30.f, S.IsFinished() ? FLinearColor(0.95f, 0.8f, 0.55f) : Ink, S.IsFinished() ? 1.6f : 1.2f, true);
+	Text(Status, Canvas->ClipX * 0.5f, 30.f * Ui(), S.IsFinished() ? FLinearColor(0.95f, 0.8f, 0.55f) : Ink, S.IsFinished() ? 1.6f : 1.2f, true);
 	// the opening and the moves live on the clipboard (Tab), not across the top of the screen
-	if (!S.OpeningName.IsEmpty() && bScreenRecord) Text(FString::Printf(TEXT("%s  %s"), *S.OpeningEco, *S.OpeningName), Canvas->ClipX * 0.5f, 64.f, Dim, 0.85f, true);
-	Text(TEXT("[Tab] game record"), Canvas->ClipX - 20.f, Canvas->ClipY - 34.f, FLinearColor(0.5f, 0.47f, 0.42f, 0.8f), 0.75f, false);
-	if (S.Disconnected.Contains(Them)) Text(TEXT("Opponent disconnected - waiting"), Canvas->ClipX * 0.5f, 88.f, FLinearColor(0.9f, 0.6f, 0.3f), 0.9f, true);
+	if (!S.OpeningName.IsEmpty() && bScreenRecord) Text(FString::Printf(TEXT("%s  %s"), *S.OpeningEco, *S.OpeningName), Canvas->ClipX * 0.5f, 64.f * Ui(), Dim, 0.85f, true);
+	Text(TEXT("[TAB] GAME RECORD"), Canvas->ClipX - 230.f * Ui(), Canvas->ClipY - 40.f * Ui(), FLinearColor(0.5f, 0.47f, 0.42f, 0.8f), 0.75f, false);
+	if (S.Disconnected.Contains(Them)) Text(TEXT("Opponent disconnected - waiting"), Canvas->ClipX * 0.5f, 88.f * Ui(), FLinearColor(0.9f, 0.6f, 0.3f), 0.9f, true);
 
-	float Y = 140.f;
+	const float U2 = Ui(), AX = 30.f * U2;
+	float Y = Canvas->ClipY * 0.42f;
 	if (S.IsActive())
 	{
 		if (!S.DrawOfferBy.IsEmpty() && S.DrawOfferBy != Me)
 		{
-			Text(TEXT("Your opponent offers a draw"), 20.f, Y, Ink, 0.95f); Y += 26.f;
-			Button(TEXT("accept"), TEXT("Accept draw"), 20.f, Y, 200.f); Y += 40.f;
-			Button(TEXT("decline"), TEXT("Decline"), 20.f, Y, 200.f); Y += 52.f;
+			Text(TEXT("Your opponent offers a draw"), AX, Y, Ink, 0.95f); Y += 28.f * U2;
+			Button(TEXT("accept"), TEXT("Accept draw"), AX, Y, 210.f); Y += 44.f * U2;
+			Button(TEXT("decline"), TEXT("Decline"), AX, Y, 210.f); Y += 56.f * U2;
 		}
-		else Button(TEXT("offer"), S.DrawOfferBy == Me ? TEXT("Draw offered") : TEXT("Offer draw"), 20.f, Y, 200.f), Y += 40.f;
-		if (!S.ClaimableDraw.IsEmpty() && C->IsMyTurn()) { Button(TEXT("claim"), FString::Printf(TEXT("Claim draw (%s)"), *S.ClaimableDraw), 20.f, Y, 200.f); Y += 40.f; }
-		Button(TEXT("resign"), bConfirmResign ? TEXT("Click again to resign") : TEXT("Resign"), 20.f, Y, 200.f);
+		else Button(TEXT("offer"), S.DrawOfferBy == Me ? TEXT("Draw offered") : TEXT("Offer draw"), AX, Y, 210.f), Y += 44.f * U2;
+		if (!S.ClaimableDraw.IsEmpty() && C->IsMyTurn()) { Button(TEXT("claim"), FString::Printf(TEXT("Claim draw (%s)"), *S.ClaimableDraw), AX, Y, 210.f); Y += 44.f * U2; }
+		Button(TEXT("resign"), bConfirmResign ? TEXT("Click again to resign") : TEXT("Resign"), AX, Y, 210.f);
 	}
 	else if (S.IsFinished())
 	{
-		Button(TEXT("rematch"), S.RematchOfferBy.IsEmpty() ? TEXT("Rematch") : (S.RematchOfferBy == Me ? TEXT("Rematch offered") : TEXT("Accept rematch")), 20.f, Y, 200.f);
-		Button(TEXT("leave"), TEXT("Leave table"), 20.f, Y + 40.f, 200.f);
+		Button(TEXT("rematch"), S.RematchOfferBy.IsEmpty() ? TEXT("Rematch") : (S.RematchOfferBy == Me ? TEXT("Rematch offered") : TEXT("Accept rematch")), AX, Y, 210.f);
+		Button(TEXT("leave"), TEXT("Leave table"), AX, Y + 44.f * U2, 210.f);
 	}
 	if (B && B->HasPendingPromotion())
 	{

@@ -9,6 +9,7 @@
 
 class ATCBoard;
 class UTCCoreClient;
+class UFont;
 
 /**
  * Startup and seat handling.
@@ -106,6 +107,10 @@ private:
 	struct FButton { FString Id; FString Label; FVector2D Pos, Size; };
 	TArray<FButton> Buttons;
 	void Button(const FString& Id, const FString& Label, float X, float Y, float W = 260.f);
+	void Plate(float X, float Y, float W, float H, float Alpha, float BorderAlpha);
+	UFont* UiFont();
+	float Ui() const;
+	UPROPERTY(Transient) TObjectPtr<UFont> Font;
 	void Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale = 1.f, bool bCenter = false);
 	void DrawMenu(UTCCoreClient* C);
 	void DrawGame(UTCCoreClient* C);
