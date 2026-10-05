@@ -43,6 +43,7 @@ public:
 private:
 	UFUNCTION() void OnCoreReady(const FString& Url);
 	UFUNCTION() void OnConnection(const FString& State);
+	void TryAutoStart();
 	UFUNCTION() void OnState(const FTCGameState& State, const FString& Reason);
 	void ApplySeat(const FString& Color);
 	void ApplyQualityPreset();

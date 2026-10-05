@@ -200,7 +200,7 @@ void ATCGameMode::SmokeTick()
 	{
 		if (bAutoDone && S.IsActive() && S.History.Num() == 0) { SmokeGameId = S.Id; SmokeLog.Add(FString::Printf(TEXT("own game %s vs %s"), *S.Id, *(S.White.AiLevel + S.Black.AiLevel))); }
 		else if (S.IsActive()) { if (!bSmokeResigned) { SmokeLog.Add(TEXT("resigning a restored game ") + S.Id); C->Resign(); bSmokeResigned = true; } return; }
-		else { C->LeaveGame(); bAutoDone = false; return; }  // the auto-start may have been refused ("busy") by the restored game: retry
+		else { C->LeaveGame(); bAutoDone = false; TryAutoStart(); return; }  // the auto-start was refused ("busy") by the restored game: start ours now (no new connection event would)
 	}
 	if (S.Id != SmokeGameId) return;
 	const int32 Ply = S.History.Num();
@@ -253,7 +253,9 @@ void ATCGameMode::OnCoreReady(const FString& Url)
 	Core->Connect(Url, GI->GetSubsystem<UTCLocalCore>()->GetSecret(), Username);
 }
 
-void ATCGameMode::OnConnection(const FString& State)
+void ATCGameMode::OnConnection(const FString& State) { TryAutoStart(); }
+
+void ATCGameMode::TryAutoStart()
 {
 	UTCCoreClient* Core = GetGameInstance()->GetSubsystem<UTCCoreClient>();
 	if (Core->GetConnection() != ETCConnection::Welcomed || bAutoDone || Auto.IsEmpty() || (Core->HasGame() && !Core->GetState().IsFinished())) return;
