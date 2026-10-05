@@ -793,6 +793,15 @@ def _xf(t):
 SEATED = {}
 
 
+def bone_relative(bone, offset):
+    """head_relative for any recorded bone (spine_03, spine_05, pelvis): props authored in component space."""
+    t1, q1, q0 = SEATED[bone]
+    tilt = _qmul(q1, _qinv(q0))
+    o = _qrot(tilt, offset)
+    iq = _qinv(q1)
+    return unreal.Vector(*_qrot(iq, o)), unreal.Quat(*_qmul(iq, tilt)).rotator()
+
+
 def head_relative(offset):
     """Relative transform (location, rotator) on the 'head' bone that puts a prop authored face +Y / up +Z (mannequin
     component space) at `offset` from the head bone, following the seated pose's head tilt."""
@@ -958,6 +967,9 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
     # head in the seated pose (component space) and its idle orientation, for props attached to the head bone
     SEATED["head"] = (new_w["head"][0], new_w["head"][1], wld["head"][1])
+    for b_ in ("spine_03", "spine_05", "pelvis"):
+        if b_ in new_w:
+            SEATED[b_] = (new_w[b_][0], new_w[b_][1], wld[b_][1])
 
     path = f"{dest}/{name}"
     if EAL.does_asset_exist(path):
@@ -1432,6 +1444,17 @@ def build():
             EAL.save_loaded_asset(cage[0])
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,4.5,-1").split(",")]  # forward (+Y), up (+Z) from the head bone
             attach_static("CageMask", cage[0], smc, "head", *head_relative(off), "TC_Opponent_caged")
+        # straitjacket: canvas webbing belts round the chest and waist with brass buckles (props.py "restraint_straps")
+        straps = import_prop("restraint_straps")
+        if straps and "spine_03" in SEATED:
+            mi_web = make_mi(master, "MI_Webbing", {"BaseColor": None}, tint=(0.34, 0.3, 0.22), rough=0.9, grime_color=(0.4, 0.32, 0.22),
+                             scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "MicroRough": 0.1})
+            mi_buckle = make_mi(master, "MI_Buckle", {"BaseColor": None}, metal=1.0, rough=0.45, tint=(0.55, 0.42, 0.22))
+            for sm in straps:
+                for i, sl in enumerate(sm.static_materials):
+                    sm.set_material(i, mi_buckle if "buckle" in str(sl.material_slot_name).lower() else mi_web)
+                EAL.save_loaded_asset(sm)
+            attach_static("Straitjacket", straps[0], smc, "spine_03", *bone_relative("spine_03", [0.0, 2.0, 0.0]), "TC_Opponent_caged")
 
     # 0. The player's own arms (first person): the reference shows real hands with sleeves resting on the board,
     #    not floating gloves. Eyes at the camera (x=-87, z=top+42); ATCGameMode hides the head (tag TC_PlayerBody).

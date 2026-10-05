@@ -713,6 +713,54 @@ def brass_bowl():
     export("brass_bowl.obj")
 
 
+
+def restraint_straps():
+    """Straitjacket webbing for a seated adult torso: a chest belt and a waist belt (elliptical, 5 cm webbing, stitched
+    edges) with brass roller buckles on the front, and a vertical strap joining them. Origin at the chest belt centre,
+    front = Blender -Y (UE +Y after export, like the masks)."""
+    reset()
+    parts = []
+    def belt(z, rx, ry, w, name):
+        bm = bmesh.new()
+        seg = 72
+        ring_lo, ring_hi = [], []
+        for k in range(seg):
+            a = 2 * math.pi * k / seg
+            x, y = rx * math.cos(a), ry * math.sin(a)
+            ring_lo.append(bm.verts.new((x, y, z - w / 2)))
+            ring_hi.append(bm.verts.new((x, y, z + w / 2)))
+        for k in range(seg):
+            bm.faces.new((ring_lo[k], ring_lo[(k + 1) % seg], ring_hi[(k + 1) % seg], ring_hi[k]))
+        ob = obj_from_bm(name, bm)
+        so = ob.modifiers.new("solid", "SOLIDIFY"); so.thickness = 0.003; so.offset = 1
+        bv = ob.modifiers.new("bev", "BEVEL"); bv.width = 0.001; bv.segments = 2
+        apply_mods(ob)
+        material(ob, "M_Webbing")
+        parts.append(ob)
+    belt(0.0, 0.175, 0.125, 0.05, "ChestBelt")       # just outside the shirt at the chest
+    belt(-0.22, 0.165, 0.12, 0.05, "WaistBelt")
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, -0.127, -0.11))
+    v = bpy.context.active_object; v.scale = (0.045, 0.004, 0.22); bpy.ops.object.transform_apply(scale=True)
+    material(v, "M_Webbing"); parts.append(v)
+    for z in (0.0, -0.22):  # roller buckles on the front
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.0032, major_segments=24, minor_segments=8,
+                                         location=(0.06, -0.13, z), rotation=(math.radians(90), 0, 0))
+        b = bpy.context.active_object; b.scale = (1.0, 1.3, 1.0); material(b, "M_Buckle"); parts.append(b)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0025, depth=0.05, location=(0.06, -0.133, z))
+        p = bpy.context.active_object; material(p, "M_Buckle"); parts.append(p)
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    st = bpy.context.active_object
+    st.name = "SM_RestraintStraps"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    export("restraint_straps.obj")
+
+
 def export(name):
     # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
     # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
@@ -736,7 +784,7 @@ BUILDERS = {
     "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp,
     "annotator_mask": annotator_mask, "annotator_coif": annotator_coif, "ledger": ledger, "pencil": pencil,
     "oversleeve": lambda: sleeve("SM_Oversleeve", 0.24, 0.042, 0.034, "M_Duck", "oversleeve.obj"),
-    "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl,
+    "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl, "restraint_straps": restraint_straps,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.055, 0.046, "M_CoatWool", "coat_sleeve.obj"),
 }
 for k, f in BUILDERS.items():
