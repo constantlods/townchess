@@ -146,9 +146,21 @@ void ATCGameMode::ApplyPlayerLook(const FString& Look)
 			Shown += bOn ? 1 : 0;
 		}
 	}
+	// skin variants are material swaps on the player's body (MI_PlayerSkin_<bare|dirty|scarred>, render artist pass 53;
+	// /Game/TownChess/Characters/PlayerSkin is always cooked); the look names at most one of them, bare otherwise
+	FString Skin = TEXT("bare");
+	for (const FString& W : Want) if (W == TEXT("dirty") || W == TEXT("scarred")) Skin = W;
+	UMaterialInterface* SkinMat = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/TownChess/Characters/PlayerSkin/MI_PlayerSkin_%s.MI_PlayerSkin_%s"), *Skin, *Skin));
+	if (SkinMat)
+	{
+		for (TActorIterator<ASkeletalMeshActor> It(GetWorld()); It; ++It)
+		{
+			if (It->ActorHasTag(TEXT("TC_PlayerBody")) && It->ActorHasTag(TEXT("TC_Body"))) It->GetSkeletalMeshComponent()->SetMaterial(0, SkinMat);
+		}
+	}
 	GConfig->SetString(TEXT("TownChess"), TEXT("PlayerLook"), *PlayerLook, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
-	UE_LOG(LogTownChess, Log, TEXT("player look: %s (%d parts shown)"), *PlayerLook, Shown);
+	UE_LOG(LogTownChess, Log, TEXT("player look: %s (%d parts shown, skin %s%s)"), *PlayerLook, Shown, *Skin, SkinMat ? TEXT("") : TEXT(" not found"));
 }
 
 void ATCGameMode::ApplyOpponent(const FString& Id)
@@ -705,7 +717,11 @@ UTexture2D* ATCHUD::Portrait(const FString& OpponentId)
 
 FString ATCHUD::LookName(const FString& Look)
 {
-	return Look == TEXT("sleeves") ? TEXT("Sleeves") : Look == TEXT("watch") ? TEXT("Watch") : Look == TEXT("sleeves+watch") ? TEXT("Sleeves + Watch") : TEXT("Bare");
+	if (Look == TEXT("bare") || Look.IsEmpty()) return TEXT("Bare");
+	TArray<FString> P;
+	Look.ParseIntoArray(P, TEXT("+"));
+	for (FString& S : P) S = S.Left(1).ToUpper() + S.Mid(1);
+	return FString::Join(P, TEXT(" + "));
 }
 
 FString ATCHUD::OpponentName(const FString& Id)
@@ -735,10 +751,12 @@ void ATCHUD::PressButton(const FString& Id)
 	{
 		if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
 		{
-			static const TCHAR* Looks[] = {TEXT("bare"), TEXT("sleeves"), TEXT("watch"), TEXT("sleeves+watch")};
+			// the reference's HAND CUSTOMIZATION: skins (bare, dirty, scarred) and accessories (sleeves, watch)
+			static const TCHAR* Looks[] = {TEXT("bare"), TEXT("dirty"), TEXT("scarred"), TEXT("sleeves"), TEXT("watch"), TEXT("dirty+sleeves+watch")};
+			constexpr int32 N = UE_ARRAY_COUNT(Looks);
 			int32 I = 0;
-			for (int32 k = 0; k < 4; ++k) if (GM->GetPlayerLook() == Looks[k]) I = k;
-			GM->ApplyPlayerLook(Looks[(I + 1) % 4]);
+			for (int32 k = 0; k < N; ++k) if (GM->GetPlayerLook() == Looks[k]) I = k;
+			GM->ApplyPlayerLook(Looks[(I + 1) % N]);
 		}
 	}
 	else if (Id == TEXT("settings")) bShowSettings = !bShowSettings;
