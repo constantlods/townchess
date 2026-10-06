@@ -895,19 +895,19 @@ def wristwatch():
     st = bpy.context.active_object
     # object scale acts on the torus's own axes (before the rotation): its Z (the ring axis, now the arm) sets the strap
     # width, its X/Y (now world Z/Y) the oval (2.8 on X stretched the ring itself into a 9 cm hoop, pass 52)
-    st.scale = (0.67, 0.88, 2.8)
+    st.scale = (0.85, 0.97, 2.8)  # 2.8 x 3.2 cm oval: 2.2 x 2.9 sank into the MetaHuman wrist
     bpy.ops.object.transform_apply(scale=True, rotation=True)
     material(st, "M_Strap"); parts.append(st)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.017, depth=0.008, location=(0, 0, 0.026))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.017, depth=0.008, location=(0, 0, 0.032))
     case = bpy.context.active_object
     bv = case.modifiers.new("bevel", "BEVEL"); bv.width = 0.0015; bv.segments = 3
     apply_mods(case); material(case, "M_Steel"); parts.append(case)
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=8, radius=0.015, location=(0, 0, 0.029))
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=8, radius=0.015, location=(0, 0, 0.035))
     gl = bpy.context.active_object
     gl.scale = (1, 1, 0.22)
     bpy.ops.object.transform_apply(scale=True)
     material(gl, "M_Dial"); parts.append(gl)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0022, depth=0.004, location=(0.0, 0.019, 0.026),
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0022, depth=0.004, location=(0.0, 0.019, 0.032),
                                         rotation=(math.radians(90), 0, 0))
     crown = bpy.context.active_object
     material(crown, "M_Steel"); parts.append(crown)
