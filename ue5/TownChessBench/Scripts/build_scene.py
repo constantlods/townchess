@@ -829,6 +829,15 @@ POSES = {
 }
 
 
+def _nlerp(a, b, t):
+    """Normalised lerp between two quaternions (x, y, z, w), taking the short way round."""
+    if sum(a[i] * b[i] for i in range(4)) < 0:
+        b = tuple(-v for v in b)
+    q = [a[i] * (1 - t) + b[i] * t for i in range(4)]
+    n = math.sqrt(sum(v * v for v in q)) or 1.0
+    return tuple(v / n for v in q)
+
+
 def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, pose_name="rest"):
     """Authors a single-frame seated pose for the UE5 mannequin.
 
@@ -866,6 +875,14 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             if b in ref_names:
                 loc[b] = (_xf(unreal.AnimPoseExtensions.get_bone_pose(ref, b, unreal.AnimPoseSpaces.LOCAL))[0], loc[b][1])
         names = [b for b in names if b in ref_names]
+        if pose_name == "player":
+            # The idle's hanging hands curl every finger; resting on the table that read as a fist (LIM-011). Blend the
+            # finger joints toward the reference pose (straight fingers) and keep a little of the idle's curl.
+            relax = float(os.environ.get("TC_FINGER_RELAX", 0.6))
+            for b in names:
+                if b.startswith(("thumb_", "index_", "middle_", "ring_", "pinky_")) and not b.endswith("metacarpal_l") and not b.endswith("metacarpal_r"):
+                    rq = _xf(unreal.AnimPoseExtensions.get_bone_pose(ref, b, unreal.AnimPoseSpaces.LOCAL))[1]
+                    loc[b] = (loc[b][0], _nlerp(loc[b][1], rq, relax))
 
     order = []
     seen = set()
