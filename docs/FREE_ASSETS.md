@@ -19,7 +19,8 @@ where free assets fall short. No paid assets, nothing ripped from commercial gam
 | old_bed_frame, wheelchair_01, metal_office_desk, drawer_cabinet, painted_wooden_chair_01, book_encyclopedia_set_01, modular_industrial_pipes_01, mounted_fluorescent_lights, alarm_clock_01, desk_lamp_arm_01, lightbulb_01 | polyhaven.com/a/<slug> | CC0 | 2K | Room props |
 | MetaHuman (Walter preset, wardrobe, grooms) | Unreal Engine MetaHuman Creator 5.8 | Epic MetaHuman licence (free for UE projects; no AI training) | Cinematic pipeline | Opponents and the player's arms |
 | UE template mannequins (fallback) | Unreal Engine templates | UE EULA | — | Fallback when no MetaHuman is built |
-| Patrick Hand, Courier Prime | Google Fonts | SIL OFL 1.1 (licences in `ue5/assets/fonts`) | — | Clipboard game record |
+| Patrick Hand, Courier Prime | Google Fonts | SIL OFL 1.1 (licences in `ue5/assets/fonts`) | — | Clipboard game record; Courier Prime Regular also for the HUD's section titles |
+| Lato Light, Lato Regular | https://github.com/google/fonts/tree/main/ofl/lato | SIL OFL 1.1 (`ue5/assets/fonts/OFL-Lato.txt`) | — | HUD text (names, clocks, menus, action list) |
 | Stockfish 19 | https://github.com/official-stockfish/Stockfish/releases/tag/sf_19 | GPL-3.0, separate process only (`tools/engines/SOURCE.txt`) | — | League opponents, simulator referee |
 
 All Poly Haven downloads are scripted (`ue5/tools/fetch_polyhaven.py`, hero resolutions in `HERO`/`HERO_TEXTURES`).
@@ -32,6 +33,7 @@ All Poly Haven downloads are scripted (`ue5/tools/fetch_polyhaven.py`, hero reso
 | Blood decals (spatter, pool, smear, drips: colour/coverage, relief, gloss) and handling-grime masks | `ue5/tools/textures/blood.py` (numpy/scipy/pillow, `tools/.venv`) | `ue5/assets/textures/blood`, `.../grime` |
 | Inlaid board surface (maple/walnut composite, joints, scratches, wear) | `ue5/tools/textures/board.py` | `ue5/assets/textures/board` |
 | Grime mask (blotches, streaks, smudges) | `build_scene.py` `grime_png` | built into the level |
+| Piece sounds: wooden move "clack" and heavier capture (synthesised: modal resonances of a wood block plus a felt thud) | `ue5/tools/audio/clack.py` | `ue5/assets/sounds/S_TC_Move.wav`, `S_TC_Capture.wav` |
 
 ## Credits
 

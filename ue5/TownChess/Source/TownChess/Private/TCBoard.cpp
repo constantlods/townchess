@@ -349,8 +349,12 @@ bool ATCBoard::ChoosePromotion(const FString& Piece)
 {
 	UTCCoreClient* C = Core();
 	if (!C || PromotionFrom.IsEmpty()) return false;
-	if (!C->IsMyTurn()) { PromotionFrom.Empty(); PromotionTo.Empty(); ClearSelection(); return false; }
-	if (Piece.IsEmpty()) { PromotionFrom.Empty(); PromotionTo.Empty(); ClearSelection(); return false; }
+	if (!C->IsMyTurn() || Piece.IsEmpty())
+	{
+		// cancelled: a pawn dragged to the last rank goes home (BUG-008: it stayed drawn on the promotion square)
+		if (!DroppedFrom.IsEmpty()) { SnapBack(DroppedFrom); DroppedFrom.Empty(); }
+		PromotionFrom.Empty(); PromotionTo.Empty(); ClearSelection(); return false;
+	}
 	C->SubmitMove(PromotionFrom, PromotionTo, Piece.Left(1).ToLower());
 	PromotionFrom.Empty();
 	PromotionTo.Empty();
@@ -515,8 +519,9 @@ ETCClickResult ATCBoard::EndDrag(const FString& Square)
 	}
 	Selected = From;
 	const ETCClickResult R = ClickSquare(Square);
-	if (R == ETCClickResult::Submitted) DroppedFrom = From;  // stays where it was dropped until the core answers
-	else if (R != ETCClickResult::NeedsPromotion) SnapBack(From);
+	// stays where it was dropped until the core answers (or, for a promotion, until the piece is chosen or cancelled)
+	if (R == ETCClickResult::Submitted || R == ETCClickResult::NeedsPromotion) DroppedFrom = From;
+	else SnapBack(From);
 	return R;
 }
 

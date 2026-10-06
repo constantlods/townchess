@@ -72,8 +72,10 @@ public:
 	ATCBoard* Board() const;
 	UTCCoreClient* Core() const;
 	/** Text entry for the "join table" code on the menu. */
-	FString JoinCode;
-	bool bTypingCode = false;
+	UPROPERTY(BlueprintReadOnly, Category = "TownChess") FString JoinCode;
+	UPROPERTY(BlueprintReadOnly, Category = "TownChess") bool bTypingCode = false;
+	/** Autotest hook: feeds a key (by name: "Tab", "A", "BackSpace", "Escape", "Q") through the same handler as the keyboard. */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void PressKeyForTest(FName KeyName) { OnKey(FKey(KeyName)); }
 private:
 	void OnClick();
 	void OnRelease();
@@ -85,6 +87,11 @@ private:
 };
 
 /** Minimal in-world HUD (canvas): menu, player plates, clocks, status, actions, promotion picker. */
+/** HUD fonts: the reference pairs a clean sans (play) with thin monospace capitals (section titles). */
+enum class ETCUiFont : uint8 { Sans, SansLight, Title };
+/** HUD button looks: quiet text row, bordered option, filled primary action. */
+enum class ETCButton : uint8 { Plain, Boxed, Primary };
+
 UCLASS()
 class TOWNCHESS_API ATCHUD : public AHUD
 {
@@ -110,12 +117,14 @@ public:
 private:
 	struct FButton { FString Id; FString Label; FVector2D Pos, Size; };
 	TArray<FButton> Buttons;
-	void Button(const FString& Id, const FString& Label, float X, float Y, float W = 260.f);
-	void Plate(float X, float Y, float W, float H, float Alpha, float BorderAlpha);
-	UFont* UiFont();
+	void Button(const FString& Id, const FString& Label, float X, float Y, float W = 260.f, ETCButton Style = ETCButton::Plain);
+	void Plate(float X, float Y, float W, float H, float Alpha, float BorderAlpha, const FLinearColor& Fill = FLinearColor(0.012f, 0.011f, 0.01f));
+	bool Hovered(float X, float Y, float W, float H) const;
+	UFont* UiFont(ETCUiFont Which = ETCUiFont::Sans);
+	float TextWidth(const FString& S, float Scale, ETCUiFont Which = ETCUiFont::Sans);
 	float Ui() const;
-	UPROPERTY(Transient) TObjectPtr<UFont> Font;
-	void Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale = 1.f, bool bCenter = false);
+	UPROPERTY(Transient) TArray<TObjectPtr<UFont>> Fonts;
+	void Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale = 1.f, bool bCenter = false, ETCUiFont Which = ETCUiFont::Sans);
 	void DrawUi();
 	void DrawMenu(UTCCoreClient* C);
 	void DrawGame(UTCCoreClient* C);

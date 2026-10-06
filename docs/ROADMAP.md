@@ -261,6 +261,12 @@ Per-ply checks (every scenario):
 | Opponent roster (caged patient, the Annotator) with an in-menu picker | Built; switching verified by capture | `-tcopponent=`, Opponent button |
 | Board turns for Black (player keeps the dressed seat) on rematch | Pass (8/8) | `autotest.ps1 -Test rematch` |
 | Four-stage agent pipeline (chess guardian, visual judge, oversight, GitHub keeper) | Running; run 1 found and fixed BUG-007 | `docs/AGENT_PIPELINE.md` |
+| Drag and drop (illegal drop snaps back; legal drop submitted, accepted, settles on its square) | Pass (8/8) | `autotest.ps1 -Test drag` |
+| Gameplay feel: 0.2 s ease-out moves, capture in parallel, hover marker, grab during an animation, wood sounds | Built; cpu 68/68 and rematch 8/8 re-run on it | `ATCBoard` |
+| Quality preset: Epic + hardware ray tracing (Lumen GI/reflections, RT shadows) when the GPU supports it, `-tcquality=` override | Built; the packaged log shows `quality: epic (level 3), hardware ray tracing on` | `ATCGameMode::ApplyQualityPreset` |
+| Reference-style HUD (Lato + monospace titles, player cards with clocks, quiet action list, FIND A GAME panel, PROMOTION card, CHECKMATE end card), captured with the scene | Built; screenshots `-TCHud=1` | `ATCHUD` |
+| Packaged game starts (the editor had enabled OptiXDenoise, whose missing DLL crashed it at launch) | Pass after disabling the plugin; smoke 12/12, Job Object, Defender clean | `test_package.ps1` |
+| Keyboard paths: Tab clipboard, join-code typing, BackSpace, Escape | New `keys` scenario (promotion keys need a start-position option in the core) | `autotest.ps1 -Test keys` |
 | Player character/hands selection | Not started (needs per-character MetaHumans, LIM-011) | — |
 | **Owner's interactive launch through the root `TownChess.exe` stub: HUD and real mouse input** | **Pending** (the stub hung with no child in the non-interactive SSH session; the tests launch `TownChess/Binaries/Win64/TownChess.exe` directly) | owner |
 

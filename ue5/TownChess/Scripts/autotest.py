@@ -13,6 +13,8 @@ Scenarios (-TCTest=):
              engine), checking sync after every move; used for the special-rules game against a browser opponent
   reconnect  joins the active game after a restart and verifies the rebuilt board, turn and clocks, then plays on
   drag       drag and drop with the board API the mouse uses: an illegal drop snaps back; a legal drop is accepted
+  keys       keyboard paths through the real key handler: Tab raises and lowers the clipboard; on the menu, "Join by Code"
+             takes typed letters, BackSpace and Escape (promotion keys need a start-position option in the core: not yet)
   rematch    resigns the first game and asks for a rematch: the new game must seat us on the other colour, and the
              board, camera and seat-mirrored props must follow by themselves ("the board flips between games")
 """
@@ -213,7 +215,7 @@ def _tick(_dt):
             check("connected, authenticated and joined a game", True, f"{st.id} as {core.get_my_color()}")
             check("board built from authoritative FEN", board.is_in_sync(), st.fen)
             screenshot("start")
-            S["phase"] = {"cpu": "reject", "reconnect": "verify_reconnect", "rematch": "rematch_resign", "drag": "drag_illegal"}.get(TEST, "play")
+            S["phase"] = {"cpu": "reject", "reconnect": "verify_reconnect", "rematch": "rematch_resign", "drag": "drag_illegal", "keys": "keys_tab"}.get(TEST, "play")
             S["wait_until"] = now + 1.0
         return
 
@@ -273,6 +275,59 @@ def _tick(_dt):
         mine = [h for h in st.history if h.color == core.get_my_color()]
         check("core accepted the dropped move", len(st.history) > S["plies_before"] and mine and mine[-1].to == to, st.fen)
         check("dropped piece settled exactly on its square, board in sync", board.is_in_sync() and board.get_physical_mismatches() == 0 and board.get_resyncs() == 0)
+        finish(True)
+        return
+
+    if S["phase"] == "keys_tab":
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        clip = next(iter(unreal.GameplayStatics.get_all_actors_of_class(w, unreal.TCClipboard)), None)
+        check("level has the game-record clipboard", clip is not None)
+        if not clip:
+            finish(False)
+            return
+        S["clip_before"] = clip.is_raised()
+        pc.press_key_for_test("Tab")
+        S["phase"] = "keys_tab_up"
+        S["wait_until"] = now + 1.0
+        return
+
+    if S["phase"] == "keys_tab_up":
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        clip = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.TCClipboard)[0]
+        check("Tab raises the clipboard", clip.is_raised() != S["clip_before"] and clip.is_raised())
+        pc.press_key_for_test("Tab")
+        S["phase"] = "keys_tab_down"
+        S["wait_until"] = now + 1.0
+        return
+
+    if S["phase"] == "keys_tab_down":
+        clip = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.TCClipboard)[0]
+        check("Tab again puts it back", not clip.is_raised())
+        core.resign()
+        S["phase"] = "keys_leave"
+        S["wait_until"] = now + 1.5
+        return
+
+    if S["phase"] == "keys_leave":
+        core.leave_game()
+        S["phase"] = "keys_join"
+        S["wait_until"] = now + 1.0
+        return
+
+    if S["phase"] == "keys_join":
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        hud = pc.get_hud()
+        check("menu shows Join by Code", "join" in list(hud.get_visible_buttons()), list(hud.get_visible_buttons()))
+        hud.press_button("join")
+        check("Join by Code starts code entry", pc.get_editor_property("b_typing_code") and pc.get_editor_property("join_code") == "GAME-")
+        for k in ("A", "B", "One"):
+            pc.press_key_for_test(k)
+        code = pc.get_editor_property("join_code")
+        check("typed keys appear in the code", code == "GAME-AB1", code)
+        pc.press_key_for_test("BackSpace")
+        check("BackSpace removes the last character", pc.get_editor_property("join_code") == "GAME-AB", pc.get_editor_property("join_code"))
+        pc.press_key_for_test("Escape")
+        check("Escape ends code entry", not pc.get_editor_property("b_typing_code"))
         finish(True)
         return
 

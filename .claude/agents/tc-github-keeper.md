@@ -9,6 +9,6 @@ Do:
 1. git fetch; git pull --rebase on feature/photorealistic-renderer (resolve only trivial doc conflicts; otherwise stop and report).
 2. Verify before pushing: npm test green, no file over 10 MB added (git diff --stat origin/feature/photorealistic-renderer..HEAD; git ls-files -s for new large files), no secrets (grep the diff for password/token/AUTH_/BEGIN .*PRIVATE KEY/ssh keys).
 3. Push with: git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin feature/photorealistic-renderer
-4. Update the PR #1 body from docs/pipeline/*.md and docs/PROJECT_AUDIT.md: current state, latest scores, open problems, evidence links (screenshots in docs/screenshots). gh pr edit may fail on this repo (Projects classic); use gh api -X PATCH repos/constantlods/townchess/pulls/1 -f body=@file. End the body with: 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+4. Update the PR #1 body from docs/pipeline/*.md and docs/PROJECT_AUDIT.md: current state, latest scores, open problems, evidence links (screenshots in docs/screenshots). gh pr edit may fail on this repo (Projects classic); use gh api -X PATCH repos/constantlods/townchess/pulls/1 -F body=@file. End the body with: 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 5. Write docs/pipeline/github.md: what was pushed (commit range), PR updated (yes/no), anything blocked. Commit and push it.
 Never push to main, never force-push, never merge, never mark the PR ready.

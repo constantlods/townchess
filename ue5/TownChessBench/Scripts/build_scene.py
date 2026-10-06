@@ -1269,6 +1269,14 @@ def build():
                 setp(clip, prop, face)  # ATCClipboard builds the runtime font (FontData is not exposed to Python)
             else:
                 log("WARNING font face import failed", ttf)
+        # HUD fonts (ATCHUD loads them by path; DefaultGame.ini always cooks /Game/TownChess/Fonts): Lato for play text,
+        # Courier Prime Regular for the thin monospace section titles of the reference
+        for ttf, nm in (("Lato-Regular.ttf", "F_TC_Sans"), ("Lato-Light.ttf", "F_TC_SansLight"), ("CourierPrime-Regular.ttf", "F_TC_Title")):
+            face = next((o for o in import_file(os.path.join(FONTS, ttf), f"{ROOT}/Fonts", nm + "_Face") if isinstance(o, unreal.FontFace)), None)
+            if face:
+                EAL.save_loaded_asset(face)  # nothing in the level references these, so the level save would not write them
+            else:
+                log("WARNING HUD font import failed", ttf)
         tag(clip)
     # ---- Wear and clutter on the table: dried blood, papers, a book stack (the reference's table is a lived-in mess)
     blood = blood_decals()

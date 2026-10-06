@@ -42,7 +42,7 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
 | [LIM-011](#lim-011) | Annotator's oversleeves do not render; all characters share one MetaHuman (Walter) | Low (visual) | Open |
 | [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Fixed |
-| [BUG-008](#bug-008) | UE board: a pawn dragged to the last rank stays where it was dropped if the promotion is cancelled | Low (shown board differs from the authority; rules unaffected) | Open (found by code review, not yet reproduced in UE) |
+| [BUG-008](#bug-008) | UE board: a pawn dragged to the last rank stays where it was dropped if the promotion is cancelled | Low (shown board differs from the authority; rules unaffected) | Fixed in code (2026-10-06), **not pinned by a test yet**: an automated drag to the last rank needs a start-position option in the core |
 
 ---
 
@@ -405,3 +405,9 @@ Found by the chess guardian (run 3) by reading the code; not reproduced in Unrea
 - **Pinned by:** nothing yet. `ue5/TownChess/Scripts/autotest.py` calls `board.choose_promotion` directly and never
   drives a drag to the last rank, keys or a cancel. Fix idea: on `NeedsPromotion` set `DroppedFrom = From`; on a
   cancelled promotion call `SnapBack(PromotionFrom)` before clearing it; add a `drag` autotest step for both paths.
+- **Fix (2026-10-06):** `EndDrag` now sets `DroppedFrom` for `NeedsPromotion` too, so a confirmed promotion settles
+  from the drop point; a cancelled one (Escape, empty piece, or no longer our turn) snaps the pawn home first.
+- **Exception to "test before fix", stated openly:** the autotest cannot reach a promotion position on demand (games
+  start from the initial position and the engine's replies vary). Pinning it needs a test-only start position on
+  `CREATE_AI_GAME` (protocol, room, journal restore, core tests), tracked as the next core task. Until then the fix
+  is verified by reading only.
