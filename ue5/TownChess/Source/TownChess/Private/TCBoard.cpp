@@ -16,7 +16,7 @@ namespace
 	const FLinearColor SelectedColor(0.95f, 0.72f, 0.25f, 0.55f);
 	const FLinearColor MoveColor(0.85f, 0.75f, 0.5f, 0.45f);
 	const FLinearColor CaptureColor(0.8f, 0.15f, 0.1f, 0.5f);
-	const FLinearColor LastMoveColor(0.75f, 0.68f, 0.45f, 0.22f);
+	const FLinearColor LastMoveColor(0.8f, 0.72f, 0.48f, 0.38f);
 	const FLinearColor CheckColor(0.95f, 0.08f, 0.05f, 0.7f);
 }
 
