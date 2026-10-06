@@ -1483,7 +1483,9 @@ def build():
         ("Ring", 22, 30, 10, 0), ("Ring", 44, -40, 9, 110),
         # pass 62: knife scars and scuffs on the table round the board (judge run 4: wide flat brown areas; V2 detail)
         ("Scratch", -40, -8, 36, 0), ("Scratch", -38, 30, 30, 15), ("Scratch", -36, -40, 30, -10), ("Scratch", 4, -46, 34, 80),
-        ("Scratch", 6, 46, 32, 100), ("Scratch", 38, 16, 28, 170), ("Scratch", -22, 52, 30, 60), ("Scratch", 30, -40, 26, 140)]
+        ("Scratch", 6, 46, 32, 100), ("Scratch", 38, 16, 28, 170), ("Scratch", -22, 52, 30, 60), ("Scratch", 30, -40, 26, 140),
+        # pass 64: blood on the near frame and the table edge in front of it (judge run 4: nothing on the table edge)
+        ("Spatter", -29, -12, 9, 250), ("Smear", -34, 10, 13, 15), ("Scratch", -44, 58, 30, 35), ("Scratch", -46, -58, 30, 160)]
     for k, (v, x, y, sz, yaw) in enumerate(placements):
         if v not in blood:
             continue

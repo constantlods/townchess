@@ -322,8 +322,8 @@ def annotator_mask():
                 if abs(xc) > _mask_width(zc) / 2:
                     continue
                 gi, gj = math.floor((xc - (eye_cx - 1.8)) / cell), math.floor((-(zc) - (-eye_cz - 1.8)) / cell)
-                if name == "Leaf_L" and 0 <= gi < 8 and 0 <= gj < 8 and (gi + gj) % 2 == 1:
-                    continue  # drilled dark squares: the checker eye opening
+                if name == "Leaf_L" and 0 <= gi < 8 and 0 <= gj < 7 and gi % 2 == 1 and gj % 2 == 1:
+                    continue  # drilled eye holes, 4.5 mm apart (pass 64: the 8 x 8 checker read as a texture-test pattern)
                 bm.faces.new((v(i, j), v(i + 1, j), v(i + 1, j + 1), v(i, j + 1)))
         ob = obj_from_bm(name, bm)
         so = ob.modifiers.new("solid", "SOLIDIFY")
