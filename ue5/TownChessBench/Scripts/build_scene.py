@@ -1083,8 +1083,9 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             deltas[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
         new_w, new_l = solve(deltas)
         SEATED[f"{pose_name}_hands"] = {s_: (new_w[f"hand_{s_}"][0], new_w[f"lowerarm_{s_}"][0]) for s_ in ("l", "r")}
-        for s_ in ("l", "r"):  # forearm bone transforms, for props aimed along the forearm (player hand options)
+        for s_ in ("l", "r"):  # arm bone transforms, for props aimed along the arm (player hand options, sleeves)
             SEATED[f"{pose_name}:lowerarm_{s_}"] = new_w[f"lowerarm_{s_}"]
+            SEATED[f"{pose_name}:upperarm_{s_}"] = new_w[f"upperarm_{s_}"]
         log(pose_name, "hands", [round(v, 1) for v in new_w["hand_l"][0]], [round(v, 1) for v in new_w["hand_r"][0]],
             "elbows", [round(v, 1) for v in new_w["lowerarm_l"][0]], [round(v, 1) for v in new_w["lowerarm_r"][0]])
 
@@ -1305,9 +1306,9 @@ def build():
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
     # tiling 1 -> 2.5, normal x1.6 (pass 56): one 2K scan stretched over 1.5 m left the table edges flat next to the reference
-    assign(table, surface_material(master, "wood_table_worn", tiling=2.5, grime_color=(0.3, 0.22, 0.15), tint=(0.7, 0.6, 0.5),
+    assign(table, surface_material(master, "wood_table_worn", tiling=3.5, grime_color=(0.3, 0.22, 0.15), tint=(0.7, 0.6, 0.5),
                                    scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.22, "GrimeContrast": 1.8,
-                                            "GrimeStreaks": 0.5, "MicroRough": 0.2, "NormalStrength": 1.6}))
+                                            "GrimeStreaks": 0.65, "MicroRough": 0.2, "NormalStrength": 2.2}))
     tlo, thi = bounds_of(table)
     # Long side runs across the player's view (along Y). Poly Haven models are centred on their origin in XY.
     yaw = 90.0 if (thi[0] - tlo[0]) > (thi[1] - tlo[1]) else 0.0
@@ -1402,9 +1403,15 @@ def build():
     mi_brass = surface_material(master, "rusty_metal_02", name="MI_Brass", tiling=1.5, metal=1.0, tint=(0.8, 0.6, 0.32), rough=0.7,
                                 scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0, "MicroRough": 0.15})
     bulb_mat = emissive_material("M_TC_Bulb", (1.0, 0.62, 0.3), 60.0)
+    # pass 61: dark green enamel worn to rust (the blotchy orange brass shade read cheap: judge run 4) and a warm
+    # glowing inner face; the bulb now sits up inside the dome
+    mi_enamel = surface_material(master, "rusty_metal_02", name="MI_LampEnamel", tiling=1.5, metal=0.4, tint=(0.17, 0.19, 0.14), rough=0.65,
+                                 grime_color=(1.8, 1.2, 0.7), scalars={"GrimeTiling": 2.5, "GrimeThreshold": 0.62, "GrimeContrast": 2.5, "MicroRough": 0.15})
+    inner_mat = emissive_material("M_TC_LampInner", (1.0, 0.72, 0.42), 2.5)
     for sm in lamp:
         for i, sl in enumerate(sm.static_materials):
-            sm.set_material(i, bulb_mat if "bulb" in str(sl.material_slot_name).lower() else mi_brass)
+            n = str(sl.material_slot_name).lower()
+            sm.set_material(i, bulb_mat if "bulb" in n else inner_mat if "inner" in n else mi_enamel)
         EAL.save_loaded_asset(sm)
     LAMP_BASE, LAMP_YAW = (24.0, -56.0), 101.0
     lamp_actors, llo, lhi = place_model(lamp, (LAMP_BASE[0], LAMP_BASE[1], 0), yaw=LAMP_YAW, label="Lamp", sit_on=top)
@@ -1720,7 +1727,9 @@ def build():
         if straps and "spine_03" in SEATED:
             mi_web = make_mi(master, "MI_Webbing", {"BaseColor": None}, tint=(0.34, 0.3, 0.22), rough=0.9, grime_color=(0.4, 0.32, 0.22),
                              scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "MicroRough": 0.1})
-            mi_buckle = make_mi(master, "MI_Buckle", {"BaseColor": None}, metal=1.0, rough=0.45, tint=(0.55, 0.42, 0.22))
+            # rough dark iron (the bright brass roller buckle read as a chest logo: judge run 4)
+            mi_buckle = make_mi(master, "MI_Buckle", {"BaseColor": None, "ARM": METAL_ARM}, metal=1.0, rough=1.3, tint=(0.09, 0.08, 0.07),
+                                grime_color=(1.6, 1.0, 0.6), scalars={"GrimeTiling": 6.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
             for sm in straps:
                 for i, sl in enumerate(sm.static_materials):
                     sm.set_material(i, mi_buckle if "buckle" in str(sl.material_slot_name).lower() else mi_web)
@@ -1818,11 +1827,37 @@ def build():
             attach_static("AnnotatorMask", plate, smc_a, "head", *head_relative([noff[0], noff[1] + 1.2, noff[2]]), "TC_Opponent_annotator")
         over = prop_with("oversleeve", {"Duck": mi_duck})
         coat = prop_with("coat_sleeve", {"Wool": mi_coat})
-        for side, flip in (("l", 180.0), ("r", 0.0)):  # measured: the first guess pointed the sleeves up the arm, into the coat
-            if over:
-                attach_static(f"Oversleeve_{side}", over, smc_a, f"lowerarm_{side}", unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, flip), "TC_Opponent_annotator")
-            if coat:
-                attach_static(f"CoatSleeve_{side}", coat, smc_a, f"upperarm_{side}", unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, flip), "TC_Opponent_annotator")
+        def arm_sleeves(body, prefix, opp_tag, mi=None):
+            """Sleeves aimed along the clasp pose's real arm joints (pass 61: the bone-axis guess with a roll flip left
+            both characters' arms bare and stood one coat sleeve up beside the head). Forearm sleeve from 2 cm above
+            the elbow, its gathered cuff ~3 cm short of the wrist; upper sleeve from 3 cm below the shoulder joint."""
+            hands = SEATED.get("clasp_hands")
+            if not (body and hands and "clasp:upperarm_l" in SEATED):
+                return
+            for side in ("l", "r"):
+                hand, elbow = hands[side]
+                sh = SEATED[f"clasp:upperarm_{side}"][0]
+                for nm, mesh, bone, a0, a1, back in (("Sleeve", over, "lowerarm", elbow, hand, 2.0), ("UpperSleeve", coat, "upperarm", sh, elbow, -3.0)):
+                    if not mesh:
+                        continue
+                    d = tuple(a1[k] - a0[k] for k in range(3))
+                    n = math.sqrt(sum(c * c for c in d)) or 1.0
+                    start = tuple(a0[k] - d[k] / n * back for k in range(3))
+                    loc, rot = aimed_on_bone(f"clasp:{bone}_{side}", start, d)
+                    act = attach_static(f"{prefix}{nm}_{side}", mesh, body, f"{bone}_{side}", loc, rot, opp_tag)
+                    if mi:
+                        for k in range(act.static_mesh_component.get_num_materials()):
+                            act.static_mesh_component.set_material(k, mi)
+
+        arm_sleeves(smc_a, "Annotator", "TC_Opponent_annotator")
+        # the caged patient wears the same sleeve meshes as a long canvas jacket with stained cuffs over his short-sleeved
+        # shirt (judge run 4: clothing 4/10; the reference's jacket is long-sleeved and filthy); material per actor, the
+        # meshes stay the Annotator's (prop_with re-imports delete older meshes)
+        if smc:
+            mi_jacket = surface_material(master, "rough_linen", name="MI_PatientJacket", tiling=5.0, tint=(0.42, 0.34, 0.23), rough=0.95,
+                                         grime_color=(0.32, 0.17, 0.1), scalars={"GrimeTiling": 1.4, "GrimeThreshold": 0.3, "GrimeContrast": 1.8,
+                                                                                    "GrimeStreaks": 0.7, "MicroRough": 0.1})
+            arm_sleeves(smc, "Patient", "TC_Opponent_caged", mi_jacket)
         led = prop_with("ledger", {"LedgerCloth": mi_oxblood, "Pages": mi_pages, "Ribbon": mi_oxblood})
         pen = prop_with("pencil", {"PencilPaint": mi_coat, "PencilWood": mi_pages, "Ferrule": mi_copper, "Eraser": mi_oxblood})
         for nm, mesh, loc, yaw in (("Ledger", led, (52, -34), 75), ("Pencil", pen, (46, -20), 30)):
@@ -1849,7 +1884,7 @@ def build():
 
     # ---- Lighting: warm practical lamp (key), cool fluorescent fill, cool rim.
     lamp_head = (lamp_bulb[0], lamp_bulb[1], lamp_bulb[2] - 3)  # just under the bulb, inside the shade
-    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (10, -5, top)), 450, 2800, 600, 65, src=2.5, vol=1.2))
+    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (10, -5, top)), 450, 2800, 600, 52, src=2.5, vol=1.2))  # cone 65 -> 52: a pool on the board (pass 61)
     bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 9), 60, 2400, 60, src=2.0, shadows=False)  # lights the shade and base
     tag(bulb)
     rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 150, 5600, 120, 15, 900, vol=0.2)
