@@ -40,9 +40,14 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-008](#lim-008) | Lenient FEN castling field (X-FEN/Shredder letters ignored) | Low | Open, documented |
 | [LIM-009](#lim-009) | What a journal restore does not bring back | Low/informational | Open, documented |
 | [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
-| [LIM-011](#lim-011) | Annotator's oversleeves do not render; all characters share one MetaHuman (Walter) | Low (visual) | Open |
+| [LIM-011](#lim-011) | Annotator's oversleeves do not render; all characters share one MetaHuman (Walter) | Low (visual) | Open (player sleeves/watch work since 2026-10-06; see LIM-016) |
 | [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Fixed |
 | [BUG-008](#bug-008) | UE board: a pawn dragged to the last rank stays where it was dropped if the promotion is cancelled | Low (shown board differs from the authority; rules unaffected) | Fixed (2026-10-06), pinned by the UE `promo` autotest (fails without the fix, passes with it) |
+| [LIM-012](#lim-012) | DLSS not active (NVIDIA's DLSS plugin is not installed in UE 5.8) | Low (TSR is used; 91 fps at 1440p without it) | Open, owner action |
+| [LIM-013](#lim-013) | Online play needs a running TownChess server | Informational (local play and play vs the engines work offline) | By design for the beta |
+| [LIM-014](#lim-014) | The player's legs under the table are bare skin (MetaHuman default body) | Low (only visible in a downward close-up, never from the seat views) | Open |
+| [LIM-015](#lim-015) | The cage mask reads dark brown, not dark iron, in a close-up under the lamp | Low (visual; from the seat it reads dark iron) | Open |
+| [LIM-016](#lim-016) | Hand customization incomplete: gloves and a tattooed skin missing; skin variants (dirty, scarred) in progress | Low (visual/content; BETA C2) | In progress |
 
 ---
 
@@ -412,3 +417,37 @@ Found by the chess guardian (run 3) by reading the code; not reproduced in Unrea
   Escape must send the pawn home; drag again and Q must promote and settle. With the fix reverted in the working tree
   the test failed exactly at "cancelled pawn went home (BUG-008)" (1 piece off its square); with the fix it passed 8/8.
   The fix was written before the test (the order the rule asks for was not kept); the fail-then-pass run makes up for it.
+
+---
+
+## LIM-012
+
+**DLSS is not active.** `ApplyQualityPreset` sets `r.NGX.DLSS.Enable 1`, but no DLSS/NGX/Streamline plugin is
+installed in the engine or the project, so the cvar does nothing and TSR does the upscaling. Measured without it: 91.4
+fps average, 81.2 fps 1% low at 2560x1440 with Epic + hardware ray tracing (BETA S3). Plan: the owner installs
+NVIDIA's free DLSS plugin for UE 5.8 from Fab; the project then enables it (no code change needed beyond the plugin
+entry).
+
+## LIM-013
+
+**Online play needs a TownChess server.** The packaged game starts its own local core for play against the engines and
+for private tables on the same machine. Casual matchmaking against other people needs `packages/server` deployed
+somewhere both players reach; nothing is deployed for the beta (the owner decides about hosting and cost).
+
+## LIM-014
+
+**Bare legs under the table.** The player's MetaHuman body wears the default (short) outfit; a downward close-up of the
+hands (camera pitch -50) shows bare knees. No seat view (view height 0..1) shows them. Plan: trousers from the MetaHuman
+wardrobe or a simple Blender garment when the character work reaches the lower body.
+
+## LIM-015
+
+**Cage colour in close-up.** The cage material's base colour is near-black (measured 0.012 linear), but the lamp hangs
+just above the patient's head; in a close-up the wire reads dark brown (85,50,26 sRGB). From the seat it reads as dark
+iron. Plan: a dedicated rim/key adjustment for the opponent or a dark lacquered-iron variant if the judge still flags it.
+
+## LIM-016
+
+**Hand customization incomplete** (BETA C2). In the game: bare, sleeves, watch and sleeves + watch. In progress (render
+artist): skin variants painted into the player's body textures (bare with veins, dirty, scarred). Missing: gloves,
+tattooed skin, preview thumbnails in the menu.
