@@ -3,5 +3,5 @@
 param([string[]]$Opponents = @('caged', 'annotator'))
 foreach ($o in $Opponents) {
   & "$PSScriptRoot\capture.ps1" -Name "portrait_$o" -Preset epic -Auto 'none' -WarmSec 15 `
-    -Extra "-tcopponent=$o -TCCamLoc=24,-3.8,109 -TCCamTarget=67,-3.8,103 -TCFov=24" | Select-String 'exported|FAILED'
+    -Extra "-tcopponent=$o -TCCamLoc=-5,-3.8,112 -TCCamTarget=67,-3.8,104 -TCFov=30" | Select-String 'exported|FAILED'
 }
