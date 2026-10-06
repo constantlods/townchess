@@ -58,7 +58,7 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 
 | Request | Where it stands |
 |---|---|
-| Keep improving mouse/drag feel ("still work on improvements if they are there") | Drag/drop, 0.2 s moves, hover, snap-back done (owner: "way better"); open ideas: lifted-piece shadow, legal-move dots while dragging, drag inertia |
+| Keep improving mouse/drag feel ("still work on improvements if they are there") | Drag/drop, 0.2 s moves, hover, snap-back done (owner: "way better"); legal-move markers already show while dragging and the carried piece lifts 2.5 cm; open ideas: a contact shadow under the carried piece, drag inertia |
 | An online opponent sees the hands/character you chose | Not built: needs the chosen look in the protocol (PLAYER_LOOK) and a remote-player avatar; post-beta |
 | The reference's BOARD ENVIRONMENTS panel (Institutional Oak, Basement Table, Examination Room, ...) | Not built: one room exists; post-beta (each environment is a level variant) |
 
