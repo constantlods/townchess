@@ -731,7 +731,7 @@ void ATCHUD::DrawUi()
 void ATCHUD::DrawMenu(UTCCoreClient* C)
 {
 	// the reference's FIND A GAME panel: a monospace title, a quiet list of modes, one filled primary button, the clock row
-	const float U = Ui(), X = 80.f * U, Y0 = 170.f * U, Step = 44.f * U, W = 320.f;
+	const float U = Ui(), X = 80.f * U, Y0 = 170.f * U, Step = 44.f * U, W = 350.f;  // "Sleeves + Watch" fits
 	const FLinearColor Dim(0.6f, 0.56f, 0.5f);
 	Plate(X - 30.f * U, Y0 - 110.f * U, (W + 60.f) * U, 660.f * U, 0.62f, 0.0f);
 	Text(TEXT("FIND A GAME"), X, Y0 - 80.f * U, FLinearColor(0.9f, 0.86f, 0.78f), 1.3f, false, ETCUiFont::Title);

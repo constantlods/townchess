@@ -269,7 +269,7 @@ Per-ply checks (every scenario):
 | Keyboard paths: Tab clipboard, join-code typing, BackSpace, Escape | Pass (10/10) | `autotest.ps1 -Test keys` |
 | Promotion from a set position: drag to the last rank + Escape (pawn goes home, BUG-008), drag + Q (queen, settles) | Pass (8/8); fails without the BUG-008 fix | `autotest.ps1 -Test promo -Extra "-tcstartfen=... -tcallowstartfen"` |
 | Full game through the new HUD code | Pass (cpu 88/88; drag 8/8, rematch 8/8) | `autotest.ps1` |
-| Player character/hands selection | Not started (needs per-character MetaHumans, LIM-011) | — |
+| Player hands selection (the reference's HAND CUSTOMIZATION) | Partial: Bare / Sleeves / Watch / Sleeves + Watch from the menu, remembered (`ApplyPlayerLook`, screenshots 52-*). Skin variants (dirty, scarred, tattooed), gloves and character bodies not yet (LIM-011) | `-tclook=`, menu "Hands" |
 | **Owner's interactive launch through the root `TownChess.exe` stub: HUD and real mouse input** | **Pending** (the stub hung with no child in the non-interactive SSH session; the tests launch `TownChess/Binaries/Win64/TownChess.exe` directly) | owner |
 
 Bugs found and fixed while testing:
