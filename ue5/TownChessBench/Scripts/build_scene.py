@@ -1098,6 +1098,9 @@ def build():
                                    scalars={"GrimeTiling": 0.7, "GrimeThreshold": 0.35, "GrimeContrast": 1.6, "GrimeStreaks": 0.7})
     mi_rust = surface_material(master, "rusty_metal_02", tiling=1.0, metal=1.0, tint=(0.5, 0.45, 0.4),
                                scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0})
+    # cell bars: the same scan darkened (stretched once round a thin cylinder it read as tan wood in the base colour)
+    mi_bar = surface_material(master, "rusty_metal_02", name="MI_BarIron", tiling=3.0, metal=0.6, tint=(0.16, 0.145, 0.135), rough=0.8,
+                              scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
     mi_cloth = surface_material(master, "rough_linen", name="MI_OpponentCloth", tiling=6.0, tint=(0.24, 0.23, 0.2), grime_color=(0.35, 0.25, 0.16),
                                 scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "GrimeStreaks": 0.5})
     mi_leather = surface_material(master, "brown_leather", name="MI_Gloves", tiling=4.0, tint=(0.38, 0.28, 0.2), rough=0.8,
@@ -1299,7 +1302,7 @@ def build():
     for k in range(6):
         b = EAS.spawn_actor_from_object(cyl, unreal.Vector(cx + L / 2 - 5, -150 - 25 + k * 10, 185), unreal.Rotator(0, 0, 0))
         b.set_actor_scale3d(unreal.Vector(0.022, 0.022, 0.92))
-        b.static_mesh_component.set_material(0, mi_rust)
+        b.static_mesh_component.set_material(0, mi_bar)
         b.set_folder_path("Window")
     # (the white binder was the brightest thing in frame and pulled the eye off the board: removed)
     # barred partition behind the opponent (the reference's cell bars) and a stencilled ward sign on the back wall
@@ -1310,12 +1313,12 @@ def build():
             continue  # the gap of an open door behind him
         b = EAS.spawn_actor_from_object(cyl, unreal.Vector(bx, k * 13.0, 115), unreal.Rotator(0, 0, 0))
         b.set_actor_scale3d(unreal.Vector(0.03, 0.03, 2.3))
-        b.static_mesh_component.set_material(0, mi_rust)
+        b.static_mesh_component.set_material(0, mi_bar)
         b.set_folder_path("Bars")
     for z in (12, 222):
         rail = EAS.spawn_actor_from_object(unreal.load_asset("/Engine/BasicShapes/Cube"), unreal.Vector(bx, 0, z), unreal.Rotator(0, 0, 0))
         rail.set_actor_scale3d(unreal.Vector(0.05, 2.5, 0.06))
-        rail.static_mesh_component.set_material(0, mi_rust)
+        rail.static_mesh_component.set_material(0, mi_bar)
         rail.set_folder_path("Bars")
     sign = EAS.spawn_actor_from_class(unreal.TextRenderActor, unreal.Vector(cx + L / 2 - 1.5, -95, 205), unreal.Rotator(0, 0, 180))
     tr = sign.text_render
@@ -1443,9 +1446,11 @@ def build():
         if cage:
             # dark forged iron, rust in patches (not an even orange coat)
             # plain dark iron (the rust scan's orange overpowered any tint: oversight run 1); rust only in grime patches
-            mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=0.85, rough=0.82, tint=(0.07, 0.065, 0.06),  # matte old iron, no silver mirror
-                              grime_color=(1.5, 0.75, 0.35), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.62, "GrimeContrast": 3.0,
-                                                                     "GrimeRoughness": 0.9, "MicroRough": 0.25})
+            # blackened iron behaves like a dark dielectric with neutral highlights: at metal 0.85 the wire mirrored the warm
+            # lamp and the brown room and rendered bronze-tan although its base colour was dark grey (close-up, pass 42)
+            mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=0.3, rough=0.5, tint=(0.028, 0.026, 0.025),
+                              grime_color=(0.42, 0.2, 0.09), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.7, "GrimeContrast": 3.0,
+                                                                     "GrimeRoughness": 0.85, "MicroRough": 0.25})
             cage[0].set_material(0, mi_iron)
             EAL.save_loaded_asset(cage[0])
             off = [float(v) for v in os.environ.get("TC_MASK_OFFSET", "0,4.5,-1").split(",")]  # forward (+Y), up (+Z) from the head bone
