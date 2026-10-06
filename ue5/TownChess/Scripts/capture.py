@@ -34,6 +34,7 @@ CAM_LOC = arg("TCCamLoc", "")   # close-up shots: x,y,z (cm) ...
 CAM_ROT = arg("TCCamRot", "")   # ... pitch,yaw,roll
 CAM_FOV = arg("TCFov", "")
 CAM_TARGET = arg("TCCamTarget", "")  # aim the close-up at this point (x,y,z) instead of giving a rotation
+RESIGN = arg("TCResign", "") == "1"  # resign once the game runs: the end card (CHECKMATE/RESIGNED + Rematch) for the shot
 HUD = arg("TCHud", "") == "1"  # draw the game HUD over the shot (what the player sees, not just the scene)
 CMDS = [c.replace("_", " ") for c in arg("TCCmds", "").split(";") if c]  # console commands, "_" for spaces (e.g. r.Fog_0)
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
@@ -159,6 +160,13 @@ def tick(_dt):
             if PRESET >= 3:  # RTX reference quality: hardware ray-traced Lumen and RT shadows (the RX 6650 XT target stays software)
                 for c in ("r.Lumen.HardwareRayTracing 1", "r.Lumen.Reflections.HardwareRayTracing 1", "r.RayTracing.Shadows 1"):
                     cmd(c)
+        elif state["phase"] == "warm" and RESIGN and not state.get("resigned"):
+            core = next((o for o in unreal.ObjectIterator(unreal.TCCoreClient) if not o.get_name().startswith("Default__")), None)
+            if core and core.has_game() and core.get_state().status == "active":
+                core.resign()
+                state["resigned"] = True
+                state["t0"] = time.time() - WARM_SEC + 5  # end card, sting, clipboard lift
+                log("resigned for the end-card shot")
         elif state["phase"] == "warm" and PLAY and not state.get("played"):
             core = next((o for o in unreal.ObjectIterator(unreal.TCCoreClient) if not o.get_name().startswith("Default__")), None)
             if core and core.has_game():

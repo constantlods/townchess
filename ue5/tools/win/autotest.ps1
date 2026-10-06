@@ -1,7 +1,7 @@
 # Runs Scripts/autotest.py in the uncooked game.  autotest.ps1 -Test rematch [-Auto cpu:novice:w:untimed] [-Extra '...']
-param([string]$Test = 'cpu', [string]$Auto = 'cpu:novice:w:untimed', [string]$Extra = '', [int]$TimeoutSec = 900, [switch]$KeepJournal)
+param([string]$Test = 'cpu', [string]$Auto = 'cpu:novice:w:untimed', [string]$Extra = '', [int]$TimeoutSec = 900, [switch]$KeepJournal, [string]$OutName = '')
 . "$PSScriptRoot\common.ps1"
-$out = Join-Path $Workspace "autotest\$Test"
+$out = Join-Path $Workspace "autotest\$(if ($OutName) { $OutName } else { $Test })"  # -OutName keeps runs of one scenario apart
 New-Item -ItemType Directory -Force $out | Out-Null
 $script = (Join-Path $Repo 'ue5\TownChess\Scripts\autotest.py').Replace('\', '/')
 $log = Join-Path $Logs "autotest-$Test.log"

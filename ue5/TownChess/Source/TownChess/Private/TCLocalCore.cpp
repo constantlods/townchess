@@ -91,7 +91,9 @@ void UTCLocalCore::Launch()
 	const FString Data = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("TownChess") / TEXT("core"));
 	const FString Params = FString::Printf(TEXT("%s \"%s\" --data \"%s\""), *Args, *Script, *Data).TrimStart();
 	// autotests that need a set position (promotion on demand) opt the core in; the child process inherits the variable
+#if !UE_BUILD_SHIPPING  // test-only (chess guardian run 4): a Shipping build never opts its core in
 	if (FParse::Param(FCommandLine::Get(), TEXT("tcallowstartfen"))) FPlatformMisc::SetEnvironmentVar(TEXT("TC_ALLOW_START_FEN"), TEXT("1"));
+#endif
 	Proc = FPlatformProcess::CreateProc(*Node, *Params, false, true, true, &Pid, 0, *FPaths::GetPath(Script), StdoutWrite, StdinRead);
 	if (!Proc.IsValid())
 	{

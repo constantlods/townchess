@@ -27,5 +27,9 @@ for ($i = 1; $i -le $Games; $i++) { $res.games += RunGame "game$i" @('-windowed'
 $w, $h = $PerfRes.Split('x')
 # -RenderOffscreen ignores -ResX/-ResY (the first run rendered 888x500): set the resolution with r.SetRes as well
 $res.perf = RunGame 'perf' @('-windowed', "-ResX=$w", "-ResY=$h", "-ExecCmds=`"r.SetRes ${PerfRes}w`"")
-$res.s2 = if (@($res.games | Where-Object { -not $_.pass -or $_.leftover }).Count -eq 0) { "PASS $Games/$Games" } else { 'FAIL' }
-$res | ConvertTo-Json -Depth 4 | Tee-Object -FilePath (Join-Path $Logs 'beta-checks.json')
+# S2 needs games: zero games is "not run", never a pass (oversight run 4 found "PASS 0/0"); a perf-only run writes its
+# own file so it cannot overwrite the S2 evidence
+$res.s2 = if ($Games -le 0) { 'not run' } elseif (@($res.games | Where-Object { -not $_.pass -or $_.leftover }).Count -eq 0) { "PASS $Games/$Games" } else { 'FAIL' }
+$res.when = (Get-Date -Format s)
+$file = if ($Games -le 0) { 'beta-perf.json' } else { 'beta-checks.json' }
+$res | ConvertTo-Json -Depth 4 | Tee-Object -FilePath (Join-Path $Logs $file)

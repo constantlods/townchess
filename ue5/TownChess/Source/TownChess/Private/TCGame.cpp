@@ -351,7 +351,9 @@ void ATCGameMode::TryAutoStart()
 	{
 		bAutoDone = true;
 		FString StartFen;  // -tcstartfen=<FEN with _ for spaces> (autotests; needs -tcallowstartfen for the local core)
+#if !UE_BUILD_SHIPPING
 		if (FParse::Value(FCommandLine::Get(), TEXT("-tcstartfen="), StartFen)) StartFen.ReplaceInline(TEXT("_"), TEXT(" "));
+#endif
 		Core->CreateAiGame(Parts.IsValidIndex(1) ? Parts[1] : TEXT("patient"), Parts.IsValidIndex(2) ? Parts[2] : TEXT("w"), Parts.IsValidIndex(3) ? Parts[3] : TEXT("5+0"), StartFen);
 	}
 	else if (Parts.Num() >= 1 && Parts[0] == TEXT("private"))
@@ -823,6 +825,7 @@ void ATCHUD::DrawToRenderTarget(UTextureRenderTarget2D* Target)
 
 void ATCHUD::DrawUi()
 {
+	if (!bCmdRead) { bShowSettings = FParse::Param(FCommandLine::Get(), TEXT("tcshowsettings")); bCmdRead = true; }  // screenshots
 	Buttons.Reset();
 	UTCCoreClient* C = GetGameInstance()->GetSubsystem<UTCCoreClient>();
 	if (!C) return;

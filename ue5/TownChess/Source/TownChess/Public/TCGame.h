@@ -142,6 +142,7 @@ public:
 	double ToastUntil = 0;
 	bool bConfirmResign = false;
 	bool bShowSettings = false;
+	bool bCmdRead = false;
 	void DrawSettings();
 	/** Accessibility: also print the opening on screen (the clipboard is the default home of the game record). */
 	bool bScreenRecord = false;

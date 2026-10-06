@@ -6,8 +6,9 @@
 param([int]$Ply = 12)
 . "$PSScriptRoot\common.ps1"
 $t0 = Get-Date
-& "$PSScriptRoot\autotest.ps1" -Test cpu -Auto 'cpu:novice:w:5+0' -Extra "-TCKillAtPly=$Ply" | Out-Null
-$r1 = Get-Content (Join-Path $Workspace 'autotest\cpu\result.json') -Raw | ConvertFrom-Json
+# its own result folder: part 1 used to overwrite the full cpu test's result (oversight run 4)
+& "$PSScriptRoot\autotest.ps1" -Test cpu -OutName reconnect_kill -Auto 'cpu:novice:w:5+0' -Extra "-TCKillAtPly=$Ply" | Out-Null
+$r1 = Get-Content (Join-Path $Workspace 'autotest\reconnect_kill\result.json') -Raw | ConvertFrom-Json
 "killed at ply $($r1.killed_at_ply)"
 Start-Sleep 3
 $orphans = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CreationDate -gt $t0 })
