@@ -1318,6 +1318,23 @@ def build():
     for sm in mug:
         sm.set_material(0, mi_rust)
         EAL.save_loaded_asset(sm)
+    # Table clutter after the reference (pass 48: its fine detail measured 12.9 against our 10.5): small worn objects at
+    # the table's edges, each scaled to a maximum size so none can wall off the board (the book set once did).
+    def clutter(name, loc, yaw, max_dim):
+        try:
+            meshes = import_model(name)
+        except (StopIteration, FileNotFoundError):
+            log("WARNING clutter model missing", name)
+            return
+        if not meshes:
+            return
+        lo, hi = bounds_of(meshes)
+        size = max(hi[i] - lo[i] for i in range(3)) or 1.0
+        place_model(meshes, (loc[0], loc[1], 0), yaw=yaw, scale=min(1.0, max_dim / size), label="Clutter_" + name, sit_on=top)
+    clutter("decorative_book_set_01", (50, 54), -105, 26.0)   # behind the mug, back right (the reference's book stack)
+    clutter("medical_tape", (10, 44), 20, 7.0)
+    clutter("cigarette_pack", (-24, -36), 35, 9.0)            # by the bowl, near the player's left hand
+    clutter("magnifying_glass_01", (44, -30), 70, 16.0)
     beds = import_model("old_bed_frame")
     if beds:
         place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)
