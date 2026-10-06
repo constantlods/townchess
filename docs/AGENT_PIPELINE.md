@@ -13,6 +13,19 @@ before it, so problems flow into one place and nothing is pushed unchecked. Defi
 Stages 1-3 commit but never push; stage 4 is the only one that pushes. The lead reads the reports, fixes, and the next
 milestone runs the pipeline again.
 
+## Working agents and the build-PC lock (2026-10-06, owner: "deploy agents ... till the build is in beta phase")
+
+Besides the four review stages, a working agent improves the game continuously:
+
+| Agent | Owns | Definition |
+|---|---|---|
+| `tc-render-artist` | The look: scene code (build_scene.py), Blender props, texture generators, materials, lighting, characters, hands; measured against the reference until docs/BETA.md V1-V5 and C2 are met | `.claude/agents/tc-render-artist.md` |
+| lead (main session) | Gameplay, rules, protocol, HUD, settings, sound, packaging, stability/performance criteria, merges the reports | — |
+
+The target is docs/BETA.md: every row has a check that can fail. The Windows build PC is shared, so every builder
+takes `ue5/tools/win/lock.ps1 -Action acquire -Owner <name>` before a build/test/capture cycle and releases it after
+(a lock older than 3 h counts as stale). Overlapping runs contaminated results before.
+
 ## Evidence rules (from oversight run 1)
 
 - Test counts are quoted for both runs: with `TC_STOCKFISH` (all tests) and without it (the live-engine test is skipped).
