@@ -1,131 +1,123 @@
-# Project audit (oversight agent, stage 3, 2026-10-05 pipeline run 3)
+# Project audit (oversight agent, stage 3, 2026-10-06 pipeline run 4, BETA focus)
 
 Scope:
-- Milestone: "gameplay feel + reference HUD + packaged build". Audited at `de4a920`, the base of this run: 23 commits
-  since the last audit (`d6f577c`).
-- Since then the lead pushed 3 more commits (`d97fa14`, `c14e510`, `c160e11`: capture log, blackened-iron cage,
-  relaxed fingers). They are noted, not judged; there are no screenshots of them yet.
+- `docs/BETA.md`, audited row by row at `origin/feature/photorealistic-renderer` = `2cab890`: 52 commits since the
+  run-3 base `de4a920`.
 - Inputs:
-  - all 60 owner messages in the transcript, including the continuation summaries;
-  - the lead's chat claims after 2026-10-05 07:58Z;
+  - all 49 owner messages in the newest transcript, including the continuation summaries;
   - chess.md and visual.md from this run;
-  - ROADMAP, VISUAL_REBUILD_ROADMAP, WINDOWS_SETUP and FREE_ASSETS;
   - PR #1;
-  - read-only checks on townchess-win: the autotest `result.json` files, `logs\pkg-smoke.log` and the
-    `test_package` output.
+  - read-only file reads on townchess-win: `logs\beta-checks.json`, `logs\beta-game*.log`, `logs\pkg-smoke.log`,
+    `logs\test-package-Development.json`, `autotest\*\result.json`, and the packaged `Saved\Logs\TownChess.log`.
+- The build lock is held by another session, so no build, test or capture was run on the PC.
+- V1/V2 were re-measured here from the committed PNG, with the method in tc-render-artist.md (crop of the reference
+  panel, ours resized to 1045x588).
 
-Labels: **done-verified** (re-checked here), **done-unverified** (claimed, no independent evidence), **in progress**,
-**not started**, **blocked (owner)**, **dropped**.
+Tests (stage 1, re-run here): **479/479 with `TC_STOCKFISH`**, and **478 + 1 skipped** without it. Typecheck is
+clean, and the floor is now 479. Sim seed 104: 13 games, 0 anomalies.
 
-Tests (stage 1, re-run): **475/475 with `TC_STOCKFISH`**, and **474 + 1 skipped** without it. Typecheck is clean and
-the floor of 475 is met. The sim batch (seed 73) found 0 anomalies in 13 games, including the first
-insufficient-material draw.
+## 1. BETA rows vs evidence
 
-## 1. Milestone claims vs evidence
+Verdicts: **confirmed** (re-checked here), **overstated** (the status claims more than its evidence shows),
+**evidence missing** (nothing that could fail is in the repo or on the PC), **agree** (not met / partial is right).
 
-| Claim | Verdict | Evidence |
-|---|---|---|
-| Autotests cpu 68/68, rematch 8/8, drag 8/8 | **done-verified, but stale** | `C:\TownChess\autotest\{cpu,rematch,drag}\result.json`: 68/68, 8/8, 8/8, written 03:45-03:48 local. HUD commit `2071f72` is 03:59, so none of them ran on the HUD code |
-| Packaged smoke 12/12, Job Object, Defender 0 | **done-verified** | `pkg-smoke.log` 08:37Z: `smoke test PASS (plies reached, 12 plies, 0 failures)`; test_package: `jobObject: PASS core terminated with the game`, `defenderDetections: 0`, D3D12. This build contains the HUD |
-| Epic + HW ray tracing on RTX | **done-verified (runs), visual effect unproven** | Same log: `quality: epic (level 3), hardware ray tracing on`. No screenshot shows it: `capture.py` has forced cinematic + HWRT since eebb6d6 (visual.md F1) |
-| OptiXDenoise disabled (packaged crash) | done-verified | `TownChess.uproject` lists `"OptiXDenoise", "Enabled": false`; the later package starts. WINDOWS_SETUP change 14 recorded with undo |
-| Smoke TryAutoStart fix | done-verified | TCGame.cpp:203 (`LeaveGame`, then `TryAutoStart`); the smoke passed after it |
-| Reference-style HUD | **in progress** | `41-hud.png`: the layout matches. Typography, portraits, icons and the Settings row do not (visual.md, HUD 5/10). "Reads like the reference's thin typewriter UI" (pass-40 note) overstates it |
-| Key handler restored after `2071f72` | **done-verified, untested** | `OnKey` at `de4a920` is byte-identical to `2071f72~1` (32 lines). 2071f72 could not have compiled. **No autotest sends Tab, Q/R/B/N, Escape or join-code keys** (`autotest.py` calls `choose_promotion` directly) |
-| Drag, 0.2 s ease-out, parallel captures, snap-back, hover, sounds | done-verified (code + drag 8/8) | TCBoard.cpp: `MoveSeconds 0.2`, cubic ease-out, captures in the mover's group with `Delay = 0.8 x MoveSeconds`. Sounds are generated in-repo (`clack.py`). Chat says captured pieces leave "while the attacker is still moving"; they start at 80 % of the move |
+| # | BETA status | Verdict | Evidence found / gap |
+|---|---|---|---|
+| G1 | met (479/479) | **confirmed** | Re-run: 479/479 with TC_STOCKFISH, 478+1 skipped without. No open rules bug |
+| G2 | met "on the current code": cpu 72/72, drag 8/8, keys 13/13, promo 8/8, rematch 8/8, reconnect 100/100 | **overstated** | `autotest\rematch\result.json` dates from 03:22. That is before a08af2a (03:59: Settings panel, HUD) and 3929ca8/d466ca1 (TCGame.cpp at 05:33). `cpu\result.json` (05:07) is now the reconnect test's kill phase: 23/23 checks, `pass` empty, `killed_at_ply`. The 72/72 full game is overwritten and can no longer be checked. drag (04:44), promo (05:03) and reconnect (05:08) predate d466ca1, a C++ change. Only keys (05:37) can be on the current code. No count is quoted in a commit message (969d5f9 says only "all autotests on the current code") |
+| G3 | met: packaged sf1600 16/16 | **confirmed (perishable)** | Packaged `Saved\Logs\TownChess.log` 04:45: `league engine: ...\engines\stockfish.exe`, `smoke test PASS (plies reached, 16 plies, 0 failures)`. The next packaged run overwrites it. No screenshot shows the menu listing novice..sfmax |
+| G4 | met | **evidence missing** | It rests on the cpu full game (overwritten, see G2) and on rematch (stale, 03:22). No end-card screenshot or log is cited |
+| G5 | met | agree | keys 13/13 (05:37) includes Tab. The clipboard screenshot is pass 13 (old scene) |
+| S1 | met | **confirmed** | `test-package-Development.json` 05:39 on the build packaged at 05:38: smoke 12/12, Job Object PASS, Defender 0 |
+| S2 | met: 10/10 | **confirmed from the logs; summary broken** | `beta-game1..10.log` (04:14-04:18): 9 checkmates + 1 draw_repetition, all PASS. But `beta-checks.json` now reads `"games": [], "s2": "PASS 0/0"`: a perf-only run overwrote it, and `beta_checks.ps1:30` reports PASS for zero games. That check cannot fail |
+| S3 | met: avg 91.4, 1% low 81.2 at 2560x1440 | **overstated** | The numbers match beta-checks.json, but the run was offscreen (no present/vsync, as the row admits). It is a 46-ply smoke rather than "a 60 s game", and it uses smoke frame times, not `stat unit`/CSV as the check asks. Needs one windowed or fullscreen run |
+| S4 | met | **confirmed (reconnect); second half unverified** | `reconnect\result.json` 05:08: 100/100. "Smoke resigns a restored game" is documented in the ROADMAP (sf1600 row), but no log line was found for it |
+| V1 | met (pass 58) | **confirmed** | Re-measured `58-main.png`: mean 26.4, p95 102.3, r/g 1.46, g/b 1.65 (reference 26.6/96.9/1.45/1.64). The measuring script is not in the repo; commit it so the check can be re-run |
+| V2 | not met (11.4) | agree | Re-measured: 11.4 (reference 13.0 by this method; BETA says 12.9) |
+| V3 | not met | agree | Visual judge run 4: **average 5.2**; 8 of 14 rows are below 6 |
+| V4 | partial | **overstated: not met** | Judge: 5/10. Nails are never visible. Dirt only shows in the non-default skin. Veins are exaggerated |
+| V5 | partial | **overstated: not met** | Judge lists 9 items. Bare knees in every close-up (LIM-014 says only "no seat view shows them", but V5 includes close-ups). Placeholder-grade watch. Brass corners that read as paper. Captured pawn under the fingers. Jagged sheet edge. No Black-seat screenshot exists, so V5 cannot be met yet |
+| C1 | met | agree | `54-hud-portraits`, `58-main`, menu switch |
+| C2 | partial | agree | `59-skins-in-game.png`. Gloves and tattoo are missing. "Remembered" is not evidenced |
+| C3 | met | **overstated / evidence missing** | It cites screenshots `hud_caged/annotator`, which are not in the repo; the nearest is `54-hud-portraits`. No committed screenshot of the Settings panel, end card or promotion card for the current HUD. The judge has the HUD at 6/10: no row icons, and a monogram for the human |
+| C4 | met | agree | `ue5/tools/audio/ambience.py`, `clack.py`. Volume is in the keys autotest |
+| C5 | met | **evidence missing** | No screenshot shows the credits line: `52-menu-hands` (02:56) predates a08af2a (03:59). FREE_ASSETS rows exist |
+| R1 | met | agree | docs/INSTALL.md |
+| R2 | partial | agree | LIM-012..016 added with severities |
+| R3 | not yet | agree | - |
+
+Net, over the 15 rows marked met:
+
+| Outcome | Rows |
+|---|---|
+| Confirmed as stated | G1, S1, V1 |
+| Confirmed, but the evidence will be overwritten | G3, S2 |
+| Agreed, not re-checked in depth | G5, C1, C4, R1 |
+| Half confirmed | S4 |
+| Overstated | G2, S3, C3 |
+| No evidence | G4, C5 |
+
+V4 and V5, marked partial, are not met.
 
 ## 2. New findings (newest first)
 
-- **F1 BUG-008 (from stage 1): drag-to-promotion has two visual bugs**, found by code review.
-  - Cancelling the picker leaves the pawn drawn on the 8th rank.
-  - Confirming makes the pawn jump back one rank before it flies.
-  - The cause is `EndDrag`'s `NeedsPromotion` branch: no `DroppedFrom`, and no `SnapBack` on cancel. `IsInSync()`
-    checks codes, not positions, so nothing repairs it.
-  - This is exactly the "pieces move worse than chess.com" area the owner complained about. Fix it and add a drag
-    autotest step for both paths.
-- **F2 The HUD shipped without a key or HUD-button regression run.** The packaged smoke drives the board's click
-  path only. Since 2071f72 nothing has run `draw`, `rematch` or `drag` on the new HUD code, and no scenario has ever
-  covered keys.
-  - The 2071f72 slip was caught only because the code did not compile. A slip that compiles (a wrong key name, or
-    a button id typo in `PressButton`) would reach the owner.
-  - Add a `keys` scenario (Tab toggles the clipboard; Q at a pending promotion; Escape cancels) and rerun
-    `draw/rematch/drag` on HEAD.
-- **F3 The lead told the owner "maximum graphics settings with ray tracing ... on your RTX card".** The log confirms
-  that the preset runs; the claim as such is honest. The pass-40 log and the PR, however, imply a visible gain, and
-  no image shows one. Capture the game camera at high vs epic, or drop the implication.
-- **F4 Stale docs.**
-  - ROADMAP's evidence table (lines 238-265) has no rows for drag (8/8), the gameplay feel, the quality preset, the
-    HUD restyle, the OptiXDenoise crash or the cpu count of 68 (it still says 28/28).
-  - FREE_ASSETS does not list the synthesised `S_TC_Move/Capture.wav` (own work; record it as generated by
-    `ue5/tools/audio/clack.py`). Courier Prime is listed for the clipboard only, but it now also draws the HUD.
-- **F5 Repo hygiene.**
-  - `40-main.png` and `40-opponent-closeup.png` were committed in cca78d3, 10 min after the strip commit, and still
-    carry 244 KB and 613 KB of stale bytes after `IEND`. They were captured outside `capture.ps1`, which deletes
-    first. All other 60 PNGs are clean.
-  - Tracked screenshots: 62 files, 105 MB.
-  - The largest file is 8.3 MB (under 10 MB).
-  - Besides this run's own worktree, `.claude/worktrees/` holds three agent worktrees. One is on the deleted
-    `agents/rules-audit-2`, and that local branch still exists; the other two may belong to active agents.
-    The remote now has only `main` and the feature branch (owner request 24 is done).
-- **F6 The visual side of the milestone is HUD-only.** The scene in `40-main`/`41-hud` is pixel-close to pass 39
-  (visual.md F6). The run-2 visual fixes are still open: hands (fist), cage tan, Annotator plate, poses, clutter,
-  lamp pool. The lead is now on cage and hands (02:20Z), which is on task.
+- **F1 Build-PC evidence is perishable and overwritten.** result.json, beta-checks.json and TownChess.log are
+  replaced on every run. The reconnect test even writes into `autotest\cpu`. BETA rows cite counts that nothing in
+  the repo records.
+  - Fix: write each run to a dated file; copy the summary JSON (counts, commit SHA, build time) into
+    `docs/pipeline/evidence/`; put the commit SHA into result.json (the `build`/`commit` fields are empty today).
+- **F2 `beta_checks.ps1` passes vacuously:** `$res.s2 = ... "PASS $Games/$Games"` gives "PASS 0/0" for a perf-only
+  run. Make S2 FAIL when `$Games -lt 10`, and keep perf in its own file.
+- **F3 Screenshot growth is against the evidence rule.** There are 81 tracked screenshots, 144 MB (run 3: 62 files,
+  105 MB): +39 MB in a day. AGENT_PIPELINE asks for the main view plus changed close-ups only. Passes 53-59 alone
+  added 7 multi-panel PNGs. Use JPEG q90 for close-ups, or keep scratch captures on the PC.
+- **F4 Chess guardian F1 (Low):** `TCLocalCore.cpp:94` honours `-tcallowstartfen` in Shipping builds via a
+  process-wide environment variable. That contradicts the comment two lines above. Not a fairness hole (local,
+  unrated), but guard it with `!UE_BUILD_SHIPPING`.
+- **F5 The visual judge found new V5 items that are not in KNOWN_LIMITATIONS:** the watch model, the brass corner
+  plates, the captured pawn under the fingers, the jagged record sheet, and the Annotator's checker eye. LIM-014
+  (legs) understates the problem: the knees show in every committed hand close-up (53, 57, 59, 52-watch).
 - Checked and clean:
-  - Secrets: diff `d6f577c..origin` grepped for password/token/AUTH_/PRIVATE KEY/ssh keys/ghp_/github_pat. The only
-    hit is prose in WINDOWS_SETUP change 14, which says the Android block's local token was *not* committed.
-    `git grep` finds no AndroidFileServer or SecurityToken in `ue5/`.
-  - GameCore authority: no `packages/` change.
-  - Windows work stayed in `C:\TownChess`, and this audit only read files there.
+  - Secrets: diff `de4a920..2cab890` grepped for password/token/AUTH_/PRIVATE KEY/ssh-rsa/ed25519/ghp_/github_pat/AKIA.
+    The only hits are audit prose and WINDOWS_SETUP change 15 (AndroidFileServer disabled because it wrote a
+    *local* token into DefaultEngine.ini; that token was not committed).
+  - The largest tracked file is 8.3 MB (`T_HandlingGrime_Normal.png`); nothing is over 10 MB.
+  - GameCore authority: the only `packages/` change is 8a3f90e (startFen opt-in, verified by stage 1).
+  - Free assets: the new sounds and portraits are own work and recorded in FREE_ASSETS (5b40049). Player skins are
+    derived from MetaHuman textures and kept out of the repo (`TC_SKIN_DIR`).
   - All commits are by constantlods.
-  - The previous audit's F1 overclaims were corrected in chat (the 08:38Z message lists the fist, the bronze cage,
-    the sleeves, and the veins as unchecked).
 
 ## 3. Owner requests
 
 | # | Request | Status | Evidence | Gap |
 |---|---|---|---|---|
-| 0 | Latest: "okay continue with the build" (10-06 02:12Z) | **followed** | cage/bars/fingers commits c14e510, c160e11 | not yet screenshotted |
-| 0a | "pieces in chess.com move better ... mouse movement is bad ... looks worse than roblox" (10-05 07:37Z) | **in progress** | drag/ease/sounds (5213cea..559558e), drag 8/8, packaged build ready | owner has not played it yet; BUG-008; HUD 5/10 |
-| 1 | Native UE5 game, Windows first | done-verified | packaged build 08:37Z | - |
-| 2 | GameCore sole chess authority | done-verified | chess.md run 3 | - |
-| 3 | Regression test per chess bug; count never drops | done-verified | 475 (floor met) | BUG-008 is UE-side and has no harness here |
-| 7 | Owner plays a full game with the mouse | **pending (owner)**, asked again 08:38Z | ROADMAP line 265 | - |
-| 8 | Windows PC rules + change log | done-verified | change 14 (OptiXDenoise) recorded | stray `ue5\TownChess 5.8*` folders await the owner's OK |
-| 9/10 | No secrets, no large binaries | done-verified | grep + size scan | F5 |
-| 11 | Critique -> render -> compare loop | in progress | visual.md run 3, passes 40-41 logged | - |
-| 12 | MetaHuman opponent in the cage mask | done-verified | 40-opponent-closeup | cage still tan (fix pending in c14e510) |
-| 13/20 | Four-stage pipeline | run 3 in progress | this file | - |
-| 14a | Player picks character/hands | not started, tracked | ROADMAP, LIM-011 | - |
-| 14b | Board flips between games | done-verified (autotest) | rematch 8/8 (03:45) | no Black-seat screenshot |
-| 14c/d | Clipboard cart, Tab toggle | done-verified (visual), **key path untested** | 13-clipboard-raised | F2 |
-| 14e | Simulated classics / CPU vs CPU by Elo | done-verified | 73 games, 0 anomalies; first draw path | not in CI |
-| 14f | Stockfish league | done-verified | packaged sf1600 16/16 (ROADMAP) | - |
-| 15 | Caged patient + Annotator | in progress | 39-annotator | plate tan, shared pose, LIM-011 |
-| 18 | AAA realism: blood on the board, hand veins | in progress | visual.md: board 5, blood 4, hands 3 | no hand close-up since the 8K skin |
-| 19 | Free assets only | done-verified | Courier Prime OFL; sounds generated | FREE_ASSETS rows missing (F4) |
-| 22 | DLSS if needed | **blocked (owner)** | plugin not installed, told 07:59Z | - |
-| 23 | 8K skin for veins | owner part done; **verification pending** | BuiltCine 8192 textures (chat) | no close-up |
-| 24 | Delete merged branches | **done-verified** | `git ls-remote`: only main and the feature branch | local `agents/rules-audit-2` |
+| 0 | Latest (10-06 07:55Z): "continue ... all the way to the end ... deploy agents (critique, rendering, github, review vs picture) ... till the build is in beta phase" | **in progress** | BETA.md, tc-render-artist, pipeline run 4 | BETA: V2, V3, V4, V5, C2, R2 and R3 open; 5 met rows disputed (G2, G4, S3, C3, C5) |
+| 0a | 10-06 03:13Z: "mouse movement way better, still work on improvements"; "pieces still hide behind each other"; "still extremely low quality" | in progress | seat view on the wheel (145821c, `47-view-heights`); V3 5.2 | **No open item tracks further mouse/drag feel work.** Add one, or ask the owner what still feels off |
+| 1-3 | Native UE5, GameCore authority, a regression test per bug | done-verified | chess.md run 4 | - |
+| 7 | Owner plays a full game with the mouse | done (owner played: 10-06 03:13Z feedback) | owner message | - |
+| 14a | Player picks character/hands; "so can his opponent" | **partial** | Hands menu: bare/dirty/scarred/sleeves/watch; opponent choice in the menu | **Not tracked:** an online opponent seeing the other player's chosen hands/character. LIM-013 covers only the missing server |
+| 14b | Board flips between games | done (stale) | rematch 8/8 (03:22) | No Black-seat screenshot, which V5 also needs |
+| 14c/d | Clipboard cart, Tab toggle | done-verified | keys 13/13 | - |
+| 14e/f | Simulated classics, CPU by Elo, Stockfish league | done-verified | 86 sim games, 0 anomalies; packaged sf1600 16/16 | - |
+| 15 | Caged patient + Annotator | done | C1 | The Annotator plate is flat and bright (visual.md) |
+| 18 | "blood on the board, veins in the hands ... extremely detailed" | in progress | V2 11.4/11.5, V4 5/10 | visual.md top 8 |
+| 19 | Free assets only | done-verified | FREE_ASSETS | - |
+| 22 | DLSS if needed | tracked (LIM-012) | plugin not installed | owner action |
+| - | Reference panels: BOARD ENVIRONMENTS (6 rooms), tattooed hands, gloves, Rated queue, row icons | **partly untracked** | gloves/tattoo in LIM-016; environments only as ROADMAP phase 9 | **Environments are not in BETA.md:** ask the owner whether beta needs them |
 
 ## 4. Wrong or risky (carried over)
 
-- **R3** The cage mask's likeness to a famous film character. Re-check it once the iron cage lands.
-- **R5** `docs/reference/concept-reference.jpg` is public with no recorded source or licence. It is the north star
-  image itself (pixel-identical to `reference-northstar.png` up to JPEG noise).
+- **R3** The cage mask's likeness to a famous film character (unchanged).
+- **R5** `docs/reference/concept-reference.jpg` is public with no recorded source or licence.
 - **R7** There is no branch protection on `main`.
 
 ## 5. Next actions (priority order)
 
-1. **Fix BUG-008** (snap back on a cancelled promotion; set `DroppedFrom` on `NeedsPromotion`). Add a `keys` autotest,
-   then rerun `cpu/draw/rematch/drag/keys` on HEAD before the next owner build.
-2. **Owner play test:** get the owner's verdict on how moving pieces feels. Keep the mouse game on the owner list.
-3. **HUD to the reference:** a sans face for plates and buttons, portraits, icons, equal plates, a Settings row (or
-   remove it from the plan), and quieter move markers (visual.md fixes 2-5).
-4. **Visual scene:** screenshot the iron cage and relaxed fingers (c14e510, c160e11); do the hand close-up for the
-   8K skin; get the lamp and its pool into shot.
-5. **Evidence:** one game-camera capture at high vs epic, or stop implying a visible gain. Also add a Black-seat
-   screenshot.
-6. **Docs:** ROADMAP rows (drag, preset, HUD, OptiXDenoise, cpu 68). FREE_ASSETS rows for the sounds and the HUD
-   font.
-7. **Housekeeping:** re-encode the two 40-* PNGs, remove the stale worktrees and the local `agents/rules-audit-2`
-   branch, and ask the owner about the `ue5\TownChess 5.8*` folders.
+1. **Make the BETA evidence durable** (F1, F2). Rerun cpu, drag, promo, rematch and reconnect on HEAD once, with
+   dated results and SHAs, then correct G2, G4 and S2.
+2. **Correct the BETA statuses:** V4 and V5 "not met". S3 "met offscreen; windowed run pending". C3 and C5 need a
+   current menu/Settings/end-card screenshot.
+3. **Visual top 8 (visual.md):** legs (LIM-014 widened), both hands in view, dirty skin by default, the patient's
+   jacket, brass corners, watch, lamp, table detail. Capture a Black-seat view.
+4. Guard `-tcallowstartfen` in Shipping (F4). Commit the V1/V2 measuring script.
+5. Screenshot budget (F3). Ask the owner about environments for beta and about online hand visibility.
