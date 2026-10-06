@@ -890,24 +890,26 @@ def wristwatch():
     Origin on the wrist axis. (A round 3.3 cm strap stood off the flattened MetaHuman wrist as a loose loop.)"""
     reset()
     parts = []
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.033, minor_radius=0.003, major_segments=40, minor_segments=8,
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.033, minor_radius=0.003, major_segments=56, minor_segments=12,
                                      location=(0, 0, 0), rotation=(0, math.radians(90), 0))
     st = bpy.context.active_object
     # object scale acts on the torus's own axes (before the rotation): its Z (the ring axis, now the arm) sets the strap
     # width, its X/Y (now world Z/Y) the oval (2.8 on X stretched the ring itself into a 9 cm hoop, pass 52)
     st.scale = (0.85, 0.97, 2.8)  # 2.8 x 3.2 cm oval: 2.2 x 2.9 sank into the MetaHuman wrist
     bpy.ops.object.transform_apply(scale=True, rotation=True)
+    bpy.context.view_layer.objects.active = st
+    bpy.ops.object.shade_smooth()
     material(st, "M_Strap"); parts.append(st)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.017, depth=0.008, location=(0, 0, 0.032))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.017, depth=0.008, location=(0, 0, 0.0295))
     case = bpy.context.active_object
     bv = case.modifiers.new("bevel", "BEVEL"); bv.width = 0.0015; bv.segments = 3
     apply_mods(case); material(case, "M_Steel"); parts.append(case)
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=8, radius=0.015, location=(0, 0, 0.035))
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=8, radius=0.015, location=(0, 0, 0.0325))
     gl = bpy.context.active_object
     gl.scale = (1, 1, 0.22)
     bpy.ops.object.transform_apply(scale=True)
     material(gl, "M_Dial"); parts.append(gl)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0022, depth=0.004, location=(0.0, 0.019, 0.032),
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0022, depth=0.004, location=(0.0, 0.019, 0.0295),
                                         rotation=(math.radians(90), 0, 0))
     crown = bpy.context.active_object
     material(crown, "M_Steel"); parts.append(crown)
