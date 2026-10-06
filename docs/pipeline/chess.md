@@ -1,5 +1,68 @@
 # Chess guardian report (stage 1)
 
+## Run 3: 2026-10-05, base `de4a920` (milestone "gameplay feel + reference HUD + packaged build")
+
+### Test counts
+| Check | Result |
+|---|---|
+| `npm test` with TC_STOCKFISH (live-engine test runs) | **475 passed / 475**, 19 files (floor 475: met) |
+| `npm test` without TC_STOCKFISH | **474 passed + 1 skipped (475)**, 19 files (floor met) |
+| `npm run typecheck` (shared, engine, server, client, learning) | clean, 0 errors |
+
+Floor for run 4: 475. No tests were added or removed this run (the new bug lives in the UE client, see F1).
+
+### Commit review
+- `git log be79b31..de4a920 -- packages tools` is **empty**: the 23 commits since run 2 touch only `ue5/` and
+  `docs/`. GameCore, the protocol, the house engine and the league are unchanged, so rules authority is unchanged.
+- The UE client still submits every move through the core: `ATCBoard::ClickSquare`, `EndDrag` and
+  `ChoosePromotion` call `UTCCoreClient::SubmitMove`. The new drag code only moves meshes locally until the core
+  answers (`DroppedFrom`, `SnapBack`), and `IsInSync()` still rebuilds from the authoritative FEN after animations.
+- The smoke fix (TCGame.cpp:203: `LeaveGame` then `TryAutoStart` when a restored game refused the auto-start) is a
+  client flow change. It does not touch rules.
+
+### Simulator batch (seed 73, `--games 8`, Stockfish referee per ply)
+**13 games in 142 s (wall 2 min 26 s), 0 anomalies.** First non-mate ending since run 1.
+
+| Game | White | Black | Plies | Result |
+|---|---|---|---|---|
+| 5 classics (Fool's, Legall, Opera, Immortal, Evergreen) | replay | replay | 4/13/33/45/47 | checkmate (expected) |
+| #1 A57 Benko, Zaitsev | stockfish-2500 | stockfish-2850 | 84 | checkmate 0-1 |
+| #2 B44 Sicilian Taimanov | stockfish-2500 | house-1 | 59 | checkmate 1-0 |
+| #3 B28 Sicilian O'Kelly | stockfish-1600 | stockfish-2200 | 114 | checkmate 0-1 |
+| #4 A00 Grob, Romford | stockfish-2850 | stockfish-2850 | 112 | checkmate 0-1 |
+| #5 C40 Damiano Gambit | stockfish-2200 | stockfish-2200 | 59 | checkmate 1-0 |
+| #6 E80 KID Saemisch | house-2 | stockfish-1350 | 178 | checkmate 0-1 |
+| #7 B90 Najdorf, Adams | house-1 | stockfish-1900 | 86 | checkmate 0-1 |
+| #8 C10 French, Marshall Gambit | stockfish-2200 | stockfish-2200 | 146 | **draw_insufficient** 1/2-1/2 |
+
+Game #8 runs the insufficient-material path end to end, and GameCore and the referee agree on it. Still no house-3
+or house-4 player drawn, and no stalemate, repetition or 75-move ending. Running total: 73 games, 0 anomalies.
+
+### Findings
+#### F1: BUG-008 (Low, open, UE client): cancelling a drag-to-promotion leaves the pawn on the promotion square
+- `ATCBoard::EndDrag` (TCBoard.cpp ~506) snaps the piece back on every result except `Submitted` and
+  `NeedsPromotion`. On `NeedsPromotion` the pawn stays where it was dropped, and `DroppedFrom` is not set.
+- `ChoosePromotion("")` (Escape) clears the picker state but never calls `SnapBack`. `IsInSync()` compares the codes
+  on each square, not mesh positions, so the resync does not repair it.
+- On a confirmed promotion the flight starts from `LocalOf(From)`, so the pawn visibly jumps back one rank first.
+- Rules are unaffected, because the core never saw a move. Found by code review only. It was not reproduced, because
+  Unreal cannot run here.
+- Not pinned: no test harness for the UE client runs on this host. `autotest.py` calls `board.choose_promotion`
+  directly (~406) and never drags to the last rank, presses Q/R/B/N/Escape or cancels. Documented in
+  docs/KNOWN_LIMITATIONS.md with a fix idea and the autotest step that would catch it.
+
+#### F2: the key handler slip of 2071f72 is repaired, but nothing would catch it again
+- `ATCPlayerController::OnKey` at de4a920 is byte-identical to 2071f72~1 (32 lines). In 2071f72 its body had been
+  replaced by the promotion-picker drawing code. That code uses `Canvas`, `U2` and `Plate`, which the controller does
+  not have, so 2071f72 could not compile (its message says "not yet compiled"). 7374e09 restored the handler.
+- No autotest drives keys: `autotest.py` has no Tab, promotion-key or join-code typing step. The cpu, rematch and
+  drag autotest counts quoted for this milestone were run before the HUD commits. Suggested: a `keys` scenario
+  that sends Tab, Escape and Q through `InputKey`, then checks the clipboard and the promotion result.
+
+LIM-001..LIM-011 are unchanged. BUG-001..007 stay fixed, and their tests pass in both runs.
+
+---
+
 ## Run 2: 2026-10-04, base `be79b31` (light run: only the commits since run 1, c791d46)
 
 ### Test counts
@@ -48,78 +111,8 @@ No regression tests added this run. LIM-001..LIM-010 unchanged.
 
 ---
 
-## Run 1 (base `340cdfc`, first run of this stage)
-
-### Test counts
-
-| Check | Result |
-|---|---|
-| `npm test` (TC_STOCKFISH set, live-engine test runs) before this run | 473 passed / 473 |
-| `npm test` after this run | **474 passed + 1 expected fail (475)**, 19 files |
-| `npm run typecheck` (shared, engine, server, client, learning) | clean, 0 errors |
-
-Floor for the next run: 475 tests (474 passing + BUG-007 pinned as `it.fails`).
-
-### Findings (newest first)
-
-#### F1: BUG-007 (Low, open): the league's crash retry re-binds an engine process to a finished game
-- `UciLeague.bestMove` (`packages/server/src/uciEngine.ts`, 27d4d00) retries once after a crash by calling
-  `acquire(roomId)` again. If `Hub.finished` already called `league.release(roomId)` while the request was in flight
-  (resign, flag or abort while the engine thinks or starts), the retry starts a fresh process bound to the finished room.
-  Nothing releases it again. Four such leaks fill `maxEngines` (4), and from then on every league move silently falls
-  back to Warden until the core restarts. The game result is not affected: the hub drops the move (`status !== 'active'`).
-- Evidence: the new test fails with `expected UciEngine{...} to be null` on `lg.engineOf('R1')` after
-  `p = lg.bestMove('R1', ...)` (crash-once fake engine), `lg.release('R1')`, `await p`. The no-crash control passes.
-- Pinned: `BUG-007` `it.fails` plus a control in `packages/server/test/uci.test.ts`. Documented in docs/KNOWN_LIMITATIONS.md.
-
-#### F2: the simulator ignores its "bounded house think-time" (tooling, not a product bug)
-- `search()` sets `deadline = opt.nodeLimit ? Infinity : now + timeMs` (`packages/engine/src/search.ts:79`). Every
-  house player in `tools/sim/simulate.ts` sets `nodeLimit`, so the `timeMs` values that 594559b lowered
-  ("sim: bounded house think-time") have no effect. Only the node caps (4k/15k/40k/80k) apply.
-- Evidence: game #4 (house-4 vs house-3, 145 plies) took about 50 min of this batch's 70 min. A CDP stack sample of the
-  running sim showed it inside `search -> negamax -> quiesce -> chess.js _moves`, with Stockfish idle.
-  Run 2 (seed 23) took 5993 s for 19 games for the same reason.
-- Product impact: none. No code in `packages/*/src` passes `nodeLimit`; the hub's house levels use `timeMs`
-  (capped by `moveBudgetMs`). Suggestion for the lead: lower the sim node caps, or let `search` honour both limits.
-
-#### Commit review (packages/, tools/sim since the start of the branch's chess work)
-- 27d4d00 / 7bc5874 (Stockfish league): rules authority stays in GameCore. `leagueMove` only gets a UCI string from
-  the engine and submits it through `room.move(aiId, ..., ply)`. A rejected or missing move falls back to the house
-  engine, the ply guard drops late replies, and finished positions are never sent (`legalMovesUci().length === 0`).
-  Positions go as start FEN plus every move (the engine sees repetitions). UCI_Elo values 1350..2500 are inside
-  Stockfish's 1320..3190 range. Timeouts use stop, then kill. The only defect found is F1.
-- b072814 (BUG-005/006 fixes): `eventSeq` is persisted and restored with max(). Replayed `clockAfterMs` values are
-  cleared. Correct, and covered by the now-passing BUG-005a/b and BUG-006a.
-- c0a4784 (rules audit 2 tests) and 594559b (sim): tests only, plus F2.
-- Noted, not a bug: a journal record has no start FEN (restore assumes the standard start). That is fine while every
-  room starts from the standard position.
-
-### Simulator batch (seed 37, `--games 8`, Stockfish 19 referee per ply)
-
-Total: 13 games in 4193 s, **0 anomalies** (legal-move sets, check/mate/stalemate, fivefold/75-move, insufficient
-material, eventSeq, journal restore, PGN round-trip, engine legality).
-
-| Game | White | Black | Plies | Result |
-|---|---|---|---|---|
-| Fool's Mate | replay | replay | 4 | checkmate 0-1 (expected) |
-| Legall's mate | replay | replay | 13 | checkmate 1-0 (expected) |
-| Opera Game | replay | replay | 33 | checkmate 1-0 (expected) |
-| Immortal Game | replay | replay | 45 | checkmate 1-0 (expected) |
-| Evergreen Game | replay | replay | 47 | checkmate 1-0 (expected) |
-| #1 A43 Benoni | stockfish-2850 | house-1 | 37 | checkmate 1-0 |
-| #2 D83 Grünfeld | stockfish-2200 | house-2 | 101 | checkmate 1-0 |
-| #3 B90 Najdorf | stockfish-1350 | house-4 | 44 | checkmate 0-1 |
-| #4 D01 Richter-Veresov | house-4 | house-3 | 145 | checkmate 1-0 |
-| #5 B06 Modern | house-4 | house-1 | 65 | checkmate 1-0 |
-| #6 C60 Ruy Lopez | stockfish-2850 | stockfish-1350 | 55 | checkmate 1-0 |
-| #7 D66 QGD Orthodox | stockfish-1900 | house-3 | 49 | checkmate 1-0 |
-| #8 C32 KGD Falkbeer | stockfish-1350 | stockfish-1350 | 83 | checkmate 1-0 |
-
-
-### Regression tests added
-- `BUG-007: a game released mid-request is not re-bound by the crash retry (no leaked process)`: `it.fails`.
-- `BUG-007 control: release without a crash leaves no binding and at most one idle process`: passes.
-
-### Tracked limitations (unchanged, still open)
-LIM-001 (dead positions from locked pawns, pinned in fide-cases.core.test.ts), LIM-002..LIM-010 as listed in
-docs/KNOWN_LIMITATIONS.md.
+## Run 1 (base `340cdfc`), condensed
+- Tests went from 473 to 475 (BUG-007 pinned as `it.fails`; fixed in 7cdc067, see run 2). Typecheck clean.
+- F1 BUG-007: the league's crash retry re-bound an engine to a finished game. Fixed.
+- F2: the sim ignored house `timeMs` whenever `nodeLimit` was set (`search.ts:79`). Addressed by node budgets (f895b14).
+- Sim seed 37: 13 games in 4193 s, 0 anomalies, all mates.

@@ -42,6 +42,7 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
 | [LIM-011](#lim-011) | Annotator's oversleeves do not render; all characters share one MetaHuman (Walter) | Low (visual) | Open |
 | [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Fixed |
+| [BUG-008](#bug-008) | UE board: a pawn dragged to the last rank stays where it was dropped if the promotion is cancelled | Low (shown board differs from the authority; rules unaffected) | Open (found by code review, not yet reproduced in UE) |
 
 ---
 
@@ -384,3 +385,23 @@ the player's arms wear the patient's shirt. The generated hand vein/dirt decals 
 bisected as the cause of a 2x exposure jump (frame mean 39 -> 85) and looked weak on curved skin; hand veins wait for the
 MetaHuman 8K skin textures (an owner action in the editor). Each character needs its own MetaHuman (one cloud auto-rig per character
 in the owner's editor) before player character/hands selection can ship.
+
+## BUG-008
+
+**UE client: cancelling the promotion picker after a drag leaves the pawn floating on the promotion square.**
+Found by the chess guardian (run 3) by reading the code; not reproduced in Unreal (the pipeline host cannot run it).
+
+- **Where:** `ATCBoard::EndDrag` and `ATCBoard::ChoosePromotion` in
+  `ue5/TownChess/Source/TownChess/Private/TCBoard.cpp` (drag-and-drop, commit 5213cea).
+- **What happens:** `EndDrag` snaps the piece back for every result except `Submitted` and `NeedsPromotion`. For
+  `NeedsPromotion` the pawn stays at the drop point while the picker is shown, and `DroppedFrom` is not set.
+  - Escape (or `promo_` with an empty piece) calls `ChoosePromotion("")`, which clears `PromotionFrom/To` and the
+    selection but never moves the pawn back. It is drawn on the 8th rank while the authority has it on the 7th.
+  - `IsInSync()` compares piece codes per square, not positions, so the end-of-animation resync does not repair it.
+  - If the promotion is confirmed instead, the move animation starts at `LocalOf(From)` (no `DroppedFrom`), so the
+    pawn jumps back to the 7th rank and flies forward again.
+- **Reproduction (UE):** play to a position with a pawn on the 7th rank, drag it to the 8th, press Escape at the
+  picker; the pawn stays on the 8th rank. Press Q instead: the pawn visibly jumps back before the move plays.
+- **Pinned by:** nothing yet. `ue5/TownChess/Scripts/autotest.py` calls `board.choose_promotion` directly and never
+  drives a drag to the last rank, keys or a cancel. Fix idea: on `NeedsPromotion` set `DroppedFrom = From`; on a
+  cancelled promotion call `SnapBack(PromotionFrom)` before clearing it; add a `drag` autotest step for both paths.
