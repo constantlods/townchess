@@ -115,8 +115,8 @@ def probe(world):
             for bone in ("lowerarm_l", "hand_l", "lowerarm_r", "hand_r"):
                 if smc.does_socket_exist(bone):
                     t = smc.get_socket_transform(bone, unreal.RelativeTransformSpace.RTS_WORLD)
-                    q = t.rotation
-                    x = q.get_forward_vector(); z = q.get_up_vector()
+                    x = unreal.MathLibrary.transform_direction(t, unreal.Vector(1, 0, 0))
+                    z = unreal.MathLibrary.transform_direction(t, unreal.Vector(0, 0, 1))
                     log(f"probe player {bone} at ({t.translation.x:.1f},{t.translation.y:.1f},{t.translation.z:.1f}) "
                         f"X=({x.x:.2f},{x.y:.2f},{x.z:.2f}) Z=({z.x:.2f},{z.y:.2f},{z.z:.2f})")
         if smc.does_socket_exist("head"):
