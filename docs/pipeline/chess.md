@@ -1,5 +1,63 @@
 # Chess guardian report (stage 1)
 
+## Run 4: 2026-10-06, base `d466ca1` (BETA focus: G1 + the test-only start position)
+
+### Test counts (G1)
+| Check | Result |
+|---|---|
+| `npm test` with TC_STOCKFISH (`tools/.cache/stockfish/stockfish-linux-x86-64-universal`) | **479 passed / 479**, 19 files (floor 475: met) |
+| `npm test` without TC_STOCKFISH | **478 passed + 1 skipped (479)**, 19 files (floor met) |
+| `npm run typecheck` (shared, engine, server, client, learning) | clean, 0 errors |
+
++4 tests since run 3 (server.test.ts: 3 startFen tests; journal.test.ts: 1 restore-from-startFen). Floor for run 5: 479.
+No `it.fails` pins are open; BUG-001..008 are fixed and their tests pass in both runs. BETA G1 "met (479/479)": confirmed.
+
+### Commit review (de4a920..d466ca1 touching packages/ and tools/: one commit, 8a3f90e)
+**Test-only start position (`CREATE_AI_GAME.startFen`) cannot be used on a normal server: verified.**
+- `HubOptions.allowCustomStart` defaults to false (`hub.ts:67`, `opts.allowCustomStart ?? false`). The public server
+  (`packages/server/src/index.ts:27`, `new Hub(server, players)`) passes no options, so it is always off there.
+- The only place that sets it is the sidecar (`sidecar.ts:62-63`): `allowCustomStart: process.env.TC_ALLOW_START_FEN === '1'`.
+  The sidecar listens on `127.0.0.1` only (`sidecar.ts:80`) and needs the per-launch secret.
+- The check runs before the FEN is parsed and before any room exists (`hub.ts:294-297`): disabled -> ERROR
+  `start_fen_disabled`, invalid -> `bad_fen`, both with `hub.rooms.size === 0` asserted. The schema caps the field at
+  100 chars (`protocol.ts:55`). The "refused" test uses a fresh `new Hub(server, players)` per test (beforeEach), so it
+  checks the real default, not a flag left on by an earlier test.
+- Only `CREATE_AI_GAME` accepts it (AI games are unrated: `createRoom(tc, false, ...)`), and the opening book is only
+  used from the standard start (`game.ts:192`). Journal records keep `startFen`, and restore replays from it.
+- Rules authority is unchanged: the FEN only seeds `GameCore`; every move still goes through `GameCore`.
+
+#### F1 (Low, UE client, no rules impact): the packaged game honours `-tcallowstartfen`
+`TCLocalCore.cpp:94` sets `TC_ALLOW_START_FEN=1` from the command line in every build configuration, including
+Shipping, and it sets it process-wide. Two lines above, the comment says "Nothing goes through the environment
+(it is process-wide and inherited by every child ...)". A player can only start their own local AI game from a set
+position (unrated, loopback core), so this is not a fairness hole. Still, it contradicts the file's own rule.
+Suggested: wrap it in `#if !UE_BUILD_SHIPPING` and pass `--allow-start-fen` as a sidecar argument instead of using the
+environment. Not pinned: no test harness for the UE client runs on this host.
+
+### Simulator batch (seed 104, `--games 8`, Stockfish referee per ply)
+**13 games in 544 s, 0 anomalies.** First batch that draws house-3 and house-4 (the run-3 gap).
+
+| Game | White | Black | Plies | Result |
+|---|---|---|---|---|
+| 5 classics (Fool's, Legall, Opera, Immortal, Evergreen) | replay | replay | 4/13/33/45/47 | checkmate (expected) |
+| #1 C37 King's Gambit, Kotov | stockfish-2850 | stockfish-2200 | 99 | checkmate 1-0 |
+| #2 B58 Sicilian Classical | stockfish-1350 | house-1 | 51 | checkmate 1-0 |
+| #3 C34 KGA Gianutio | house-2 | stockfish-1900 | 60 | checkmate 0-1 |
+| #4 D35 QGD Exchange, Saemisch | house-2 | house-1 | 245 | checkmate 1-0 |
+| #5 E34 Nimzo Classical, Belyavsky | house-3 | stockfish-1900 | 42 | checkmate 0-1 |
+| #6 B07 Lion, Bayonet | stockfish-1900 | house-3 | 61 | checkmate 1-0 |
+| #7 A98 Dutch Ilyin-Zhenevsky | stockfish-2500 | stockfish-2500 | 90 | checkmate 0-1 |
+| #8 C27 Vienna Frankenstein-Dracula | house-4 | stockfish-2850 | 50 | checkmate 0-1 |
+
+Game #4 (245 plies, house vs house) ran long without reaching the 75-move rule. No sim has produced a stalemate,
+repetition or 75-move ending yet; unit tests cover all three. Running total: 86 games, 0 anomalies.
+
+### Regression tests added
+None. No new rules bug was found. F1 is a client hardening item, and the lead fixes it (product code).
+
+---
+
+
 ## Run 3: 2026-10-05, base `de4a920` (milestone "gameplay feel + reference HUD + packaged build")
 
 ### Test counts
@@ -63,53 +121,8 @@ LIM-001..LIM-011 are unchanged. BUG-001..007 stay fixed, and their tests pass in
 
 ---
 
-## Run 2: 2026-10-04, base `be79b31` (light run: only the commits since run 1, c791d46)
-
-### Test counts
-| Check | Result |
-|---|---|
-| `npm test` with TC_STOCKFISH (live-engine test runs) | **475 passed / 475**, 19 files (floor 475: met) |
-| `npm test` without TC_STOCKFISH | **474 passed + 1 skipped (475)**, 19 files (floor met) |
-| `npm run typecheck` (5 packages) | clean, 0 errors |
-
-BUG-007 is now a normal passing test (was `it.fails`), so the count stays 475. Floor for run 3: 475.
-
-### Commit review
-- **7cdc067 (BUG-007 fix, `packages/server/src/uciEngine.ts`)**: correct. `release()` bumps a per-room generation;
-  `bestMove` captures it up front and returns null when it changed, both before each attempt (so the crash retry no
-  longer re-acquires) and right after `acquire` (if the release landed during `newGame`, the engine is unbound and
-  returned to idle). `unbind` only deletes the room binding if it still points at that engine and guards against a
-  duplicate idle entry (release and the stale path can both unbind the same engine). A release during the think puts
-  a still-busy engine on the idle list, but `UciEngine` serialises commands (`serial()`), so the next game's
-  `ucinewgame` waits for the pending `bestmove`; no protocol interleaving. Rules authority is untouched: the league
-  still only returns a UCI string to the hub, which submits it through GameCore.
-  The test now asserts no binding for R1, at most 1 process, and that R2 can get an engine afterwards.
-  Nit (no finding): `gens` is never pruned, one number per room id ever released. Negligible unless room ids are
-  unbounded over a very long uptime.
-- **f895b14 (sim node budgets)**: house-3 40k -> 12k nodes, house-4 80k -> 25k. Tooling only; addresses run 1's F2.
-  The `timeMs` values are still dead in the sim (`search.ts:79` ignores them whenever `nodeLimit` is set); the comment
-  now says so. No product code changed.
-
-### Simulator batch (seed 41, `--games 4`, Stockfish referee per ply)
-**9 games in 27 s (wall 32.8 s incl. startup), 0 anomalies.** Run 1 took 4193 s for 13 games.
-
-| Game | White | Black | Plies | Result |
-|---|---|---|---|---|
-| 5 classics (Fool's, Legall, Opera, Immortal, Evergreen) | replay | replay | 4/13/33/45/47 | checkmate (expected) |
-| #1 C41 Philidor, Exchange | stockfish-1600 | stockfish-1900 | 68 | checkmate 0-1 |
-| #2 C40 Latvian Gambit Accepted | stockfish-2500 | stockfish-1350 | 31 | checkmate 1-0 |
-| #3 D31 QGD Janowski | stockfish-1350 | house-1 | 49 | checkmate 1-0 |
-| #4 B21 Smith-Morra, Siberian | stockfish-1900 | stockfish-1350 | 103 | checkmate 1-0 |
-
-Caveat: this seed drew no house-3 or house-4 player, so the speed-up of the new node budgets is not measured
-directly here; most of the gain is that no long house-vs-house game was drawn. Running totals: 60 games, 0 anomalies.
-Again every game ended in mate, so the draw paths were only checked as "not missed".
-
-### Findings
-None new. BUG-007 is fixed (verified by review and the passing test). F2 from run 1 is addressed in the sim.
-No regression tests added this run. LIM-001..LIM-010 unchanged.
-
----
+## Run 2: 2026-10-04, base `be79b31`, condensed
+475/475 with TC_STOCKFISH, 474 + 1 skipped without; BUG-007 fix (7cdc067) reviewed correct; sim seed 41: 9 games, 0 anomalies.
 
 ## Run 1 (base `340cdfc`), condensed
 - Tests went from 473 to 475 (BUG-007 pinned as `it.fails`; fixed in 7cdc067, see run 2). Typecheck clean.
