@@ -79,11 +79,22 @@ public:
 private:
 	void OnClick();
 	void OnRelease();
+	void ViewUp() { SetViewHeight(ViewHeight + 0.1f); }
+	void ViewDown() { SetViewHeight(ViewHeight - 0.1f); }
 	virtual void PlayerTick(float Dt) override;
 	bool PointerOnBoard(FString& Square, FVector& World) const;
 	void OnKey(FKey Key);
 	UFUNCTION() void OnState(const FTCGameState& State, const FString& Reason);
 	FString CameraFor;
+	/** Seat view height, 0 = low over the table (the reference's angle) .. 1 = higher, looking down onto the board so
+	 *  no piece hides behind another. Mouse wheel; remembered in GameUserSettings; -tcview=<0..1> for screenshots. */
+	void SetViewHeight(float V);
+	void ApplyView(float Dt);
+	float ViewHeight = 0.55f;
+	float ViewShown = -1.f;
+	TWeakObjectPtr<AActor> ViewCam;
+	FVector ViewBaseLoc = FVector::ZeroVector;
+	FRotator ViewBaseRot = FRotator::ZeroRotator;
 };
 
 /** Minimal in-world HUD (canvas): menu, player plates, clocks, status, actions, promotion picker. */

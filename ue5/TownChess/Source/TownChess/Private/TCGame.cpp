@@ -1,6 +1,8 @@
 #include "TCGame.h"
 
 #include "Camera/CameraActor.h"
+#include "CineCameraActor.h"
+#include "CineCameraComponent.h"
 #include "Engine/Canvas.h"
 #include "CanvasItem.h"
 #include "Engine/Engine.h"
@@ -330,6 +332,9 @@ void ATCPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	SetInputMode(FInputModeGameAndUI().SetHideCursorDuringCapture(false));
+	GConfig->GetFloat(TEXT("TownChess"), TEXT("ViewHeight"), ViewHeight, GGameUserSettingsIni);
+	FParse::Value(FCommandLine::Get(), TEXT("-tcview="), ViewHeight);
+	ViewHeight = FMath::Clamp(ViewHeight, 0.f, 1.f);
 	if (UTCCoreClient* C = Core()) C->OnState.AddDynamic(this, &ATCPlayerController::OnState);
 	OnState(FTCGameState(), TEXT("init"));
 }
@@ -346,6 +351,38 @@ void ATCPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATCPlayerController::OnClick);
 	InputComponent->BindKey(EKeys::LeftMouseButton, IE_Released, this, &ATCPlayerController::OnRelease);
 	InputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this, &ATCPlayerController::OnKey);
+	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &ATCPlayerController::ViewUp);
+	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &ATCPlayerController::ViewDown);
+}
+
+void ATCPlayerController::SetViewHeight(float V)
+{
+	ViewHeight = FMath::Clamp(V, 0.f, 1.f);
+	GConfig->SetFloat(TEXT("TownChess"), TEXT("ViewHeight"), ViewHeight, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+}
+
+void ATCPlayerController::ApplyView(float Dt)
+{
+	// moves the seat camera the level placed (TC_Camera_White/Black): up and slightly forward, pitched further down
+	AActor* T = GetViewTarget();
+	if (!T || !(T->ActorHasTag(TEXT("TC_Camera_White")) || T->ActorHasTag(TEXT("TC_Camera_Black")))) return;
+	if (ViewCam.Get() != T) { ViewCam = T; ViewBaseLoc = T->GetActorLocation(); ViewBaseRot = T->GetActorRotation(); ViewShown = -1.f; }
+	const float Was = ViewShown;
+	ViewShown = ViewShown < 0.f ? ViewHeight : FMath::FInterpTo(ViewShown, ViewHeight, Dt, 8.f);
+	if (FMath::IsNearlyEqual(Was, ViewShown, 1e-4f)) return;
+	const FVector Fwd = FVector(ViewBaseRot.Vector().X, ViewBaseRot.Vector().Y, 0.f).GetSafeNormal();
+	const FVector Loc = ViewBaseLoc + FVector(0, 0, 24.f * ViewShown) + Fwd * (5.f * ViewShown);
+	FRotator Rot = ViewBaseRot;
+	Rot.Pitch -= 18.f * ViewShown;
+	T->SetActorLocationAndRotation(Loc, Rot);
+	if (ACineCameraActor* Cine = Cast<ACineCameraActor>(T))
+	{
+		if (const ATCBoard* B = Board())  // keep the board in focus as the distance changes
+		{
+			Cine->GetCineCameraComponent()->FocusSettings.ManualFocusDistance = FVector::Dist(Loc, B->GetActorLocation());
+		}
+	}
 }
 
 ATCBoard* ATCPlayerController::Board() const
@@ -415,6 +452,7 @@ void ATCPlayerController::OnRelease()
 void ATCPlayerController::PlayerTick(float Dt)
 {
 	Super::PlayerTick(Dt);
+	ApplyView(Dt);
 	ATCBoard* B = Board();
 	if (!B) return;
 	FString Sq;

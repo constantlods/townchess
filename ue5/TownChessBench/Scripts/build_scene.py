@@ -1154,10 +1154,11 @@ def build():
     # ---- Chess set: board + 32 pieces; rotate so White faces the player (-X).
     chess = import_model("chess_set")
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
-    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.45, 0.34, 0.22), tint=(0.86, 0.72, 0.52), rough=0.7,
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.95, "GrimeContrast": 2.5, "MicroRough": 0.3, "GrimeStreaks": 0.0})
-    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.5, tint=(0.11, 0.095, 0.085),
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.95, "GrimeContrast": 2.0, "MicroRough": 0.2, "GrimeStreaks": 0.0})
+    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.3, 0.22, 0.14), tint=(0.62, 0.52, 0.38), rough=0.72,
+                           # aged, handled ivory: darker base and dirt in the crevices (the clean ivory was the frame's glare; pass 47)
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.62, "GrimeContrast": 2.5, "MicroRough": 0.3, "GrimeStreaks": 0.25})
+    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.55, tint=(0.11, 0.095, 0.085),
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.7, "GrimeContrast": 2.0, "MicroRough": 0.25, "GrimeStreaks": 0.15})
     mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.36, 0.25, 0.16), tint=(0.8, 0.63, 0.44),
                            scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.3, "GrimeContrast": 2.5, "MicroRough": 0.2})
     assign(chess, mi_pw, lambda n: "white" in n)
@@ -1200,7 +1201,8 @@ def build():
                 "BaseColor": import_texture(os.path.join(bd, "T_Board_BaseColor.jpg"), f"{ROOT}/Textures/Board", "T_Board_BaseColor", "color"),
                 "Normal": import_texture(os.path.join(bd, "T_Board_Normal.jpg"), f"{ROOT}/Textures/Board", "T_Board_Normal", "normal"),
                 "ARM": import_texture(os.path.join(bd, "T_Board_ARM.jpg"), f"{ROOT}/Textures/Board", "T_Board_ARM", "linear")},
-                rough=0.85, tint=(0.6, 0.57, 0.53), scalars={"MicroRough": 0.08})
+                rough=0.85, tint=(0.5, 0.47, 0.42), grime_color=(0.3, 0.22, 0.14),
+                scalars={"MicroRough": 0.1, "GrimeTiling": 2.2, "GrimeThreshold": 0.55, "GrimeContrast": 2.2, "GrimeStreaks": 0.2})
         wood_board = import_prop("chess_board") if squares else None
         if wood_board:
             mi_frame = surface_material(master, "wood_cabinet_worn_long", name="MI_BoardFrame", tiling=2.0, tint=(0.55, 0.42, 0.32),
@@ -1671,6 +1673,10 @@ def build():
         "color_saturation_shadows": unreal.Vector4(0.85, 0.9, 1.0, 0.9),
         "color_gain_shadows": unreal.Vector4(0.92, 0.97, 1.05, 1.0),
         "color_contrast": unreal.Vector4(1.06, 1.06, 1.06, 1.0),
+        # measured against the reference panel (pass 47): highlights 148 vs 97 (95th pct), red/green 1.63 vs 1.44,
+        # green/blue 1.45 vs 1.62 -> compress the highlights and move the grade from orange towards olive
+        "color_gain_highlights": unreal.Vector4(0.74, 0.74, 0.74, 1.0),
+        "color_gain": unreal.Vector4(0.9, 1.0, 0.9, 1.0),
     }.items():
         try:
             s.set_editor_property("override_" + k, True)
