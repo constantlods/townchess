@@ -111,6 +111,14 @@ def probe(world):
                 f"parent={parent.get_name() if parent else None} hidden={a.is_hidden_ed() if hasattr(a, 'is_hidden_ed') else '?'}")
     for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SkeletalMeshActor):
         smc = a.skeletal_mesh_component
+        if a.actor_has_tag("TC_PlayerBody") and a.actor_has_tag("TC_Body"):
+            for bone in ("lowerarm_l", "hand_l", "lowerarm_r", "hand_r"):
+                if smc.does_socket_exist(bone):
+                    t = smc.get_socket_transform(bone, unreal.RelativeTransformSpace.RTS_WORLD)
+                    q = t.rotation
+                    x = q.get_forward_vector(); z = q.get_up_vector()
+                    log(f"probe player {bone} at ({t.translation.x:.1f},{t.translation.y:.1f},{t.translation.z:.1f}) "
+                        f"X=({x.x:.2f},{x.y:.2f},{x.z:.2f}) Z=({z.x:.2f},{z.y:.2f},{z.z:.2f})")
         if smc.does_socket_exist("head"):
             h = smc.get_socket_location("head")
             log(f"probe head of {a.get_name()} at ({h.x:.1f},{h.y:.1f},{h.z:.1f})")
