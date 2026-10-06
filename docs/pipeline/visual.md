@@ -9,8 +9,9 @@ Judged images (newest passes only):
   hands), `57-forearm-closeup.png`, `52-watch.png`;
 - board: `55-board-before-after.png`.
 
-No Black-seat screenshot exists in passes 51-58, so that row is not scored. The newest commit (d466ca1: skins in the
-Hands menu) has **no screenshot**. No image shows a skin chosen from the menu in the packaged game.
+No Black-seat screenshot exists in passes 51-59, so that row is not scored. Added during this run: `59-skins-in-game.png`
+(2cab890, dirty above / scarred below, switched from the menu). The dirty skin now shows real grime smudges on the
+back of the hand. The scar is a single small pink line, and the bare knee fills the lower left again (finding 1).
 
 ## Findings first (evidence)
 
@@ -67,8 +68,9 @@ Hands menu) has **no screenshot**. No image shows a skin chosen from the menu in
 | Black-seat view | n/a | n/a | n/a | No screenshot |
 | **Average (14 scored rows)** | 4.4 | **5.2** | +0.8 | **BETA V3 not met**: 8 of 14 rows are below 6, and the average is below 7 |
 
-**V4 (hands: veins, dirt, nails; >= 7): 4/10, not met.** Veins are present but exaggerated. Dirt is light and off
-by default. Nails have never been visible in an image.
+**V4 (hands: veins, dirt, nails; >= 7): 5/10, not met.** Veins are present but exaggerated. Dirt reads in the
+dirty skin (`59-skins-in-game`), but `bare` is the default and the main view shows no dirt. Nails have never been
+visible in an image. "Scarred" is one small mark.
 
 **V5 (placeholder/broken assets): not met.** Every item seen:
 1. Bare player knees/thighs below the table in all downward views (`53-hands-veins`, `57-skin-variants`, `52-watch`).
