@@ -38,6 +38,10 @@ public:
 	/** Show one opponent from the level's roster (tags TC_Opponent_<id>) and hide the others. */
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void ApplyOpponent(const FString& Id);
 	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetOpponent() const { return OpponentShown; }
+	/** The player's hands (the reference's HAND CUSTOMIZATION): "bare", "sleeves", "watch" or "sleeves+watch". Shows the
+	 *  level's TC_PlayerOpt_<option> actors that the look names; remembered in GameUserSettings; -tclook= overrides. */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void ApplyPlayerLook(const FString& Look);
+	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetPlayerLook() const { return PlayerLook; }
 	virtual void Tick(float Dt) override;
 
 private:
@@ -49,6 +53,7 @@ private:
 	void ApplyQualityPreset();
 
 	FString ServerUrl, Auto, Username, SeatApplied, OpponentShown;
+	FString PlayerLook = TEXT("bare");
 	int32 SmokePlies = 0, SmokeChecked = -1, SmokeFailures = 0;
 	FString SmokeGameId;
 	bool bSmokeResigned = false;
@@ -125,6 +130,7 @@ public:
 	/** Accessibility: also print the opening on screen (the clipboard is the default home of the game record). */
 	bool bScreenRecord = false;
 	static FString OpponentName(const FString& Id);
+	static FString LookName(const FString& Look);
 
 private:
 	struct FButton { FString Id; FString Label; FVector2D Pos, Size; };

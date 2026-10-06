@@ -884,6 +884,34 @@ def pill_bottle():
     export("pill_bottle.obj")
 
 
+def wristwatch():
+    """Worn steel wristwatch around a wrist along +X: a leather strap ring (inner radius 3.0 cm, 1.8 cm wide) and a
+    3.4 cm case with a domed crystal on +Z (the back of the wrist). Origin on the wrist axis."""
+    reset()
+    parts = []
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.033, minor_radius=0.003, major_segments=40, minor_segments=8,
+                                     location=(0, 0, 0), rotation=(0, math.radians(90), 0))
+    st = bpy.context.active_object
+    st.scale = (2.8, 1.0, 1.0)  # flat strap: wide along the arm
+    bpy.ops.object.transform_apply(scale=True, rotation=True)
+    material(st, "M_Strap"); parts.append(st)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.017, depth=0.008, location=(0, 0, 0.036))
+    case = bpy.context.active_object
+    bv = case.modifiers.new("bevel", "BEVEL"); bv.width = 0.0015; bv.segments = 3
+    apply_mods(case); material(case, "M_Steel"); parts.append(case)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=8, radius=0.015, location=(0, 0, 0.039))
+    gl = bpy.context.active_object
+    gl.scale = (1, 1, 0.22)
+    bpy.ops.object.transform_apply(scale=True)
+    material(gl, "M_Dial"); parts.append(gl)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0022, depth=0.004, location=(0.0, 0.019, 0.036),
+                                        rotation=(math.radians(90), 0, 0))
+    crown = bpy.context.active_object
+    material(crown, "M_Steel"); parts.append(crown)
+    _join_uv(parts, "SM_Wristwatch")
+    export("wristwatch.obj")
+
+
 def export(name):
     # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
     # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
@@ -909,7 +937,8 @@ BUILDERS = {
     "oversleeve": lambda: sleeve("SM_Oversleeve", 0.25, 0.056, 0.047, "M_Duck", "oversleeve.obj"),  # fits over a MetaHuman forearm
     "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl, "restraint_straps": restraint_straps,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.068, 0.06, "M_CoatWool", "coat_sleeve.obj"),  # fits over the upper arm
-    "book_stack": book_stack, "loose_papers": loose_papers, "pill_bottle": pill_bottle,
+    "book_stack": book_stack, "loose_papers": loose_papers, "pill_bottle": pill_bottle, "wristwatch": wristwatch,
+    "player_sleeve": lambda: sleeve("SM_PlayerSleeve", 0.24, 0.05, 0.043, "M_PlayerSleeve", "player_sleeve.obj"),  # over the player's forearm
 }
 for k, f in BUILDERS.items():
     if not WHICH or k in WHICH:

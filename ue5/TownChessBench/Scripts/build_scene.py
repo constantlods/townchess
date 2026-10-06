@@ -868,6 +868,42 @@ def bone_relative(bone, offset):
     return unreal.Vector(*_qrot(iq, o)), unreal.Quat(*_qmul(iq, tilt)).rotator()
 
 
+def _quat_from_axes(xa, za):
+    """Quaternion (x, y, z, w) of the rotation whose X axis is xa and whose Z axis is za made orthogonal to it."""
+    def norm(v):
+        n = math.sqrt(sum(c * c for c in v)) or 1.0
+        return tuple(c / n for c in v)
+    X = norm(xa)
+    d = sum(za[i] * X[i] for i in range(3))
+    Z = norm(tuple(za[i] - d * X[i] for i in range(3)))
+    Y = (Z[1] * X[2] - Z[2] * X[1], Z[2] * X[0] - Z[0] * X[2], Z[0] * X[1] - Z[1] * X[0])
+    m00, m01, m02 = X[0], Y[0], Z[0]
+    m10, m11, m12 = X[1], Y[1], Z[1]
+    m20, m21, m22 = X[2], Y[2], Z[2]
+    tr = m00 + m11 + m22
+    if tr > 0:
+        s = math.sqrt(tr + 1.0) * 2
+        return ((m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s, 0.25 * s)
+    if m00 > m11 and m00 > m22:
+        s = math.sqrt(1.0 + m00 - m11 - m22) * 2
+        return (0.25 * s, (m01 + m10) / s, (m02 + m20) / s, (m21 - m12) / s)
+    if m11 > m22:
+        s = math.sqrt(1.0 + m11 - m00 - m22) * 2
+        return ((m01 + m10) / s, 0.25 * s, (m12 + m21) / s, (m02 - m20) / s)
+    s = math.sqrt(1.0 + m22 - m00 - m11) * 2
+    return ((m02 + m20) / s, (m12 + m21) / s, 0.25 * s, (m10 - m01) / s)
+
+
+def aimed_on_bone(key, origin, direction, up=(0.0, 0.0, 1.0)):
+    """Relative transform on a recorded bone (SEATED[key] = (t, q), component space) that puts a prop authored along +X
+    (its +Z up) at `origin`, pointing along `direction`, with its +Z towards `up`."""
+    tb, qb = SEATED[key]
+    iq = _qinv(qb)
+    rel_t = _qrot(iq, (origin[0] - tb[0], origin[1] - tb[1], origin[2] - tb[2]))
+    rel_q = _qmul(iq, _quat_from_axes(direction, up))
+    return unreal.Vector(*rel_t), unreal.Quat(*rel_q).rotator()
+
+
 def head_relative(offset):
     """Relative transform (location, rotator) on the 'head' bone that puts a prop authored face +Y / up +Z (mannequin
     component space) at `offset` from the head bone, following the seated pose's head tilt."""
@@ -1045,6 +1081,8 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             deltas[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
         new_w, new_l = solve(deltas)
         SEATED[f"{pose_name}_hands"] = {s_: (new_w[f"hand_{s_}"][0], new_w[f"lowerarm_{s_}"][0]) for s_ in ("l", "r")}
+        for s_ in ("l", "r"):  # forearm bone transforms, for props aimed along the forearm (player hand options)
+            SEATED[f"{pose_name}:lowerarm_{s_}"] = new_w[f"lowerarm_{s_}"]
         log(pose_name, "hands", [round(v, 1) for v in new_w["hand_l"][0]], [round(v, 1) for v in new_w["hand_r"][0]],
             "elbows", [round(v, 1) for v in new_w["lowerarm_l"][0]], [round(v, 1) for v in new_w["lowerarm_r"][0]])
 
@@ -1638,6 +1676,29 @@ def build():
                         dec.set_actor_label(f"HandDetail_{side}_{mat[5:]}")
                         dec.set_folder_path("Player")
                 log("hand detail decals on", sorted(hands))
+
+        # Player hand options (the reference's HAND CUSTOMIZATION): institutional sleeves and a wristwatch, attached to
+        # the player's forearms and shown by ATCGameMode::ApplyPlayerLook (tags TC_PlayerOpt_<option>)
+        hands = SEATED.get("player_hands")
+        if pb and hands and "player:lowerarm_l" in SEATED:
+            psmc = pb.skeletal_mesh_component
+            mi_ps = make_mi(master, "MI_PlayerSleeve", {"BaseColor": None}, tint=(0.11, 0.12, 0.13), rough=0.9, grime_color=(0.3, 0.26, 0.2),
+                            scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.1})
+            sleeve_sm = prop_with("player_sleeve", {"PlayerSleeve": mi_ps})
+            watch_sm = prop_with("wristwatch", {"Strap": make_mi(master, "MI_WatchStrap", {"BaseColor": None}, tint=(0.07, 0.045, 0.03), rough=0.7),
+                                                "Steel": make_mi(master, "MI_WatchSteel", {"BaseColor": None}, metal=1.0, rough=0.35, tint=(0.55, 0.55, 0.53)),
+                                                "Dial": make_mi(master, "MI_WatchDial", {"BaseColor": None}, tint=(0.6, 0.57, 0.48), rough=0.25)})
+            for side, (hand, elbow) in hands.items():
+                d = tuple(hand[i] - elbow[i] for i in range(3))
+                n = math.sqrt(sum(c * c for c in d)) or 1.0
+                if sleeve_sm:
+                    loc, rot = aimed_on_bone(f"player:lowerarm_{side}", elbow, d)
+                    attach_static(f"PlayerSleeve_{side}", sleeve_sm, psmc, f"lowerarm_{side}", loc, rot, "TC_PlayerOpt_sleeves")
+                if watch_sm and side == "l":
+                    wrist = tuple(hand[i] - d[i] / n * 4.0 for i in range(3))  # 4 cm up the forearm from the wrist joint
+                    loc, rot = aimed_on_bone(f"player:lowerarm_{side}", wrist, d)
+                    attach_static("PlayerWatch", watch_sm, psmc, f"lowerarm_{side}", loc, rot, "TC_PlayerOpt_watch")
+            log("player hand options attached", sorted(hands))
 
     # 2. The Annotator: slate-green coat, tan oversleeves, linen coif, two-leaf riveted plate, ledger and pencil
     # flat cloth colours (the linen scan's yellow cast turned slate green into lime) + our grime layer for wear

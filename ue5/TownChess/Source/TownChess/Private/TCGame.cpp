@@ -97,6 +97,28 @@ static FName OpponentTagOf(const AActor* A)
 	return NAME_None;
 }
 
+void ATCGameMode::ApplyPlayerLook(const FString& Look)
+{
+	PlayerLook = Look.IsEmpty() ? TEXT("bare") : Look.ToLower();
+	TArray<FString> Want;
+	PlayerLook.ParseIntoArray(Want, TEXT("+"));
+	int32 Shown = 0;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		for (const FName& T : It->Tags)
+		{
+			const FString S = T.ToString();
+			if (!S.StartsWith(TEXT("TC_PlayerOpt_"))) continue;
+			const bool bOn = Want.Contains(S.RightChop(13));
+			It->SetActorHiddenInGame(!bOn);
+			Shown += bOn ? 1 : 0;
+		}
+	}
+	GConfig->SetString(TEXT("TownChess"), TEXT("PlayerLook"), *PlayerLook, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+	UE_LOG(LogTownChess, Log, TEXT("player look: %s (%d parts shown)"), *PlayerLook, Shown);
+}
+
 void ATCGameMode::ApplyOpponent(const FString& Id)
 {
 	const FName Want(*(TEXT("TC_Opponent_") + Id));
@@ -152,6 +174,10 @@ void ATCGameMode::BeginPlay()
 	FString OpponentId = TEXT("caged");
 	FParse::Value(FCommandLine::Get(), TEXT("-tcopponent="), OpponentId);
 	ApplyOpponent(OpponentId);
+	FString Look = TEXT("bare");
+	GConfig->GetString(TEXT("TownChess"), TEXT("PlayerLook"), Look, GGameUserSettingsIni);
+	FParse::Value(FCommandLine::Get(), TEXT("-tclook="), Look);
+	ApplyPlayerLook(Look);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcserver="), ServerUrl);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcauto="), Auto);
 	FParse::Value(FCommandLine::Get(), TEXT("-tcname="), Username);
@@ -612,6 +638,11 @@ bool ATCHUD::HandleClick(const FVector2D& Pos)
 void ATCHUD::OnRejected(const FString& Reason) { Toast = FString::Printf(TEXT("The move was refused: %s"), *Reason); ToastUntil = FPlatformTime::Seconds() + 3.5; }
 void ATCHUD::OnError(const FString& Message) { Toast = Message; ToastUntil = FPlatformTime::Seconds() + 3.5; }
 
+FString ATCHUD::LookName(const FString& Look)
+{
+	return Look == TEXT("sleeves") ? TEXT("Sleeves") : Look == TEXT("watch") ? TEXT("Watch") : Look == TEXT("sleeves+watch") ? TEXT("Sleeves + Watch") : TEXT("Bare");
+}
+
 FString ATCHUD::OpponentName(const FString& Id)
 {
 	return Id == TEXT("annotator") ? TEXT("The Annotator") : TEXT("The Patient");
@@ -633,6 +664,16 @@ void ATCHUD::PressButton(const FString& Id)
 		if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
 		{
 			GM->ApplyOpponent(GM->GetOpponent() == TEXT("caged") ? TEXT("annotator") : TEXT("caged"));
+		}
+	}
+	else if (Id == TEXT("look"))
+	{
+		if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
+		{
+			static const TCHAR* Looks[] = {TEXT("bare"), TEXT("sleeves"), TEXT("watch"), TEXT("sleeves+watch")};
+			int32 I = 0;
+			for (int32 k = 0; k < 4; ++k) if (GM->GetPlayerLook() == Looks[k]) I = k;
+			GM->ApplyPlayerLook(Looks[(I + 1) % 4]);
 		}
 	}
 	else if (Id == TEXT("tc")) TimeControl = TimeControl == TEXT("5+0") ? TEXT("10+0") : TimeControl == TEXT("10+0") ? TEXT("untimed") : TimeControl == TEXT("untimed") ? TEXT("3+2") : TEXT("5+0");
@@ -723,6 +764,7 @@ void ATCHUD::DrawMenu(UTCCoreClient* C)
 	Option(TEXT("tc"), TEXT("Time Control"), TimeControl == TEXT("untimed") ? TEXT("Untimed") : TimeControl.Replace(TEXT("+"), TEXT(" + ")));
 	Option(TEXT("level"), TEXT("Strength"), LevelLabel);
 	if (GM) Option(TEXT("opponent"), TEXT("Opponent"), OpponentName(GM->GetOpponent()));
+	if (GM) Option(TEXT("look"), TEXT("Hands"), LookName(GM->GetPlayerLook()));
 }
 
 void ATCHUD::DrawGame(UTCCoreClient* C)
