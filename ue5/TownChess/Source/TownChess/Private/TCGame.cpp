@@ -13,6 +13,8 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "AudioDevice.h"
+#include "Engine/GameViewportClient.h"
+#include "UnrealClient.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/KismetRenderingLibrary.h"
@@ -240,7 +242,12 @@ void ATCGameMode::BeginPlay()
 void ATCGameMode::Tick(float Dt)
 {
 	Super::Tick(Dt);
-	if (SmokePlies > 0) SmokeTick();
+	if (SmokePlies > 0)
+	{
+		// frame times for the beta performance check (BETA S3): skip the first 10 s (shader warm-up, streaming)
+		if (FPlatformTime::Seconds() > SmokeDeadline - 600.0 + 10.0) FrameTimes.Add(FApp::GetDeltaTime());
+		SmokeTick();
+	}
 }
 
 void ATCGameMode::SmokeTick()
@@ -284,7 +291,16 @@ void ATCGameMode::SmokeFinish(const FString& Why)
 	FString Json = FString::Printf(TEXT("{\n  \"pass\": %s,\n  \"reason\": \"%s\",\n  \"plies\": %d,\n  \"failures\": %d,\n  \"rhi\": \"%s\",\n  \"corePid\": %d,\n  \"coreUrl\": \"%s\",\n  \"log\": [\n"),
 		bPass ? TEXT("true") : TEXT("false"), *Why, SmokeChecked, SmokeFailures, GDynamicRHI ? GDynamicRHI->GetName() : TEXT("?"), L ? L->GetCorePid() : 0, L ? *L->GetUrl() : TEXT(""));
 	for (int32 i = 0; i < SmokeLog.Num(); ++i) Json += FString::Printf(TEXT("    \"%s\"%s\n"), *SmokeLog[i], i + 1 < SmokeLog.Num() ? TEXT(",") : TEXT(""));
-	Json += TEXT("  ]\n}\n");
+	// performance (BETA S3): average fps and the 1% low over the measured frames, and the resolution rendered
+	double Sum = 0;
+	for (const double F : FrameTimes) Sum += F;
+	TArray<double> Sorted = FrameTimes;
+	Sorted.Sort();
+	const double Avg = FrameTimes.Num() ? FrameTimes.Num() / FMath::Max(Sum, 1e-6) : 0.0;
+	const double P99 = Sorted.Num() ? Sorted[FMath::Clamp(int32(Sorted.Num() * 0.99), 0, Sorted.Num() - 1)] : 0.0;
+	const FIntPoint Res = GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport ? GEngine->GameViewport->Viewport->GetSizeXY() : FIntPoint::ZeroValue;
+	Json += FString::Printf(TEXT("  ],\n  \"frames\": %d,\n  \"avgFps\": %.1f,\n  \"low1Fps\": %.1f,\n  \"resolution\": \"%dx%d\",\n  \"quality\": \"%s\"\n}\n"),
+		FrameTimes.Num(), Avg, P99 > 0 ? 1.0 / P99 : 0.0, Res.X, Res.Y, *Quality);
 	FFileHelper::SaveStringToFile(Json, *(FPaths::ProjectSavedDir() / TEXT("TownChess") / TEXT("smoke.json")));
 	UE_LOG(LogTownChess, Log, TEXT("smoke test %s (%s, %d plies, %d failures)"), bPass ? TEXT("PASS") : TEXT("FAIL"), *Why, SmokeChecked, SmokeFailures);
 	SmokePlies = 0;

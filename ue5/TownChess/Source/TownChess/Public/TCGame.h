@@ -64,6 +64,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<class UAudioComponent> Ambience;
 	UPROPERTY(Transient) TObjectPtr<class USoundBase> Sting;
 	bool bSawActive = false, bSawFinish = false;
+	TArray<double> FrameTimes;
 	FString ActiveId;
 	int32 SmokePlies = 0, SmokeChecked = -1, SmokeFailures = 0;
 	FString SmokeGameId;
