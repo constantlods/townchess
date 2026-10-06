@@ -42,7 +42,7 @@ The workflow behind this file is in [ENGINE_AGENT.md](ENGINE_AGENT.md).
 | [LIM-010](#lim-010) | League (Stockfish) opponents: strength labels and fallbacks | Low/informational | Open, documented |
 | [LIM-011](#lim-011) | Annotator's oversleeves do not render; all characters share one MetaHuman (Walter) | Low (visual) | Open |
 | [BUG-007](#bug-007) | League crash retry re-binds an engine to a finished game | Low (engine slot leak; league can silently degrade to Warden) | Fixed |
-| [BUG-008](#bug-008) | UE board: a pawn dragged to the last rank stays where it was dropped if the promotion is cancelled | Low (shown board differs from the authority; rules unaffected) | Fixed in code (2026-10-06), **not pinned by a test yet**: an automated drag to the last rank needs a start-position option in the core |
+| [BUG-008](#bug-008) | UE board: a pawn dragged to the last rank stays where it was dropped if the promotion is cancelled | Low (shown board differs from the authority; rules unaffected) | Fixed (2026-10-06), pinned by the UE `promo` autotest (fails without the fix, passes with it) |
 
 ---
 
@@ -407,7 +407,8 @@ Found by the chess guardian (run 3) by reading the code; not reproduced in Unrea
   cancelled promotion call `SnapBack(PromotionFrom)` before clearing it; add a `drag` autotest step for both paths.
 - **Fix (2026-10-06):** `EndDrag` now sets `DroppedFrom` for `NeedsPromotion` too, so a confirmed promotion settles
   from the drop point; a cancelled one (Escape, empty piece, or no longer our turn) snaps the pawn home first.
-- **Exception to "test before fix", stated openly:** the autotest cannot reach a promotion position on demand (games
-  start from the initial position and the engine's replies vary). Pinning it needs a test-only start position on
-  `CREATE_AI_GAME` (protocol, room, journal restore, core tests), tracked as the next core task. Until then the fix
-  is verified by reading only.
+- **Pinned (2026-10-06):** the core gained a test-only start position (`CREATE_AI_GAME.startFen`, opt-in with
+  `TC_ALLOW_START_FEN=1`), and the UE `promo` autotest starts from `8/4P3/8/8/8/8/k7/4K3 w - - 0 1`: drag e7-e8 and
+  Escape must send the pawn home; drag again and Q must promote and settle. With the fix reverted in the working tree
+  the test failed exactly at "cancelled pawn went home (BUG-008)" (1 piece off its square); with the fix it passed 8/8.
+  The fix was written before the test (the order the rule asks for was not kept); the fail-then-pass run makes up for it.
