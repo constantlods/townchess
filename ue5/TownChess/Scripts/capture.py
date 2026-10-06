@@ -83,6 +83,16 @@ def begin():
     cc.set_editor_property("texture_target", rt)
     cc.set_editor_property("capture_every_frame", True)
     cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
+    # Scene captures do not take the level's fixed exposure from the unbound PostProcessVolume (EV 7.8 -> 8.3 changed
+    # nothing in the shots, and earlier shots drifted with scene content): give the capture the volume's settings so the
+    # shot is exposed and graded like the game viewport.
+    for ppv in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.PostProcessVolume):
+        if ppv.get_editor_property("unbound"):
+            cc.set_editor_property("post_process_settings", ppv.get_editor_property("settings"))
+            cc.set_editor_property("post_process_blend_weight", 1.0)
+            ps = ppv.get_editor_property("settings")
+            log(f"capture uses the level's post settings (EV {ps.get_editor_property('auto_exposure_min_brightness'):.1f})")
+            break
     state["cap"] = (world, rt)
     probe(world)
     log(f"capture {w}x{h} fov={fov:.1f} cam=({loc.x:.0f},{loc.y:.0f},{loc.z:.0f}) preset={PRESET}")  # the shot camera, not the player's
