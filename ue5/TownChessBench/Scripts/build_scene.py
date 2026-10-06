@@ -268,15 +268,15 @@ def marker_material():
     soft = MEL.create_material_expression(m, unreal.MaterialExpressionPower, -380, 250)
     soft.set_editor_property("const_exponent", 1.6)
     MEL.connect_material_expressions(sat, "", soft, "Base")
-    alpha = MEL.create_material_expression(m, unreal.MaterialExpressionComponentMask, -700, 80)
-    for ch, on in (("r", False), ("g", False), ("b", False), ("a", True)):
-        alpha.set_editor_property(ch, on)
-    MEL.connect_material_expressions(col, "", alpha, "")
+    # strength from the parameter's own alpha pin (its default output is RGB only: masking A from it failed to compile
+    # and the markers fell back to the world-grid material, pass 49)
     op = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -250, 200)
     MEL.connect_material_expressions(soft, "", op, "A")
-    MEL.connect_material_expressions(alpha, "", op, "B")
+    MEL.connect_material_expressions(col, "A", op, "B")
     MEL.connect_material_property(op, "", unreal.MaterialProperty.MP_OPACITY)
     MEL.recompile_material(m)
+    errs = MEL.get_statistics(m) if hasattr(MEL, "get_statistics") else None
+    log("marker material compiled", errs)
     EAL.save_loaded_asset(m)
     return m
 
