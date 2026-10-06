@@ -475,7 +475,12 @@ def _tick(_dt):
                 else:  # Windows: TerminateProcess on ourselves, as hard as SIGKILL (no shutdown code runs)
                     import ctypes
                     k32 = ctypes.windll.kernel32
+                    # 64-bit handles: without explicit types ctypes passes the pseudo-handle as a 32-bit int and the
+                    # call fails silently (the first Windows run kept "killing" from ply 12 to 22)
+                    k32.GetCurrentProcess.restype = ctypes.c_void_p
+                    k32.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
                     k32.TerminateProcess(k32.GetCurrentProcess(), 9)
+                    os._exit(9)  # never reached when TerminateProcess works
         if st.status not in ("active", "waiting"):
             detail = f"{st.status} / {st.termination} winner={st.winner or '-'}"
             if EXPECT_TERMINATION:
