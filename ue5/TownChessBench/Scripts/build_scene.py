@@ -923,7 +923,7 @@ POSES = {
              "upperarm_l": (52, 0), "upperarm_r": (52, 0), "lowerarm_l": (50, 0), "lowerarm_r": (50, 0)},
     # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
     # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
-    "player": {"spine_01": (8, 0), "spine_03": (12, 0), "neck_01": (6, 0), "head": (10, 0),
+    "player": {"spine_01": (8, 0), "spine_03": (float(os.environ.get("TC_PLAYER_LEAN", 16)), 0),  # 12 -> 16 (pass 63): reach further "neck_01": (6, 0), "head": (10, 0),
                "hand_l": (0, 0, float(os.environ.get("TC_HAND_ROLL", -95))), "hand_r": (0, 0, -float(os.environ.get("TC_HAND_ROLL", -95)))},
     "clasp": {"spine_01": (-4, 0), "spine_03": (-7, 0), "neck_01": (2, 0), "head": (4, 0),  # slight lean in, head level
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
@@ -980,7 +980,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         if pose_name == "player":
             # The idle's hanging hands curl every finger; resting on the table that read as a fist (LIM-011). Blend the
             # finger joints toward the reference pose (straight fingers) and keep a little of the idle's curl.
-            relax = float(os.environ.get("TC_FINGER_RELAX", 0.6))
+            relax = float(os.environ.get("TC_FINGER_RELAX", 0.8))  # 0.6 -> 0.8 (pass 63): the curled tips hid every nail
             for b in names:
                 if b.startswith(("thumb_", "index_", "middle_", "ring_", "pinky_")) and not b.endswith("metacarpal_l") and not b.endswith("metacarpal_r"):
                     rq = _xf(unreal.AnimPoseExtensions.get_bone_pose(ref, b, unreal.AnimPoseSpaces.LOCAL))[1]
@@ -1032,8 +1032,8 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
     new_w, new_l = solve(deltas)
     ARM_TARGETS = {"clasp": {"hand": (3.0, 18.0, -21.0), "elbow_z": -31.0, "elbow_x": 19.0},  # hands under the chin, cage visible
                    # pass 60: (22, 46, -32) left the left wrist below the frame and the right hand a sliver at the corner
-                   "player": {"hand": tuple(float(v) for v in os.environ.get("TC_PLAYER_HAND", "19,54,-32").split(",")),
-                              "elbow_z": -40.0, "elbow_x": 22.0}}  # in reach (60 cm forward gave IK error 174/561)  # head sits ~34 cm over the table
+                   "player": {"hand": tuple(float(v) for v in os.environ.get("TC_PLAYER_HAND", "19,58,-32").split(",")),
+                              "elbow_z": -36.0, "elbow_x": 22.0}}  # pass 63: elbows may lift off the table (out of view) for reach  # in reach (60 cm forward gave IK error 174/561)  # head sits ~34 cm over the table
     if pose_name in ARM_TARGETS and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
         # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
         head = new_w["head"][0]
@@ -1898,7 +1898,7 @@ def build():
     rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
     # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)
     # the player's hands are hero assets in the reference: a soft warm light from the lamp side keeps them readable
-    tag(rect("Hands_Key", (-30, -40, top + 40), (0, -50, 30), 220, 2600, 70, 40, 160, vol=0.2))
+    tag(rect("Hands_Key", (-30, -40, top + 40), (0, -50, 30), 200, 2600, 70, 40, 160, vol=0.2))  # 220 -> 200 (pass 63): both hands now in the main view lifted p95 to 106
     # pass 58: the table right of the board was near black (luma 9-17 against the reference's lit clutter; its fine detail
     # 4.6 vs 11-15): a dim warm spill over the right hand, the record sheets and the mug
     tag(rect("Table_Right", (-20, 48, top + 45), (0, -60, -25), 80, 2600, 60, 40, 150, vol=0.2))  # 55 -> 80 (pass 62, frame mean 24.4)  # 110 lm lifted the frame mean 24 -> 32

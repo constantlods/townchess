@@ -104,7 +104,7 @@ for s, sfx in ((1, "_l"), (-1, "_r")):
 # (visual judge run 4); every variant paints them as dark institutional trousers
 arm_tri = np.isin(vcls[tv], (1, 2, 3, 4)).all(1) | (vcls[tv] == 5).all(1)
 log("arm+leg triangles", int(arm_tri.sum()), "of", len(tv))
-idx_l, pos_l, nrm_l, cls_l, side_l, cmpt_l = [], [], [], [], [], []
+idx_l, pos_l, nrm_l, cls_l, side_l, cmpt_l, grp_l = [], [], [], [], [], [], []
 for t in np.nonzero(arm_tri)[0]:
     vi, li = tv[t], tl[t]
     P = np.stack([(uv[li, 0] - np.floor(uv[li, 0].min())) * R - 0.5, (1.0 - uv[li, 1]) * R - 0.5], 1)
@@ -128,7 +128,7 @@ for t in np.nonzero(arm_tri)[0]:
     nn = W @ nrm[vi]
     nrm_l.append(nn / np.linalg.norm(nn, axis=1, keepdims=True))
     k = np.argmax(W, 1)
-    cls_l.append(vcls[vi][k]); side_l.append(vside[vi][k])
+    cls_l.append(vcls[vi][k]); side_l.append(vside[vi][k]); grp_l.append(dom[vi][k])
     a3 = 0.5 * np.linalg.norm(np.cross(co[vi[1]] - co[vi[0]], co[vi[2]] - co[vi[0]]))
     cmpt_l.append(np.full(m.sum(), np.sqrt(a3 / max(abs(den) * 0.5, 1e-6)), np.float32))
 idx = np.concatenate(idx_l)
@@ -136,9 +136,10 @@ idx, first = np.unique(idx, return_index=True)
 pos = np.concatenate(pos_l)[first].astype(np.float32)
 nor = np.concatenate(nrm_l)[first].astype(np.float32)
 cls = np.concatenate(cls_l)[first]
+grp = np.concatenate(grp_l)[first]
 side = np.concatenate(side_l)[first]
 cmpt = np.concatenate(cmpt_l)[first]
-del idx_l, pos_l, nrm_l, cls_l, side_l, cmpt_l
+del idx_l, pos_l, nrm_l, cls_l, side_l, cmpt_l, grp_l
 log("arm texels", len(idx), "median cm/texel", float(np.median(cmpt)).__round__(4))
 
 
@@ -342,13 +343,45 @@ def dense(vals, fill=0.0):
     return img
 
 
-# nails: lighter, pinker patches on the finger tips in the base colour
-lum = bc_full.mean(2)
-tip = dense(((cls == 3) & (th > 1.2) & (dors > 0.15)).astype(np.float32))
-tip = ndimage.binary_erosion(tip > 0, iterations=10).astype(np.float32)  # island edges are not nails
-nail = np.clip((lum - ndimage.gaussian_filter(lum, 18)) / 0.035, 0, 1) * tip
-nail = ndimage.gaussian_filter(np.clip(ndimage.grey_closing(nail, size=5) * 1.5, 0, 1), 1.0)
-rim = np.clip(ndimage.grey_dilation(nail, size=9) - nail, 0, 1) * dense(np.clip((th - 1.3) * 2, 0, 1))  # skin around the nail, distal side weighted
+# nails, placed from the geometry (pass 63: the old detector, local brightness on the finger tips, found only small
+# dots and its dirt rim drew dark "C" rings): on each distal phalanx, the dorsal patch from ~1.5 mm behind the tip to
+# ~1.2 cm back, ~1 cm wide, with a curved cuticle; the free edge is the distal 2.5 mm
+nail_t = np.zeros(len(idx), np.float32)
+free_t = np.zeros(len(idx), np.float32)
+for s_, sfx in ((1, "_l"), (-1, "_r")):
+    for f in FINGERS:
+        n3, n2 = f"{f}_03{sfx}", f"{f}_02{sfx}"
+        if n3 not in G or n2 not in G:
+            continue
+        g3, g2 = G.index(n3), G.index(n2)
+        c3, c2 = co[dom == g3].mean(0), co[dom == g2].mean(0)
+        ax = (c3 - c2) / np.linalg.norm(c3 - c2)
+        m = np.nonzero(grp == g3)[0]
+        if not len(m):
+            continue
+        dv = Ls[s_]["dors"] - Ls[s_]["dors"].dot(ax) * ax
+        dv /= np.linalg.norm(dv)
+        if f == "thumb":  # the thumb nail faces sideways off the hand: use the texels' own mean normal on its far side
+            nn = nor[m].mean(0); dv = nn - nn.dot(ax) * ax; dv /= np.linalg.norm(dv) + 1e-6
+            vv = co[dom == g3] - c3
+            dv = -dv if ((vv - np.outer(vv @ ax, ax)) @ dv).max() < 0 else dv
+        rel = pos[m] - c3
+        t = rel @ ax
+        back = t.max() - t                                      # cm from the finger tip
+        lat = rel - np.outer(t, ax)
+        side_v = np.cross(ax, dv)
+        w = np.abs(lat @ side_v)
+        half = 0.62 if f == "thumb" else 0.5 if f in ("index", "middle") else 0.45
+        L_ = 1.35 if f == "thumb" else 1.15
+        up = nor[m] @ dv
+        shape = smooth(0.08, 0.18, back) * (1 - smooth(L_ - 0.12 - 0.3 * (w / half) ** 2, L_ - 0.3 * (w / half) ** 2, back)) \
+            * (1 - smooth(half * 0.85, half, w)) * smooth(0.35, 0.6, up)
+        nail_t[m] = np.maximum(nail_t[m], shape)
+        free_t[m] = np.maximum(free_t[m], shape * (1 - smooth(0.2, 0.3, back)))
+nail = ndimage.gaussian_filter(dense(nail_t), 0.8)
+nail_free = ndimage.gaussian_filter(dense(free_t), 0.8)
+# dirt in the nail folds: a thin band just outside the plate, strongest under the free edge
+rim = ndimage.gaussian_filter(np.clip(ndimage.grey_dilation(nail, size=5) - nail, 0, 1), 1.0) * 0.45 + nail_free * 0.2
 log("nail texels", int((nail > 0.5).sum()))
 
 # creases from the original normal map's curvature (4K), for dirt in knuckle folds and around nails
@@ -418,7 +451,7 @@ def variant(name, rng):
     col = col * (1 - grime[:, None]) + col * gc * grime[:, None]
     # nail plates: paler and pinker than the finger, a whiter free edge (no image showed a nail before pass 60)
     nl = nail[yy, xx]
-    free = nl * np.clip((th - 1.55) * 4, 0, 1)
+    free = nail_free[yy, xx]
     col = col * (1 - 0.55 * nl[:, None]) + np.clip(col * np.array([1.12, 1.0, 0.98], np.float32) + 0.1, 0, 1) * 0.55 * nl[:, None]
     col = col * (1 - 0.35 * free[:, None]) + np.array([0.78, 0.72, 0.62], np.float32) * 0.35 * free[:, None]
     col = col * (1 - nail_dirt[:, None]) + np.array([0.06, 0.045, 0.035], np.float32) * nail_dirt[:, None]
