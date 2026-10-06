@@ -1464,8 +1464,9 @@ def build():
             # dark forged iron, rust in patches (not an even orange coat)
             # plain dark iron (the rust scan's orange overpowered any tint: oversight run 1); rust only in grime patches
             # blackened iron behaves like a dark dielectric with neutral highlights: at metal 0.85 the wire mirrored the warm
-            # lamp and the brown room and rendered bronze-tan although its base colour was dark grey (close-up, pass 42)
-            mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=0.3, rough=0.5, tint=(0.028, 0.026, 0.025),
+            # lamp and the brown room and rendered bronze-tan although its base colour was dark grey; at 0.028/metal 0.3 the
+            # lamp just above still lit it mid-brown (base colour 47 sRGB, final 97,56,30): near-black, rougher (pass 42)
+            mi_iron = make_mi(master, "MI_CageIron", {"BaseColor": None}, metal=0.0, rough=0.68, tint=(0.012, 0.0115, 0.011),
                               grime_color=(0.42, 0.2, 0.09), scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.7, "GrimeContrast": 3.0,
                                                                      "GrimeRoughness": 0.85, "MicroRough": 0.25})
             cage[0].set_material(0, mi_iron)
