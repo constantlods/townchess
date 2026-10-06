@@ -1384,6 +1384,17 @@ def build():
                 setp(clip, prop, face)  # ATCClipboard builds the runtime font (FontData is not exposed to Python)
             else:
                 log("WARNING font face import failed", ttf)
+        # HUD portraits (ue5/assets/ui/T_Portrait_<opponent>.png, captured from the game): /Game/TownChess/UI, loaded by
+        # path in ATCHUD::Portrait and always cooked; saved explicitly since nothing in the level references them
+        ui_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "ui"))
+        if os.path.isdir(ui_dir):
+            for f in sorted(os.listdir(ui_dir)):
+                if f.endswith(".png"):
+                    t = import_texture(os.path.join(ui_dir, f), f"{ROOT}/UI", os.path.splitext(f)[0], "color")
+                    if t:
+                        setp(t, "lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
+                        setp(t, "mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+                        EAL.save_loaded_asset(t)
         # HUD fonts (ATCHUD loads them by path; DefaultGame.ini always cooks /Game/TownChess/Fonts): Lato for play text,
         # Courier Prime Regular for the thin monospace section titles of the reference
         for ttf, nm in (("Lato-Regular.ttf", "F_TC_Sans"), ("Lato-Light.ttf", "F_TC_SansLight"), ("CourierPrime-Regular.ttf", "F_TC_Title")):

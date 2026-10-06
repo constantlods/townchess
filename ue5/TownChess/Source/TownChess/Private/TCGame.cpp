@@ -8,6 +8,7 @@
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
 #include "Engine/FontFace.h"
+#include "Engine/Texture2D.h"
 #include "Animation/SkeletalMeshActor.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
@@ -691,6 +692,17 @@ bool ATCHUD::HandleClick(const FVector2D& Pos)
 void ATCHUD::OnRejected(const FString& Reason) { Toast = FString::Printf(TEXT("The move was refused: %s"), *Reason); ToastUntil = FPlatformTime::Seconds() + 3.5; }
 void ATCHUD::OnError(const FString& Message) { Toast = Message; ToastUntil = FPlatformTime::Seconds() + 3.5; }
 
+UTexture2D* ATCHUD::Portrait(const FString& OpponentId)
+{
+	// headshots made by ue5/tools/portraits.ps1 (captured in game, cropped and graded), imported by the level builder
+	// into /Game/TownChess/UI (always cooked); missing ones fall back to a monogram
+	if (OpponentId.IsEmpty()) return nullptr;
+	if (const TObjectPtr<UTexture2D>* Hit = Portraits.Find(OpponentId)) return Hit->Get();
+	UTexture2D* T = LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/TownChess/UI/T_Portrait_%s.T_Portrait_%s"), *OpponentId, *OpponentId));
+	Portraits.Add(OpponentId, T);
+	return T;
+}
+
 FString ATCHUD::LookName(const FString& Look)
 {
 	return Look == TEXT("sleeves") ? TEXT("Sleeves") : Look == TEXT("watch") ? TEXT("Watch") : Look == TEXT("sleeves+watch") ? TEXT("Sleeves + Watch") : TEXT("Bare");
@@ -898,12 +910,22 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 		FString Sub = Col == TEXT("w") ? TEXT("White") : TEXT("Black");
 		if (P.Rating >= 0) Sub += FString::Printf(TEXT("   %d"), P.Rating);
 		if (!P.AiLevel.IsEmpty()) Sub += TEXT("   ") + P.AiLevel;
-		const float W = FMath::Max(230.f * U, FMath::Max(TextWidth(Name, 0.95f), TextWidth(Sub, 0.78f)) + 32.f * U);
+		// a portrait at the card's left, as in the reference: the opponent's headshot (captured from the game), or a
+		// monogram tile for a human player
+		const float Pic = 62.f * U, Pad = 6.f * U, Tx = Pic + 2.f * Pad + 8.f * U;
+		const float W = FMath::Max(230.f * U, FMath::Max(TextWidth(Name, 0.95f), TextWidth(Sub, 0.78f)) + Tx + 18.f * U);
 		const float Bx = bRight ? X - W : X;
 		Plate(Bx, 22.f * U, W, 74.f * U, 0.6f, 0.0f);  // tall enough that the bottom rule clears the second line
 		DrawRect(FLinearColor(0.62f, 0.55f, 0.42f, 0.35f), Bx, 22.f * U + 74.f * U - 1.f, W, 1.f);
-		Text(Name, Bx + 16.f * U, 28.f * U, Ink, 0.95f);
-		Text(Sub, Bx + 16.f * U, 57.f * U, Dim, 0.78f, false, ETCUiFont::SansLight);
+		UTexture2D* Face = P.AiLevel.IsEmpty() ? nullptr : Portrait(GM ? GM->GetOpponent() : FString());
+		if (Face) DrawTexture(Face, Bx + Pad, 22.f * U + Pad, Pic, Pic, 0, 0, 1, 1, FLinearColor::White);
+		else
+		{
+			DrawRect(FLinearColor(0.06f, 0.055f, 0.05f, 0.9f), Bx + Pad, 22.f * U + Pad, Pic, Pic);
+			Text(Name.Left(1).ToUpper(), Bx + Pad + Pic * 0.5f, 22.f * U + Pad + 12.f * U, Dim, 1.5f, true, ETCUiFont::Title);
+		}
+		Text(Name, Bx + Tx, 28.f * U, Ink, 0.95f);
+		Text(Sub, Bx + Tx, 57.f * U, Dim, 0.78f, false, ETCUiFont::SansLight);
 		const bool bRun = S.IsActive() && S.Turn == Col;
 		if (S.IsTimed()) Text(ClockText(C->GetDisplayClockMs(Col)), Bx + W * 0.5f, 104.f * U, bRun ? FLinearColor(1.f, 0.95f, 0.85f) : Dim, 1.9f, true, ETCUiFont::SansLight);
 	};

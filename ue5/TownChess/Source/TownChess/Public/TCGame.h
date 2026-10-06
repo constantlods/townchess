@@ -147,6 +147,8 @@ public:
 	bool bScreenRecord = false;
 	static FString OpponentName(const FString& Id);
 	static FString LookName(const FString& Look);
+	UTexture2D* Portrait(const FString& OpponentId);
+	UPROPERTY(Transient) TMap<FString, TObjectPtr<UTexture2D>> Portraits;
 
 private:
 	struct FButton { FString Id; FString Label; FVector2D Pos, Size; };
