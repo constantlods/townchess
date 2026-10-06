@@ -34,6 +34,10 @@
 		{
 			"Name": "OptiXDenoise",
 			"Enabled": false
+		},
+		{
+			"Name": "AndroidFileServer",
+			"Enabled": false
 		}
 	]
 }
