@@ -46,6 +46,19 @@ const rulesView = (d: GameStateDTO) => ({
 });
 
 describe('server journal: record -> JSON -> fromRecord reproduces the game', () => {
+  it('a game from a custom start position restores from that position (startFen in the record)', () => {
+    const store = new PlayerStore(null);
+    const a = store.authenticate(undefined, 'WFEN').player, b = store.authenticate(undefined, 'BFEN').player;
+    const fen = '8/4P3/8/8/8/8/k7/4K3 w - - 0 1';
+    const room = new GameRoom('GAME-F00001', { initialMs: 0, incrementMs: 0 }, false, a.id, b.id, store, ev().ev, { timeControl: null, drawPolicy: 'automatic', startFen: fen });
+    room.start();
+    expect(room.move(a.id, 'e1', 'd2', undefined, 0)).toBeNull();
+    const restored = reload(room, store);
+    expect(rulesView(restored.dto())).toEqual(rulesView(room.dto()));
+    expect(restored.dto().legalMoves).toContain('a2b3');
+    expect(room.record().startFen).toBe(fen);
+  });
+
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     it(`seed ${seed}: random game restored at a random ply plays on identically`, () => {
       const rng = mulberry32(seed * 104729);

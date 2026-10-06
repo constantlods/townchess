@@ -15,6 +15,8 @@ Scenarios (-TCTest=):
   drag       drag and drop with the board API the mouse uses: an illegal drop snaps back; a legal drop is accepted
   keys       keyboard paths through the real key handler: Tab raises and lowers the clipboard; on the menu, "Join by Code"
              takes typed letters, BackSpace and Escape (promotion keys need a start-position option in the core: not yet)
+  promo      from a set position (-tcstartfen, -tcallowstartfen): drag a pawn to the last rank and press Escape (it must
+             go home, BUG-008), then drag again and press Q (queen promotion accepted, every piece on its square)
   rematch    resigns the first game and asks for a rematch: the new game must seat us on the other colour, and the
              board, camera and seat-mirrored props must follow by themselves ("the board flips between games")
 """
@@ -215,7 +217,7 @@ def _tick(_dt):
             check("connected, authenticated and joined a game", True, f"{st.id} as {core.get_my_color()}")
             check("board built from authoritative FEN", board.is_in_sync(), st.fen)
             screenshot("start")
-            S["phase"] = {"cpu": "reject", "reconnect": "verify_reconnect", "rematch": "rematch_resign", "drag": "drag_illegal", "keys": "keys_tab"}.get(TEST, "play")
+            S["phase"] = {"cpu": "reject", "reconnect": "verify_reconnect", "rematch": "rematch_resign", "drag": "drag_illegal", "keys": "keys_tab", "promo": "promo_cancel"}.get(TEST, "play")
             S["wait_until"] = now + 1.0
         return
 
@@ -328,6 +330,41 @@ def _tick(_dt):
         check("BackSpace removes the last character", pc.get_editor_property("join_code") == "GAME-AB", pc.get_editor_property("join_code"))
         pc.press_key_for_test("Escape")
         check("Escape ends code entry", not pc.get_editor_property("b_typing_code"))
+        finish(True)
+        return
+
+    if S["phase"] == "promo_cancel":
+        if not core.is_my_turn() or board.is_animating():
+            return
+        check("set position has a promotion", any(m.startswith("e7e8") for m in st.legal_moves), st.fen)
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        board.begin_drag("e7")
+        board.update_drag(board.square_world("e8") + unreal.Vector(0.9, 0.6, 0))
+        r = board.end_drag("e8")
+        check("drop on the last rank asks for the piece", "promotion" in str(r).lower() and board.has_pending_promotion(), r)
+        pc.press_key_for_test("Escape")
+        S["phase"] = "promo_cancel_wait"
+        S["wait_until"] = now + 1.0
+        return
+
+    if S["phase"] == "promo_cancel_wait":
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        check("Escape cancels the promotion", not board.has_pending_promotion() and len(st.history) == 0)
+        check("cancelled pawn went home (BUG-008)", board.get_physical_mismatches() == 0 and board.is_in_sync(), board.get_physical_mismatches())
+        board.begin_drag("e7")
+        board.update_drag(board.square_world("e8") + unreal.Vector(-0.7, 0.8, 0))
+        board.end_drag("e8")
+        pc.press_key_for_test("Q")
+        S["phase"] = "promo_confirm_wait"
+        S["wait_until"] = now + 2.0
+        return
+
+    if S["phase"] == "promo_confirm_wait":
+        if board.is_animating() or board.is_awaiting_core():
+            return
+        mine = [h for h in st.history if h.color == core.get_my_color()]
+        check("Q promotes to a queen (core accepted)", bool(mine) and mine[0].to == "e8" and mine[0].promotion == "q", st.fen)
+        check("promoted piece settled on its square, board in sync", board.is_in_sync() and board.get_physical_mismatches() == 0 and board.get_resyncs() == 0)
         finish(True)
         return
 

@@ -264,7 +264,9 @@ void ATCGameMode::TryAutoStart()
 	if (Parts.Num() >= 1 && Parts[0] == TEXT("cpu"))
 	{
 		bAutoDone = true;
-		Core->CreateAiGame(Parts.IsValidIndex(1) ? Parts[1] : TEXT("patient"), Parts.IsValidIndex(2) ? Parts[2] : TEXT("w"), Parts.IsValidIndex(3) ? Parts[3] : TEXT("5+0"));
+		FString StartFen;  // -tcstartfen=<FEN with _ for spaces> (autotests; needs -tcallowstartfen for the local core)
+		if (FParse::Value(FCommandLine::Get(), TEXT("-tcstartfen="), StartFen)) StartFen.ReplaceInline(TEXT("_"), TEXT(" "));
+		Core->CreateAiGame(Parts.IsValidIndex(1) ? Parts[1] : TEXT("patient"), Parts.IsValidIndex(2) ? Parts[2] : TEXT("w"), Parts.IsValidIndex(3) ? Parts[3] : TEXT("5+0"), StartFen);
 	}
 	else if (Parts.Num() >= 1 && Parts[0] == TEXT("private"))
 	{

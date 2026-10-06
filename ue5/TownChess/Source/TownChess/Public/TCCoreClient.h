@@ -46,7 +46,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void Disconnect();
 
 	// ── requests (the core decides; nothing here changes local game state) ──
-	UFUNCTION(BlueprintCallable, Category = "TownChess") void CreateAiGame(const FString& Level, const FString& Color, const FString& TimeControl);
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void CreateAiGame(const FString& Level, const FString& Color, const FString& TimeControl, const FString& StartFen = TEXT(""));
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void CreatePrivate(const FString& TimeControl);
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void JoinGame(const FString& GameId);
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void FindMatch(const FString& TimeControl, bool bRated);

@@ -48,6 +48,11 @@ export const ClientMessage = z.discriminatedUnion('type', [
     timeControl: z.string().max(10),
     /** Threefold/fifty handling (see docs/CHESS.md). Default 'automatic'. */
     drawPolicy: z.enum(['automatic', 'claim']).optional(),
+    /**
+     * Test-only start position (FEN). Refused with ERROR 'start_fen_disabled' unless the core was started with custom
+     * starts allowed (local core with TC_ALLOW_START_FEN=1, used by the UE autotests); an invalid FEN gives 'bad_fen'.
+     */
+    startFen: z.string().max(100).optional(),
   }),
   z.object({ type: z.literal('JOIN_GAME'), gameId: z.string().regex(/^GAME-[0-9A-F]{6}$/) }),
   z.object({ type: z.literal('LEAVE_GAME'), gameId: z.string() }),

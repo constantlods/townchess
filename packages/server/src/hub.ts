@@ -3,7 +3,7 @@ import nodePath from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage, Server } from 'node:http';
-import { parseClientMessage, PROTOCOL_VERSION, TIME_CONTROLS, isFinished, aiLevelsOffered, isLeagueLevel, moveBudgetMs, LEAGUE_LEVELS, type ClientMessage, type ServerMessage, type TimeControl, type LeagueLevelId } from '@hc/shared';
+import { parseClientMessage, ChessRules, PROTOCOL_VERSION, TIME_CONTROLS, isFinished, aiLevelsOffered, isLeagueLevel, moveBudgetMs, LEAGUE_LEVELS, type ClientMessage, type ServerMessage, type TimeControl, type LeagueLevelId } from '@hc/shared';
 import { AI_LEVELS, isAiLevel, type AiLevel } from '@hc/engine';
 import { PlayerStore } from './players.js';
 import { GameRoom, isAiSeat, newGameId, type RoomEvents, type RoomRecord } from './room.js';
@@ -24,6 +24,8 @@ export interface HubOptions {
   uciEngine?: UciCommand | null;
   /** Pool / timeout settings for the league engine processes (tests shorten them). */
   league?: LeagueOptions;
+  /** Accept CREATE_AI_GAME.startFen (test-only; the sidecar sets it from TC_ALLOW_START_FEN=1). Default off. */
+  allowCustomStart?: boolean;
 }
 
 /** Abuse limits. Per IP: concurrent sockets and new identities per minute. AI games: one active per player. */
@@ -62,6 +64,7 @@ export class Hub implements RoomEvents {
     const allowed = opts.allowedOrigins ?? (process.env.HC_ALLOWED_ORIGINS ? process.env.HC_ALLOWED_ORIGINS.split(',') : null);
     this.trustProxy = opts.trustProxy ?? process.env.HC_TRUST_PROXY === '1';
     this.journalDir = opts.journalDir ?? null;
+    this.allowCustomStart = opts.allowCustomStart ?? false;
     this.league = new UciLeague(opts.uciEngine === undefined ? discoverUciEngine() : opts.uciEngine, opts.league);
     if (this.league.cmd) console.log(`[hub] league engine: ${this.league.cmd.path}`);
     const secret = opts.secret ? Buffer.from(opts.secret) : null;
@@ -95,6 +98,8 @@ export class Hub implements RoomEvents {
   }
 
   private trustProxy: boolean;
+  /** See HubOptions.allowCustomStart. */
+  allowCustomStart: boolean;
   private journalDir: string | null;
   private journalTimer: NodeJS.Timeout | null = null;
 
@@ -286,9 +291,13 @@ export class Hub implements RoomEvents {
           this.reply(c, { type: 'ERROR', code: 'busy', message: 'The engine is busy. Try again shortly.' });
           break;
         }
+        if (m.startFen !== undefined) {
+          if (!this.allowCustomStart) { this.reply(c, { type: 'ERROR', code: 'start_fen_disabled', message: 'Custom start positions are disabled on this core.' }); break; }
+          try { new ChessRules(m.startFen); } catch { this.reply(c, { type: 'ERROR', code: 'bad_fen', message: 'invalid start position' }); break; }
+        }
         const human = m.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : m.color;
         const bot = `ai:${m.level}`;
-        const r = this.createRoom(tc, false, human === 'w' ? pid : bot, human === 'w' ? bot : pid, false, m.drawPolicy);
+        const r = this.createRoom(tc, false, human === 'w' ? pid : bot, human === 'w' ? bot : pid, false, m.drawPolicy, m.startFen);
         this.reply(c, { type: 'GAME_JOINED', color: human, state: r.dto() });
         break;
       }
@@ -354,11 +363,11 @@ export class Hub implements RoomEvents {
   }
 
   /** `tc` null = untimed. Engine seats (ai:*) are never tracked as active players and games with them are never rated. */
-  createRoom(tc: TimeControl | null, rated: boolean, white: string, black: string | null, isPrivate = false, drawPolicy: 'automatic' | 'claim' = 'automatic'): GameRoom {
+  createRoom(tc: TimeControl | null, rated: boolean, white: string, black: string | null, isPrivate = false, drawPolicy: 'automatic' | 'claim' = 'automatic', startFen?: string): GameRoom {
     let id = newGameId();
     while (this.rooms.has(id)) id = newGameId();
     const withAi = isAiSeat(white) || isAiSeat(black);
-    const r = new GameRoom(id, tc ?? UNTIMED, rated && !withAi, white, black, this.players, this, { isPrivate, timeControl: tc, drawPolicy });
+    const r = new GameRoom(id, tc ?? UNTIMED, rated && !withAi, white, black, this.players, this, { isPrivate, timeControl: tc, drawPolicy, startFen });
     this.rooms.set(id, r);
     if (!isAiSeat(white)) this.activeGame.set(white, id);
     if (black && !isAiSeat(black)) this.activeGame.set(black, id);

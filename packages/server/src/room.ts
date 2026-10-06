@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { GameCore, isFinished, otherColor, type Color, type DrawPolicy, type GameStateDTO, type Promotion, type ServerMessage, type TimeControl, type MoveInput } from '@hc/shared';
+import { GameCore, START_FEN, isFinished, otherColor, type Color, type DrawPolicy, type GameStateDTO, type Promotion, type ServerMessage, type TimeControl, type MoveInput } from '@hc/shared';
 import type { PlayerStore } from './players.js';
 
 export const DISCONNECT_GRACE_MS = 60_000;
@@ -36,6 +36,8 @@ export interface RoomRecord {
   createdAt: number;
   /** Last eventSeq clients were sent; restore never goes below it (BUG-005). Absent in older journals. */
   eventSeq?: number;
+  /** Custom start position; absent = the standard start (older journals never have one). */
+  startFen?: string;
 }
 
 export const newGameId = () => 'GAME-' + randomBytes(3).toString('hex').toUpperCase();
@@ -48,6 +50,8 @@ export interface RoomOptions {
   /** null = untimed. */
   timeControl: TimeControl | null;
   drawPolicy: DrawPolicy;
+  /** Custom start position (test-only, see CREATE_AI_GAME.startFen); absent = the standard start. */
+  startFen?: string;
 }
 
 /**
@@ -86,7 +90,7 @@ export class GameRoom {
   ) {
     this.isPrivate = opts.isPrivate ?? false;
     this.untimed = opts.timeControl === null;
-    this.core = new GameCore({ timeControl: this.untimed ? null : tc, firstMoveMs: FIRST_MOVE_MS, drawPolicy: opts.drawPolicy ?? 'automatic' });
+    this.core = new GameCore({ timeControl: this.untimed ? null : tc, firstMoveMs: FIRST_MOVE_MS, drawPolicy: opts.drawPolicy ?? 'automatic', startFen: opts.startFen });
   }
 
   get status() { return this.core.status; }
@@ -163,15 +167,16 @@ export class GameRoom {
       isPrivate: this.isPrivate, drawPolicy: this.core.drawPolicy, moves: this.core.movesUci(),
       clocks: this.core.clock ? { w: this.core.clock.peek('w', now), b: this.core.clock.peek('b', now) } : null,
       status: this.status, createdAt: this.createdAt, eventSeq: this.core.eventSeq,
+      ...(this.core.startFen !== START_FEN ? { startFen: this.core.startFen } : {}),
     };
   }
 
   /** Rebuild an unfinished game from its journal record (moves replayed through GameCore validation). */
   static fromRecord(rec: RoomRecord, players: PlayerStore, ev: RoomEvents): GameRoom {
-    const room = new GameRoom(rec.id, rec.tc, rec.rated, rec.white, rec.black, players, ev, { isPrivate: rec.isPrivate, timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy });
+    const room = new GameRoom(rec.id, rec.tc, rec.rated, rec.white, rec.black, players, ev, { isPrivate: rec.isPrivate, timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, startFen: rec.startFen });
     room.createdAt = rec.createdAt;
     if (rec.status === 'active' && rec.white && rec.black) {
-      room.core = GameCore.restore({ timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, moves: rec.moves, clocks: rec.clocks, eventSeq: rec.eventSeq }, room.now());
+      room.core = GameCore.restore({ timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, startFen: rec.startFen, moves: rec.moves, clocks: rec.clocks, eventSeq: rec.eventSeq }, room.now());
       room.armTimers();
     }
     return room;

@@ -412,4 +412,40 @@ describe('critique regressions (server)', () => {
     const u = await c.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length === 2, 10_000);
     expect(u.state.moveHistory[1].color).toBe('b');
   });
+
+  // Test-only start positions (UE autotests reach promotion on demand; BUG-008). Off unless the core opts in.
+  const PROMO_FEN = '8/4P3/8/8/8/8/k7/4K3 w - - 0 1';
+
+  it('CREATE_AI_GAME with a startFen is refused unless the core allows custom starts', async () => {
+    const c = new Client(url);
+    await c.open();
+    await c.hello('NOFEN');
+    c.send({ type: 'CREATE_AI_GAME', level: 'novice', color: 'w', timeControl: 'untimed', startFen: PROMO_FEN });
+    expect((await c.next('ERROR')).code).toBe('start_fen_disabled');
+    expect(hub.rooms.size).toBe(0);
+  });
+
+  it('with custom starts allowed, the game starts from the FEN and its promotion is legal', async () => {
+    hub.allowCustomStart = true;
+    const c = new Client(url);
+    await c.open();
+    await c.hello('FEN');
+    c.send({ type: 'CREATE_AI_GAME', level: 'novice', color: 'w', timeControl: 'untimed', startFen: PROMO_FEN });
+    const j = await c.next('GAME_JOINED');
+    expect(j.state.fen).toBe(PROMO_FEN);
+    expect(j.state.legalMoves).toContain('e7e8q');
+    c.send({ type: 'MOVE', gameId: j.state.id, seq: 1, from: 'e7', to: 'e8', promotion: 'q', ply: 0 });
+    const u = await c.next('GAME_STATE_UPDATED', (m) => m.state.moveHistory.length >= 1);
+    expect(u.state.moveHistory[0].promotion).toBe('q');
+  });
+
+  it('an invalid startFen is refused', async () => {
+    hub.allowCustomStart = true;
+    const c = new Client(url);
+    await c.open();
+    await c.hello('BADFEN');
+    c.send({ type: 'CREATE_AI_GAME', level: 'novice', color: 'w', timeControl: 'untimed', startFen: 'not a fen' });
+    expect((await c.next('ERROR')).code).toBe('bad_fen');
+    expect(hub.rooms.size).toBe(0);
+  });
 });

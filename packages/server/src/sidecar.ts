@@ -59,7 +59,8 @@ const players = new PlayerStore(path.join(dataDir!, 'players.json'));
 // League engine (Stockfish, GPL-3.0): a separate process found via TC_STOCKFISH, <data>/engines or engines/ next to
 // this file (the packaged townchess-core.mjs). None found = league levels are simply not offered.
 const uciEngine = discoverUciEngine({ dataDir, coreDir: path.dirname(fileURLToPath(import.meta.url)) });
-const hub = new Hub(server, players, '/ws', { secret, journalDir: path.join(dataDir!, 'journal'), uciEngine });
+const hub = new Hub(server, players, '/ws', { secret, journalDir: path.join(dataDir!, 'journal'), uciEngine,
+  allowCustomStart: process.env.TC_ALLOW_START_FEN === '1' });  // UE autotests only (promotion on demand)
 
 const shutdown = (why: string) => {
   console.error(`[sidecar] shutting down: ${why}`);

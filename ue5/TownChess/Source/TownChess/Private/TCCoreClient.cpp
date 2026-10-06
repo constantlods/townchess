@@ -229,13 +229,14 @@ double UTCCoreClient::GetDisplayClockMs(const FString& Color) const
 	return FMath::Max(0.0, Base - (FPlatformTime::Seconds() - StateReceivedAt) * 1000.0);
 }
 
-void UTCCoreClient::CreateAiGame(const FString& Level, const FString& Color, const FString& TimeControl)
+void UTCCoreClient::CreateAiGame(const FString& Level, const FString& Color, const FString& TimeControl, const FString& StartFen)
 {
 	const TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("CREATE_AI_GAME"));
 	M->SetStringField(TEXT("level"), Level);
 	M->SetStringField(TEXT("color"), Color);
 	M->SetStringField(TEXT("timeControl"), TimeControl);
+	if (!StartFen.IsEmpty()) M->SetStringField(TEXT("startFen"), StartFen);  // test-only; the core must allow it
 	Send(M);
 }
 
