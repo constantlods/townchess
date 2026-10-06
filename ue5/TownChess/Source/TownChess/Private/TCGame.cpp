@@ -12,6 +12,9 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "AudioDevice.h"
+#include "Components/AudioComponent.h"
+#include "Sound/SoundBase.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "DynamicRHI.h"
@@ -68,11 +71,37 @@ FString ATCGameMode::GetServerLabel() const
 /** Quality on start: hardware-ray-traced Lumen and RT shadows plus Epic scalability on GPUs that support ray tracing
  *  (the owner's RTX); software Lumen at High elsewhere (the RX 6650 XT target). -tcquality=low|medium|high|epic|cinematic
  *  overrides; DLSS is switched on when its plugin is present (its cvars are simply ignored otherwise). */
+void ATCGameMode::SetQuality(const FString& Choice)
+{
+	Quality = Choice.IsEmpty() ? TEXT("auto") : Choice.ToLower();
+	GConfig->SetString(TEXT("TownChess"), TEXT("Quality"), *Quality, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+	GConfig->GetString(TEXT("TownChess"), TEXT("Quality"), Quality, GGameUserSettingsIni);
+	ApplyQualityPreset();
+	GConfig->GetFloat(TEXT("TownChess"), TEXT("Volume"), Volume, GGameUserSettingsIni);
+	SetVolume(Volume);
+	// ward ambience (ue5/tools/audio/ambience.py), looping for the whole session; the sting plays at the end of a game
+	if (USoundBase* Amb = LoadObject<USoundBase>(nullptr, TEXT("/Game/TownChess/Audio/S_TC_Ambience.S_TC_Ambience")))
+	{
+		Ambience = UGameplayStatics::SpawnSound2D(this, Amb, 0.55f, 1.f, 0.f, nullptr, true, false);
+	}
+	Sting = LoadObject<USoundBase>(nullptr, TEXT("/Game/TownChess/Audio/S_TC_Sting.S_TC_Sting"));
+}
+
+void ATCGameMode::SetVolume(float V)
+{
+	Volume = FMath::Clamp(V, 0.f, 1.f);
+	GConfig->SetFloat(TEXT("TownChess"), TEXT("Volume"), Volume, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+	if (FAudioDeviceHandle Dev = GEngine ? GEngine->GetMainAudioDevice() : FAudioDeviceHandle(); Dev.IsValid()) Dev->SetTransientPrimaryVolume(Volume);
+}
+
 void ATCGameMode::ApplyQualityPreset()
 {
-	FString Q;
+	FString Q = Quality;
 	const bool bRT = GRHISupportsRayTracing && GRHISupportsRayTracingShaders;
-	if (!FParse::Value(FCommandLine::Get(), TEXT("-tcquality="), Q)) Q = bRT ? TEXT("epic") : TEXT("high");
+	FParse::Value(FCommandLine::Get(), TEXT("-tcquality="), Q);
+	if (Q.IsEmpty() || Q == TEXT("auto")) Q = bRT ? TEXT("epic") : TEXT("high");
 	const int32 Level = Q == TEXT("low") ? 0 : Q == TEXT("medium") ? 1 : Q == TEXT("high") ? 2 : Q == TEXT("cinematic") ? 4 : 3;
 	auto Exec = [this](const FString& C) { GEngine->Exec(GetWorld(), *C); };
 	for (const TCHAR* G : { TEXT("ViewDistanceQuality"), TEXT("AntiAliasingQuality"), TEXT("ShadowQuality"), TEXT("GlobalIlluminationQuality"),
@@ -312,6 +341,11 @@ void ATCGameMode::OnState(const FTCGameState& State, const FString& Reason)
 {
 	const FString Color = GetGameInstance()->GetSubsystem<UTCCoreClient>()->GetMyColor();
 	if (!Color.IsEmpty() && Color != SeatApplied) ApplySeat(Color);
+	// the end-of-game sting, once per game, only when it ends while we watch (not for a restored or joined finished game)
+	const bool bFin = State.IsFinished();
+	if (bFin && !bSawFinish && bSawActive && State.Id == ActiveId && Sting) UGameplayStatics::PlaySound2D(this, Sting, 0.9f);
+	if (State.IsActive()) { bSawActive = true; ActiveId = State.Id; bSawFinish = false; }
+	if (bFin) bSawFinish = true;
 }
 
 void ATCGameMode::ApplySeat(const FString& Color)
@@ -628,11 +662,14 @@ TArray<FString> ATCHUD::GetVisibleButtons() const
 
 bool ATCHUD::HandleClick(const FVector2D& Pos)
 {
-	for (const FButton& B : Buttons)
+	// topmost first (the settings panel is drawn last, over the menu/game buttons)
+	for (int32 i = Buttons.Num() - 1; i >= 0; --i)
 	{
+		const FButton& B = Buttons[i];
+		if (bShowSettings && !B.Id.StartsWith(TEXT("set_"))) continue;
 		if (Pos.X >= B.Pos.X && Pos.X <= B.Pos.X + B.Size.X && Pos.Y >= B.Pos.Y && Pos.Y <= B.Pos.Y + B.Size.Y) { PressButton(B.Id); return true; }
 	}
-	return false;
+	return bShowSettings;  // while the panel is open, a click elsewhere never reaches the board
 }
 
 void ATCHUD::OnRejected(const FString& Reason) { Toast = FString::Printf(TEXT("The move was refused: %s"), *Reason); ToastUntil = FPlatformTime::Seconds() + 3.5; }
@@ -675,6 +712,31 @@ void ATCHUD::PressButton(const FString& Id)
 			for (int32 k = 0; k < 4; ++k) if (GM->GetPlayerLook() == Looks[k]) I = k;
 			GM->ApplyPlayerLook(Looks[(I + 1) % 4]);
 		}
+	}
+	else if (Id == TEXT("settings")) bShowSettings = !bShowSettings;
+	else if (Id == TEXT("set_close")) bShowSettings = false;
+	else if (Id == TEXT("set_vol"))
+	{
+		if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
+		{
+			const float V = GM->GetVolume();
+			GM->SetVolume(V >= 0.99f ? 0.f : FMath::Min(1.f, FMath::RoundToFloat(V * 4.f + 1.f) / 4.f));  // 0, 25 .. 100 %
+		}
+	}
+	else if (Id == TEXT("set_quality"))
+	{
+		if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
+		{
+			static const TCHAR* Qs[] = {TEXT("auto"), TEXT("medium"), TEXT("high"), TEXT("epic")};
+			int32 I = 0;
+			for (int32 k = 0; k < 4; ++k) if (GM->GetQuality() == Qs[k]) I = k;
+			GM->SetQuality(Qs[(I + 1) % 4]);
+		}
+	}
+	else if (Id == TEXT("set_view") && PC)
+	{
+		const float V = PC->GetViewHeight();
+		PC->SetViewHeight(V < 0.3f ? 0.6f : V < 0.8f ? 1.f : 0.f);
 	}
 	else if (Id == TEXT("tc")) TimeControl = TimeControl == TEXT("5+0") ? TEXT("10+0") : TimeControl == TEXT("10+0") ? TEXT("untimed") : TimeControl == TEXT("untimed") ? TEXT("3+2") : TEXT("5+0");
 	else if (Id == TEXT("cpu_w")) C->CreateAiGame(Level, TEXT("w"), TimeControl);
@@ -720,12 +782,43 @@ void ATCHUD::DrawUi()
 	if (!C) return;
 	if (!bBound) { C->OnMoveRejected.AddDynamic(this, &ATCHUD::OnRejected); C->OnError.AddDynamic(this, &ATCHUD::OnError); bBound = true; }
 	if (C->HasGame() && C->GetState().Status != TEXT("waiting")) DrawGame(C); else DrawMenu(C);
+	if (bShowSettings) DrawSettings();
 	if (FPlatformTime::Seconds() < ToastUntil) Text(Toast, Canvas->ClipX * 0.5f, Canvas->ClipY - 104.f * Ui(), FLinearColor(0.95f, 0.35f, 0.25f), 1.0f, true);
 	if (C->GetConnection() != ETCConnection::Welcomed)
 	{
 		const ATCGameMode* GM = Cast<ATCGameMode>(UGameplayStatics::GetGameMode(this));
 		Text(FString::Printf(TEXT("connecting to %s..."), GM ? *GM->GetServerLabel() : TEXT("core")), Canvas->ClipX * 0.5f, Canvas->ClipY - 40.f, FLinearColor(0.7f, 0.7f, 0.65f), 0.9f, true);
 	}
+}
+
+void ATCHUD::DrawSettings()
+{
+	// the reference's quiet panel style: monospace title, label + value boxes that cycle on click, a primary Close
+	const float U = Ui(), Wp = 460.f * U, Hp = 330.f * U, X = (Canvas->ClipX - Wp) * 0.5f, Y = (Canvas->ClipY - Hp) * 0.5f;
+	const ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>();
+	const ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
+	Plate(X, Y, Wp, Hp, 0.85f, 0.4f);
+	Text(TEXT("SETTINGS"), X + 28.f * U, Y + 22.f * U, FLinearColor(0.9f, 0.86f, 0.78f), 1.2f, false, ETCUiFont::Title);
+	const FLinearColor Dim(0.6f, 0.56f, 0.5f);
+	float Ry = Y + 82.f * U;
+	const auto Row = [&](const FString& Id, const FString& Label, const FString& Value)
+	{
+		Text(Label, X + 30.f * U, Ry + 4.f * U, Dim, 0.85f);
+		Button(Id, Value, X + 200.f * U, Ry, 230.f, ETCButton::Boxed);
+		Ry += 46.f * U;
+	};
+	if (GM)
+	{
+		Row(TEXT("set_vol"), TEXT("Volume"), FString::Printf(TEXT("%d%%"), FMath::RoundToInt(GM->GetVolume() * 100.f)));
+		const FString Q = GM->GetQuality();
+		Row(TEXT("set_quality"), TEXT("Graphics"), Q == TEXT("auto") ? TEXT("Auto (best for this GPU)") : Q.Left(1).ToUpper() + Q.Mid(1));
+	}
+	if (PC)
+	{
+		const float V = PC->GetViewHeight();
+		Row(TEXT("set_view"), TEXT("View height"), V < 0.3f ? TEXT("Low (over the table)") : V < 0.8f ? TEXT("Medium") : TEXT("High (above the board)"));
+	}
+	Button(TEXT("set_close"), TEXT("Close"), X + (Wp - 220.f * U) * 0.5f, Y + Hp - 62.f * U, 220.f, ETCButton::Primary);
 }
 
 void ATCHUD::DrawMenu(UTCCoreClient* C)
@@ -765,6 +858,11 @@ void ATCHUD::DrawMenu(UTCCoreClient* C)
 	Option(TEXT("level"), TEXT("Strength"), LevelLabel);
 	if (GM) Option(TEXT("opponent"), TEXT("Opponent"), OpponentName(GM->GetOpponent()));
 	if (GM) Option(TEXT("look"), TEXT("Hands"), LookName(GM->GetPlayerLook()));
+	Y += Step * 0.3f;
+	Button(TEXT("settings"), TEXT("Settings"), X, Y, W, ETCButton::Plain);
+	// credits (docs/FREE_ASSETS.md): every third-party asset is free; licences in the repository
+	Text(TEXT("Free assets: Poly Haven (CC0), MetaHuman (Epic), Lato / Courier Prime / Patrick Hand (OFL), Stockfish (GPL, separate engine)"),
+		30.f * U, Canvas->ClipY - 34.f * U, FLinearColor(0.45f, 0.42f, 0.38f, 0.8f), 0.62f, false, ETCUiFont::SansLight);
 }
 
 void ATCHUD::DrawGame(UTCCoreClient* C)
@@ -841,6 +939,8 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 		else { Button(TEXT("offer"), S.DrawOfferBy == Me ? TEXT("Draw Offered") : TEXT("Offer Draw"), AX, Y, AW); Y += Step; }
 		if (!S.ClaimableDraw.IsEmpty() && C->IsMyTurn()) { Button(TEXT("claim"), FString::Printf(TEXT("Claim Draw (%s)"), *S.ClaimableDraw), AX, Y, AW, ETCButton::Boxed); Y += Step; }
 		Button(TEXT("resign"), bConfirmResign ? TEXT("Click again to resign") : TEXT("Resign"), AX, Y, AW, bConfirmResign ? ETCButton::Boxed : ETCButton::Plain);
+		Y += Step;
+		Button(TEXT("settings"), TEXT("Settings"), AX, Y, AW);
 	}
 	else if (S.IsFinished())
 	{

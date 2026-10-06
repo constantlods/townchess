@@ -42,6 +42,11 @@ public:
 	 *  level's TC_PlayerOpt_<option> actors that the look names; remembered in GameUserSettings; -tclook= overrides. */
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void ApplyPlayerLook(const FString& Look);
 	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetPlayerLook() const { return PlayerLook; }
+	/** Settings panel: graphics preset ("auto", "medium", "high", "epic") and master volume 0..1, both remembered. */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void SetQuality(const FString& Choice);
+	UFUNCTION(BlueprintPure, Category = "TownChess") FString GetQuality() const { return Quality; }
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void SetVolume(float V);
+	UFUNCTION(BlueprintPure, Category = "TownChess") float GetVolume() const { return Volume; }
 	virtual void Tick(float Dt) override;
 
 private:
@@ -54,6 +59,12 @@ private:
 
 	FString ServerUrl, Auto, Username, SeatApplied, OpponentShown;
 	FString PlayerLook = TEXT("bare");
+	FString Quality = TEXT("auto");
+	float Volume = 0.8f;
+	UPROPERTY(Transient) TObjectPtr<class UAudioComponent> Ambience;
+	UPROPERTY(Transient) TObjectPtr<class USoundBase> Sting;
+	bool bSawActive = false, bSawFinish = false;
+	FString ActiveId;
 	int32 SmokePlies = 0, SmokeChecked = -1, SmokeFailures = 0;
 	FString SmokeGameId;
 	bool bSmokeResigned = false;
@@ -79,6 +90,9 @@ public:
 	/** Text entry for the "join table" code on the menu. */
 	UPROPERTY(BlueprintReadOnly, Category = "TownChess") FString JoinCode;
 	UPROPERTY(BlueprintReadOnly, Category = "TownChess") bool bTypingCode = false;
+	/** Seat view height 0..1 (mouse wheel, settings panel). */
+	UFUNCTION(BlueprintCallable, Category = "TownChess") void SetViewHeight(float V);
+	UFUNCTION(BlueprintPure, Category = "TownChess") float GetViewHeight() const { return ViewHeight; }
 	/** Autotest hook: feeds a key (by name: "Tab", "A", "BackSpace", "Escape", "Q") through the same handler as the keyboard. */
 	UFUNCTION(BlueprintCallable, Category = "TownChess") void PressKeyForTest(FName KeyName) { OnKey(FKey(KeyName)); }
 private:
@@ -93,7 +107,6 @@ private:
 	FString CameraFor;
 	/** Seat view height, 0 = low over the table (the reference's angle) .. 1 = higher, looking down onto the board so
 	 *  no piece hides behind another. Mouse wheel; remembered in GameUserSettings; -tcview=<0..1> for screenshots. */
-	void SetViewHeight(float V);
 	void ApplyView(float Dt);
 	float ViewHeight = 0.6f;
 	float ViewShown = -1.f;
@@ -127,6 +140,8 @@ public:
 	FString Toast;
 	double ToastUntil = 0;
 	bool bConfirmResign = false;
+	bool bShowSettings = false;
+	void DrawSettings();
 	/** Accessibility: also print the opening on screen (the clipboard is the default home of the game record). */
 	bool bScreenRecord = false;
 	static FString OpponentName(const FString& Id);

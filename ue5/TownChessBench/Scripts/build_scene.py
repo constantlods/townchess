@@ -1297,6 +1297,14 @@ def build():
                 snd = next((o for o in import_file(os.path.join(snd_dir, f), f"{ROOT}/Audio") if isinstance(o, unreal.SoundWave)), None)
                 if snd:
                     setp(board, prop, snd)  # our synthesised wooden knocks (ue5/tools/audio/clack.py)
+        # ward ambience (loop) and the end-of-game sting (ue5/tools/audio/ambience.py); ATCGameMode loads them by path
+        # (/Game/TownChess/Audio is always cooked), so save them explicitly: nothing in the level references them
+        for f, loop in (("S_TC_Ambience.wav", True), ("S_TC_Sting.wav", False)):
+            if os.path.exists(os.path.join(snd_dir, f)):
+                snd = next((o for o in import_file(os.path.join(snd_dir, f), f"{ROOT}/Audio") if isinstance(o, unreal.SoundWave)), None)
+                if snd:
+                    setp(snd, "looping", loop)
+                    EAL.save_loaded_asset(snd)
         setp(board, "board_mesh_yaw", 90.0)  # a1 must be a dark square ("light on the right"), checked by screenshot
         # playing surface: our baked composite of CC0 maple/walnut scans (ue5/tools/textures/board.py) on the board's 0..1 grid
         bd = os.path.join(TEXTURES_DIR, "board")

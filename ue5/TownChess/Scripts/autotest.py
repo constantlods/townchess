@@ -330,6 +330,35 @@ def _tick(_dt):
         check("BackSpace removes the last character", pc.get_editor_property("join_code") == "GAME-AB", pc.get_editor_property("join_code"))
         pc.press_key_for_test("Escape")
         check("Escape ends code entry", not pc.get_editor_property("typing_code"))
+        # settings panel: opens from the menu, cycles the volume (remembered by the game mode), closes
+        gm = unreal.GameplayStatics.get_game_mode(w)
+        hud.press_button("settings")
+        S["vol_before"] = gm.get_volume()
+        S["phase"] = "keys_settings"
+        S["wait_until"] = now + 0.5
+        return
+
+    if S["phase"] == "keys_settings":
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        hud = pc.get_hud()
+        gm = unreal.GameplayStatics.get_game_mode(w)
+        btns = list(hud.get_visible_buttons())
+        check("Settings opens the panel", all(b in btns for b in ("set_vol", "set_quality", "set_view", "set_close")), btns)
+        hud.press_button("set_vol")
+        check("Volume cycles", abs(gm.get_volume() - S["vol_before"]) > 0.01, f"{S['vol_before']} -> {gm.get_volume()}")
+        hud.press_button("set_vol")
+        hud.press_button("set_vol")
+        hud.press_button("set_vol")
+        hud.press_button("set_vol")  # full cycle (5 steps) back to where it was
+        hud.press_button("set_close")
+        S["phase"] = "keys_settings_closed"
+        S["wait_until"] = now + 0.5
+        return
+
+    if S["phase"] == "keys_settings_closed":
+        pc = unreal.GameplayStatics.get_player_controller(w, 0)
+        btns = list(pc.get_hud().get_visible_buttons())
+        check("Close hides the panel", "set_vol" not in btns, btns)
         finish(True)
         return
 
