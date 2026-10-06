@@ -90,11 +90,12 @@ private:
 	 *  no piece hides behind another. Mouse wheel; remembered in GameUserSettings; -tcview=<0..1> for screenshots. */
 	void SetViewHeight(float V);
 	void ApplyView(float Dt);
-	float ViewHeight = 0.55f;
+	float ViewHeight = 0.6f;
 	float ViewShown = -1.f;
 	TWeakObjectPtr<AActor> ViewCam;
 	FVector ViewBaseLoc = FVector::ZeroVector;
 	FRotator ViewBaseRot = FRotator::ZeroRotator;
+	float ViewBaseFocal = 0.f;
 };
 
 /** Minimal in-world HUD (canvas): menu, player plates, clocks, status, actions, promotion picker. */

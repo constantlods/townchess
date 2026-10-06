@@ -367,21 +367,27 @@ void ATCPlayerController::ApplyView(float Dt)
 	// moves the seat camera the level placed (TC_Camera_White/Black): up and slightly forward, pitched further down
 	AActor* T = GetViewTarget();
 	if (!T || !(T->ActorHasTag(TEXT("TC_Camera_White")) || T->ActorHasTag(TEXT("TC_Camera_Black")))) return;
-	if (ViewCam.Get() != T) { ViewCam = T; ViewBaseLoc = T->GetActorLocation(); ViewBaseRot = T->GetActorRotation(); ViewShown = -1.f; }
+	ACineCameraActor* Cine = Cast<ACineCameraActor>(T);
+	if (ViewCam.Get() != T)
+	{
+		ViewCam = T; ViewBaseLoc = T->GetActorLocation(); ViewBaseRot = T->GetActorRotation(); ViewShown = -1.f;
+		ViewBaseFocal = Cine ? Cine->GetCineCameraComponent()->CurrentFocalLength : 0.f;
+	}
 	const float Was = ViewShown;
 	ViewShown = ViewShown < 0.f ? ViewHeight : FMath::FInterpTo(ViewShown, ViewHeight, Dt, 8.f);
 	if (FMath::IsNearlyEqual(Was, ViewShown, 1e-4f)) return;
 	const FVector Fwd = FVector(ViewBaseRot.Vector().X, ViewBaseRot.Vector().Y, 0.f).GetSafeNormal();
-	const FVector Loc = ViewBaseLoc + FVector(0, 0, 24.f * ViewShown) + Fwd * (5.f * ViewShown);
+	// higher, a little steeper and a little wider: the board opens up (no piece hides another) while the opponent's
+	// face stays at the top of the frame (pass 47: pitching 18 deg down from 24 cm higher cut his head off)
+	const FVector Loc = ViewBaseLoc + FVector(0, 0, 28.f * ViewShown) + Fwd * (5.f * ViewShown);
 	FRotator Rot = ViewBaseRot;
-	Rot.Pitch -= 18.f * ViewShown;
+	Rot.Pitch -= 10.f * ViewShown;
 	T->SetActorLocationAndRotation(Loc, Rot);
-	if (ACineCameraActor* Cine = Cast<ACineCameraActor>(T))
+	if (Cine)
 	{
-		if (const ATCBoard* B = Board())  // keep the board in focus as the distance changes
-		{
-			Cine->GetCineCameraComponent()->FocusSettings.ManualFocusDistance = FVector::Dist(Loc, B->GetActorLocation());
-		}
+		UCineCameraComponent* CC = Cine->GetCineCameraComponent();
+		if (ViewBaseFocal > 0.f) CC->SetCurrentFocalLength(ViewBaseFocal * (1.f - 0.2f * ViewShown));  // 30 mm -> 24 mm
+		if (const ATCBoard* B = Board()) CC->FocusSettings.ManualFocusDistance = FVector::Dist(Loc, B->GetActorLocation());
 	}
 }
 

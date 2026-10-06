@@ -1662,8 +1662,9 @@ def build():
     s = ppv.settings
     for k, v in {
         "auto_exposure_method": unreal.AutoExposureMethod.AEM_HISTOGRAM,
-        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 7.8)),
-        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 7.8)),
+        # EV 8.3 (was 7.8): the frame measured mean 35 / 95th pct 139 against the reference's 27 / 97 (pass 47)
+        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 8.3)),
+        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 8.3)),
         "bloom_intensity": 0.3, "vignette_intensity": 0.65, "film_grain_intensity": 0.15,
         "lumen_final_gather_quality": 2.0, "lumen_reflection_quality": 1.0,
         "lumen_scene_lighting_quality": 1.0, "lumen_scene_detail": 1.5,
