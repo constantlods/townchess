@@ -1498,7 +1498,7 @@ def build():
     for sm in papers:
         sm.set_material(0, mi_form)
         EAL.save_loaded_asset(sm)
-    for loc, yaw in (((-36, -46), 14), ((40, -46), -28)):
+    for loc, yaw in (((-36, -46), 14), ((40, -46), -28), ((22, 66), -150), ((-14, 74), 160)):  # two more on the right, clear of the right hand (pass 58)
         tag(place_model(papers, (loc[0], loc[1], 0), yaw=yaw, label="Papers", sit_on=top + 0.05)[0])
     cover = lambda n, c: make_mi(master, n, {"BaseColor": None}, tint=c, rough=0.82, grime_color=(0.12, 0.09, 0.06),
                                  scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.2, "MicroRough": 0.2})
@@ -1846,6 +1846,9 @@ def build():
     # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)
     # the player's hands are hero assets in the reference: a soft warm light from the lamp side keeps them readable
     tag(rect("Hands_Key", (-30, -40, top + 40), (0, -50, 30), 220, 2600, 70, 40, 160, vol=0.2))
+    # pass 58: the table right of the board was near black (luma 9-17 against the reference's lit clutter; its fine detail
+    # 4.6 vs 11-15): a dim warm spill over the right hand, the record sheets and the mug
+    tag(rect("Table_Right", (-20, 48, top + 45), (0, -60, -25), 55, 2600, 60, 40, 150, vol=0.2))  # 110 lm lifted the frame mean 24 -> 32
     # (the table bounce light over-lit the board: 11.7% clipped pixels; removed, Lumen GI does the bounce)
     # corridor light behind the bars: a cold glow that separates the opponent from the back wall
     rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)
