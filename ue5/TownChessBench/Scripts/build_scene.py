@@ -1695,7 +1695,8 @@ def build():
                     loc, rot = aimed_on_bone(f"player:lowerarm_{side}", elbow, d)
                     attach_static(f"PlayerSleeve_{side}", sleeve_sm, psmc, f"lowerarm_{side}", loc, rot, "TC_PlayerOpt_sleeves")
                 if watch_sm and side == "l":
-                    wrist = tuple(hand[i] - d[i] / n * 4.0 for i in range(3))  # 4 cm up the forearm from the wrist joint
+                    # 2.5 cm up the forearm from the wrist joint (the probe put the first try 7 cm up), past the sleeve's end
+                    wrist = tuple(hand[i] - d[i] / n * 2.5 for i in range(3))
                     loc, rot = aimed_on_bone(f"player:lowerarm_{side}", wrist, d)
                     attach_static("PlayerWatch", watch_sm, psmc, f"lowerarm_{side}", loc, rot, "TC_PlayerOpt_watch")
             log("player hand options attached", sorted(hands))
