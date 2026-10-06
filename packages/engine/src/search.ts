@@ -1,7 +1,9 @@
 import { Chess, type Move } from 'chess.js';
 
 /**
- * Small alpha-beta chess engine for "Play vs AI". Runs in a Web Worker.
+ * Small alpha-beta chess engine for the CPU opponent. Runs in a browser Web Worker or a Node worker thread; never on
+ * a thread that renders or serves. This is the TownChess house engine for casual play, not an analysis engine
+ * (Stockfish arrives in Milestone 5).
  * Negamax + alpha-beta, iterative deepening within a time budget, MVV-LVA ordering,
  * capture-only quiescence, tapered piece-square tables. Strength is tuned by depth/time/noise.
  */
@@ -48,16 +50,39 @@ function order(moves: Move[]): Move[] {
 
 class Timeout extends Error {}
 
-export interface SearchOptions { maxDepth: number; timeMs: number; noise: number }
+export interface SearchOptions {
+  maxDepth: number;
+  /** Wall-clock budget. Strength then depends on machine load; set `nodeLimit` for reproducible strength. */
+  timeMs: number;
+  /** Centipawn window for picking a near-best move (human-like imperfection). */
+  noise: number;
+  /** Optional hard node budget: makes the search deterministic regardless of machine speed. */
+  nodeLimit?: number;
+  /** Optional RNG seed for the noise choice: same seed + same position + nodeLimit = same move. */
+  seed?: number;
+}
+
+/** mulberry32: tiny seeded PRNG. */
+export function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 export function search(fen: string, opt: SearchOptions): { from: string; to: string; promotion?: string } | null {
   const c = new Chess(fen);
-  const deadline = performance.now() + opt.timeMs;
+  const deadline = opt.nodeLimit ? Infinity : performance.now() + opt.timeMs;
+  const random = opt.seed === undefined ? Math.random : seededRandom(opt.seed);
   let nodes = 0;
   const MATE = 100000;
 
   const quiesce = (alpha: number, beta: number, depth: number): number => {
-    if ((++nodes & 1023) === 0 && performance.now() > deadline) throw new Timeout();
+    if ((++nodes & 1023) === 0 && (performance.now() > deadline || (opt.nodeLimit !== undefined && nodes > opt.nodeLimit))) throw new Timeout();
     const stand = evaluate(c);
     if (stand >= beta) return beta;
     if (stand > alpha) alpha = stand;
@@ -73,7 +98,7 @@ export function search(fen: string, opt: SearchOptions): { from: string; to: str
   };
 
   const negamax = (depth: number, alpha: number, beta: number, ply: number): number => {
-    if ((++nodes & 1023) === 0 && performance.now() > deadline) throw new Timeout();
+    if ((++nodes & 1023) === 0 && (performance.now() > deadline || (opt.nodeLimit !== undefined && nodes > opt.nodeLimit))) throw new Timeout();
     if (c.isCheckmate()) return -MATE + ply;
     if (c.isDraw()) return 0;
     if (depth === 0) return quiesce(alpha, beta, 4);
@@ -99,7 +124,9 @@ export function search(fen: string, opt: SearchOptions): { from: string; to: str
       let alpha = -Infinity;
       for (const { m } of scored) {
         c.move(m);
-        const v = -negamax(d - 1, -Infinity, -alpha + 1, 1);
+        // With noise, every candidate needs an exact score (a narrowed window makes all non-best moves look alike, so
+        // the noise window would admit blunders such as allowing mate in one: regression BUG-004).
+        const v = opt.noise > 0 ? -negamax(d - 1, -Infinity, Infinity, 1) : -negamax(d - 1, -Infinity, -alpha + 1, 1);
         c.undo();
         results.push({ m, v });
         if (v > alpha) alpha = v;
@@ -117,7 +144,7 @@ export function search(fen: string, opt: SearchOptions): { from: string; to: str
   // Human-like imperfection: occasionally pick a near-best alternative.
   if (opt.noise > 0 && scored.length > 1) {
     const near = scored.filter((s) => s.v >= scored[0].v - opt.noise);
-    bestMove = near[Math.floor(Math.random() * near.length)].m;
+    bestMove = near[Math.floor(random() * near.length)].m;
   }
   return { from: bestMove.from, to: bestMove.to, promotion: bestMove.promotion };
 }

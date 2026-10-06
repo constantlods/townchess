@@ -4,3 +4,11 @@ dist
 shots/
 server-data/
 *.log
+
+# Claude Code agent worktrees
+.claude/*
+!.claude/agents/
+tools/.cache/
+tools/sim/out*/
+tools/sim/*.log
+tools/.venv/

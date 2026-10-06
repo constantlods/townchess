@@ -1,37 +1,82 @@
 import { randomBytes } from 'node:crypto';
-import { ChessClock, ChessRules, isFinished, otherColor, type Color, type GameStateDTO, type GameStatus, type MoveRecord, type Promotion, type TimeControl } from '@hc/shared';
+import { performance } from 'node:perf_hooks';
+import { GameCore, START_FEN, isFinished, otherColor, type Color, type DrawPolicy, type GameStateDTO, type Promotion, type ServerMessage, type TimeControl, type MoveInput } from '@hc/shared';
 import type { PlayerStore } from './players.js';
 
 export const DISCONNECT_GRACE_MS = 60_000;
+/** First-move window: clocks start after both first moves; no first move in time aborts the game. */
+export const FIRST_MOVE_MS = 30_000;
 
 export interface RoomEvents {
   /** Broadcast to both seats (and anyone else in the room). */
-  broadcast(room: GameRoom, msg: object): void;
+  broadcast(room: GameRoom, msg: ServerMessage): void;
   /** Send to one player. */
-  send(playerId: string, msg: object): void;
+  send(playerId: string, msg: ServerMessage): void;
   finished(room: GameRoom): void;
+  /** A seat played by the engine must move now (the hub schedules the search off the event loop). */
+  aiToMove?(room: GameRoom): void;
+  /** Called after every state change (journal for crash recovery of the local core). */
+  persist?(room: GameRoom): void;
+}
+
+/** Journal entry for an unfinished game: enough to rebuild it after a core restart. */
+export interface RoomRecord {
+  v: 1;
+  id: string;
+  white: string | null;
+  black: string | null;
+  tc: TimeControl;
+  untimed: boolean;
+  rated: boolean;
+  isPrivate: boolean;
+  drawPolicy: DrawPolicy;
+  moves: string[];
+  clocks: Record<Color, number> | null;
+  status: string;
+  createdAt: number;
+  /** Last eventSeq clients were sent; restore never goes below it (BUG-005). Absent in older journals. */
+  eventSeq?: number;
+  /** Custom start position; absent = the standard start (older journals never have one). */
+  startFen?: string;
 }
 
 export const newGameId = () => 'GAME-' + randomBytes(3).toString('hex').toUpperCase();
 
+/** Player ids of engine seats look like `ai:<level>`. */
+export const isAiSeat = (playerId: string | null) => !!playerId && playerId.startsWith('ai:');
+
+export interface RoomOptions {
+  isPrivate?: boolean;
+  /** null = untimed. */
+  timeControl: TimeControl | null;
+  drawPolicy: DrawPolicy;
+  /** Custom start position (test-only, see CREATE_AI_GAME.startFen); absent = the standard start. */
+  startFen?: string;
+}
+
 /**
- * One authoritative game. The server owns: legal moves, whose turn, the clocks and the result.
- * Clients only ask; nothing they send is trusted beyond their authenticated identity.
+ * One authoritative game on the server. All chess and game-flow decisions are delegated to the shared GameCore; the
+ * room adds identity (who sits where), timers, ratings and messaging. Clients only ask.
+ *
+ * Time: the core runs on a monotonic clock (performance.now) so an NTP step cannot flag anyone; wall-clock time
+ * (Date.now) appears only in messages for display.
  */
 export class GameRoom {
-  rules = new ChessRules();
-  clock: ChessClock;
-  history: MoveRecord[] = [];
-  status: GameStatus = 'waiting';
-  winner: Color | null = null;
-  drawOfferBy: Color | null = null;
+  core: GameCore;
   rematchOfferBy: Color | null = null;
   disconnected = new Map<Color, NodeJS.Timeout>();
   createdAt = Date.now();
   updatedAt = Date.now();
+  readonly isPrivate: boolean;
+  readonly untimed: boolean;
   private flagTimer: NodeJS.Timeout | null = null;
-  /** For tests: injectable clock. */
-  now: () => number = () => Date.now();
+  private abortTimer: NodeJS.Timeout | null = null;
+  /** Monotonic time source; injectable for tests. */
+  now: () => number = () => performance.now();
+  /** Wall time for display fields; injectable for tests. */
+  wallNow: () => number = () => Date.now();
+  /** Disconnect grace period; overridable in tests. */
+  graceMs = DISCONNECT_GRACE_MS;
 
   constructor(
     public id: string,
@@ -41,10 +86,15 @@ export class GameRoom {
     public black: string | null,
     private players: PlayerStore,
     private ev: RoomEvents,
-    public isPrivate = false,
+    opts: Partial<RoomOptions> = {},
   ) {
-    this.clock = new ChessClock(tc);
+    this.isPrivate = opts.isPrivate ?? false;
+    this.untimed = opts.timeControl === null;
+    this.core = new GameCore({ timeControl: this.untimed ? null : tc, firstMoveMs: FIRST_MOVE_MS, drawPolicy: opts.drawPolicy ?? 'automatic', startFen: opts.startFen });
   }
+
+  get status() { return this.core.status; }
+  get history() { return this.core.history; }
 
   colorOf(playerId: string): Color | null {
     return this.white === playerId ? 'w' : this.black === playerId ? 'b' : null;
@@ -61,134 +111,203 @@ export class GameRoom {
   }
 
   start() {
-    this.status = 'active';
-    this.clock.start('w', this.now());
-    this.armFlag();
+    this.core.start(this.now());
+    this.armTimers();
     this.touch();
+    this.ev.persist?.(this);
+    this.maybeAi();
   }
 
-  private touch() { this.updatedAt = this.now(); }
+  private touch() { this.updatedAt = this.wallNow(); }
 
   dto(): GameStateDTO {
     const now = this.now();
+    const wall = this.wallNow();
+    const snap = this.core.snapshot(now);
+    const initial = this.tc.initialMs;
     return {
       id: this.id,
       white: this.white ? this.players.publicOf(this.white) : null,
       black: this.black ? this.players.publicOf(this.black) : null,
-      fen: this.rules.fen,
-      moveHistory: this.history,
-      turn: this.rules.turn,
-      whiteClockMs: this.clock.peek('w', now),
-      blackClockMs: this.clock.peek('b', now),
-      clockSampledAt: now,
-      status: this.status,
-      winner: this.winner,
+      fen: snap.fen,
+      moveHistory: snap.history,
+      turn: snap.turn,
+      whiteClockMs: snap.clocks?.w ?? initial,
+      blackClockMs: snap.clocks?.b ?? initial,
+      clockSampledAt: wall,
+      clockRunning: this.status === 'active' ? snap.running : null,
+      status: snap.status,
+      winner: snap.winner,
       rated: this.rated,
       timeControl: this.tc,
-      drawOfferBy: this.drawOfferBy,
+      drawOfferBy: snap.drawOfferBy,
       rematchOfferBy: this.rematchOfferBy,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       disconnected: [...this.disconnected.keys()],
+      termination: snap.termination,
+      drawPolicy: this.core.drawPolicy,
+      claimableDraw: snap.claimableDraw,
+      legalMoves: snap.legalMoves,
+      opening: snap.opening && {
+        eco: snap.opening.eco, name: snap.opening.name, family: snap.opening.family, variation: snap.opening.variation,
+        subvariation: snap.opening.subvariation, ply: snap.opening.ply, transposed: snap.opening.transposed,
+      },
+      inBook: snap.inBook,
+      lastEvents: snap.lastEvents,
+      eventSeq: snap.eventSeq,
+      firstMoveDeadline: snap.firstMoveDeadline === null ? null : wall + (snap.firstMoveDeadline - now),
     };
   }
 
+  record(): RoomRecord {
+    const now = this.now();
+    return {
+      v: 1, id: this.id, white: this.white, black: this.black, tc: this.tc, untimed: this.untimed, rated: this.rated,
+      isPrivate: this.isPrivate, drawPolicy: this.core.drawPolicy, moves: this.core.movesUci(),
+      clocks: this.core.clock ? { w: this.core.clock.peek('w', now), b: this.core.clock.peek('b', now) } : null,
+      status: this.status, createdAt: this.createdAt, eventSeq: this.core.eventSeq,
+      ...(this.core.startFen !== START_FEN ? { startFen: this.core.startFen } : {}),
+    };
+  }
+
+  /** Rebuild an unfinished game from its journal record (moves replayed through GameCore validation). */
+  static fromRecord(rec: RoomRecord, players: PlayerStore, ev: RoomEvents): GameRoom {
+    const room = new GameRoom(rec.id, rec.tc, rec.rated, rec.white, rec.black, players, ev, { isPrivate: rec.isPrivate, timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, startFen: rec.startFen });
+    room.createdAt = rec.createdAt;
+    if (rec.status === 'active' && rec.white && rec.black) {
+      room.core = GameCore.restore({ timeControl: rec.untimed ? null : rec.tc, drawPolicy: rec.drawPolicy, startFen: rec.startFen, moves: rec.moves, clocks: rec.clocks, eventSeq: rec.eventSeq }, room.now());
+      room.armTimers();
+    }
+    return room;
+  }
+
+  /** After restore: hand the move to the engine if it is its turn. */
+  resumeAfterRestore() { this.maybeAi(); }
+
   private update(reason: string) {
     this.touch();
+    this.ev.persist?.(this);
     this.ev.broadcast(this, { type: 'GAME_STATE_UPDATED', state: this.dto(), reason });
+  }
+
+  /**
+   * Any request can end the game as a side effect (a flag that fell before the request arrived, an expired first-move
+   * window). Call after every core action so such endings are always broadcast, rated and released.
+   */
+  private settle(statusBefore: string, reason: string): boolean {
+    if (isFinished(this.status) && !isFinished(statusBefore as never)) { this.onFinished(reason); return true; }
+    return false;
   }
 
   /** Validate and apply a move. Returns null on success or a rejection reason. */
   move(playerId: string, from: string, to: string, promotion: Promotion | undefined, ply: number): string | null {
     const color = this.colorOf(playerId);
     if (!color) return 'not a player in this game';
-    if (this.status !== 'active') return 'game is not active';
-    if (this.rules.turn !== color) return 'not your turn';
-    if (ply !== this.history.length) return 'stale move';
-    const now = this.now();
-    const flagged = this.clock.flagged(now);
-    if (flagged) { this.flagFall(flagged); return 'time expired'; }
-    const piece = this.rules.pieceAt(from);
-    if (!piece || piece.color !== color) return 'not your piece';
-    const rec = this.rules.tryMove({ from, to, promotion });
-    if (!rec) return 'illegal move';
-    this.clock.press(color, now);
-    rec.clockAfterMs = this.clock.remaining[color];
-    this.history.push(rec);
-    this.drawOfferBy = null;
-    const ps = this.rules.positionStatus();
-    if (ps.status !== 'active') this.finish(ps.status, ps.winner, 'move');
-    else { this.armFlag(); this.update('move'); }
+    if (ply !== this.core.ply && this.status === 'active') return 'stale move';
+    const statusBefore = this.status;
+    const r = this.core.move(color, { from, to, promotion }, this.now());
+    if (!r.ok) {
+      this.settle(statusBefore, this.status); // the attempt itself may have ended the game (flag fall, abort)
+      return r.reason;
+    }
+    if (isFinished(this.status)) this.onFinished('move');
+    else { this.armTimers(); this.update('move'); this.maybeAi(); }
     return null;
   }
 
-  private armFlag() {
+  armTimers() {
     if (this.flagTimer) clearTimeout(this.flagTimer);
-    const c = this.clock.running;
-    if (!c || this.status !== 'active') return;
-    const ms = this.clock.peek(c, this.now());
+    if (this.abortTimer) clearTimeout(this.abortTimer);
+    this.flagTimer = this.abortTimer = null;
+    if (this.status !== 'active') return;
+    const now = this.now();
+    const deadline = this.core.firstMoveDeadline;
+    if (deadline !== null) {
+      this.abortTimer = setTimeout(() => {
+        if (this.core.checkAbort(this.now())) this.onFinished('aborted'); else this.armTimers();
+      }, Math.max(0, deadline - now) + 5);
+      this.abortTimer.unref?.();
+      return;
+    }
+    const c = this.core.clock?.running;
+    if (!c) return;
     this.flagTimer = setTimeout(() => {
-      const f = this.clock.flagged(this.now());
-      if (f) this.flagFall(f); else this.armFlag();
-    }, ms + 5);
+      if (this.core.checkFlag(this.now())) this.onFinished('timeout'); else this.armTimers();
+    }, this.core.clock!.peek(c, now) + 5);
     this.flagTimer.unref?.();
   }
 
-  private flagFall(loser: Color) {
-    const winner = otherColor(loser);
-    // a flag is a draw if the side with time cannot possibly mate
-    if (!this.rules.hasMatingMaterial(winner)) this.finish('draw_insufficient', null, 'timeout');
-    else this.finish('timeout', winner, 'timeout');
-  }
-
-  finish(status: GameStatus, winner: Color | null, reason: string) {
-    if (isFinished(this.status)) return;
-    this.clock.stop(this.now());
+  /** Called once whenever the core reports a finished game. Records ratings and notifies. */
+  private onFinished(reason: string) {
     if (this.flagTimer) clearTimeout(this.flagTimer);
+    if (this.abortTimer) clearTimeout(this.abortTimer);
     for (const t of this.disconnected.values()) clearTimeout(t);
-    this.status = status;
-    this.winner = winner;
-    this.drawOfferBy = null;
-    if (this.white && this.black && this.history.length >= 2) {
-      this.players.recordResult(this.white, this.black, winner === 'w' ? 1 : winner === 'b' ? 0 : 0.5, this.rated);
+    const humans = this.white && this.black && !isAiSeat(this.white) && !isAiSeat(this.black);
+    if (humans && this.status !== 'aborted' && this.history.length >= 2) {
+      const w = this.core.winner;
+      this.players.recordResult(this.white!, this.black!, w === 'w' ? 1 : w === 'b' ? 0 : 0.5, this.rated);
     }
     this.update(reason);
     this.ev.finished(this);
   }
 
+  /** The creator left a private table before anyone joined. */
+  leaveWaiting() {
+    if (this.status !== 'waiting') return;
+    this.core.abandon(null, this.now());
+    this.onFinished('left');
+  }
+
   resign(playerId: string) {
     const c = this.colorOf(playerId);
-    if (!c || this.status !== 'active') return;
-    this.finish('resigned', otherColor(c), 'resign');
+    if (!c) return;
+    const before = this.status;
+    if (this.core.resign(c, this.now())) this.onFinished('resign');
+    else this.settle(before, 'timeout');
   }
 
   offerDraw(playerId: string) {
     const c = this.colorOf(playerId);
-    if (!c || this.status !== 'active') return;
-    if (this.drawOfferBy && this.drawOfferBy !== c) { this.finish('draw_agreed', null, 'draw'); return; }
-    this.drawOfferBy = c;
-    this.ev.broadcast(this, { type: 'DRAW_OFFER', gameId: this.id, by: c });
-    this.update('draw_offer');
+    if (!c) return;
+    const before = this.status;
+    const r = this.core.offerDraw(c, this.now());
+    if (this.settle(before, r === 'agreed' ? 'draw' : 'timeout')) return;
+    if (r === 'offered') {
+      this.ev.broadcast(this, { type: 'DRAW_OFFER', gameId: this.id, by: c });
+      this.update('draw_offer');
+    }
   }
 
   acceptDraw(playerId: string) {
     const c = this.colorOf(playerId);
-    if (!c || this.status !== 'active' || !this.drawOfferBy || this.drawOfferBy === c) return;
-    this.finish('draw_agreed', null, 'draw');
+    if (!c) return;
+    const before = this.status;
+    const accepted = this.core.acceptDraw(c, this.now());
+    this.settle(before, accepted ? 'draw' : 'timeout');
   }
 
   declineDraw(playerId: string) {
     const c = this.colorOf(playerId);
-    if (!c || !this.drawOfferBy || this.drawOfferBy === c) return;
-    this.drawOfferBy = null;
-    this.update('draw_declined');
+    if (c && this.core.declineDraw(c)) this.update('draw_declined');
+  }
+
+  /** Returns a rejection reason, or null if the claim ended the game. */
+  claimDraw(playerId: string, intended?: MoveInput): string | null {
+    const c = this.colorOf(playerId);
+    if (!c) return 'not a player in this game';
+    const before = this.status;
+    const err = this.core.claimDraw(c, this.now(), intended);
+    this.settle(before, err === null ? 'draw_claim' : 'timeout'); // a late claim can find the flag already fallen
+    return err;
   }
 
   /** Both players asking for a rematch creates a new room with colours swapped. Returns it. */
   rematch(playerId: string, create: (white: string, black: string) => GameRoom): GameRoom | null {
     const c = this.colorOf(playerId);
     if (!c || !isFinished(this.status) || !this.white || !this.black) return null;
-    if (this.rematchOfferBy && this.rematchOfferBy !== c) {
+    const opponentIsAi = isAiSeat(this.playerOf(otherColor(c)));
+    if (opponentIsAi || (this.rematchOfferBy && this.rematchOfferBy !== c)) {
       this.rematchOfferBy = null;
       return create(this.black, this.white);
     }
@@ -204,13 +323,14 @@ export class GameRoom {
     if (!c || isFinished(this.status) || this.disconnected.has(c)) return;
     const t = setTimeout(() => {
       this.disconnected.delete(c);
-      if (this.status === 'waiting') { this.finish('abandoned', null, 'abandoned'); return; }
-      this.finish('abandoned', otherColor(c), 'abandoned');
-    }, DISCONNECT_GRACE_MS);
+      if (this.status === 'waiting') { this.core.abandon(null, this.now()); this.onFinished('abandoned'); return; }
+      this.core.abandon(c, this.now());
+      this.onFinished('abandoned');
+    }, this.graceMs);
     t.unref?.();
     this.disconnected.set(c, t);
     const other = this.playerOf(otherColor(c));
-    if (other) this.ev.send(other, { type: 'OPPONENT_DISCONNECTED', gameId: this.id, graceMs: DISCONNECT_GRACE_MS });
+    if (other) this.ev.send(other, { type: 'OPPONENT_DISCONNECTED', gameId: this.id, graceMs: this.graceMs });
     this.update('disconnect');
   }
 
@@ -227,8 +347,14 @@ export class GameRoom {
     }
   }
 
+  /** If the side to move is an engine seat, ask the hub to search. */
+  private maybeAi() {
+    if (this.status === 'active' && isAiSeat(this.playerOf(this.core.turn))) this.ev.aiToMove?.(this);
+  }
+
   dispose() {
     if (this.flagTimer) clearTimeout(this.flagTimer);
+    if (this.abortTimer) clearTimeout(this.abortTimer);
     for (const t of this.disconnected.values()) clearTimeout(t);
   }
 }
