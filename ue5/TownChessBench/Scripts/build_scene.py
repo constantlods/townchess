@@ -1369,14 +1369,46 @@ def build():
         dec.decal.set_decal_material(blood["Drips"])
         setp(dec.decal, "decal_size", unreal.Vector(10, 16, 12))
         dec.set_folder_path("Wear")
-    mi_paper = make_mi(master, "MI_LoosePaper", {"BaseColor": None}, tint=(0.62, 0.56, 0.44), rough=0.95, grime_color=(0.4, 0.3, 0.2),
-                       scalars={"GrimeTiling": 2.5, "GrimeThreshold": 0.4, "GrimeContrast": 2.0})
-    cube = unreal.load_asset("/Engine/BasicShapes/Cube")
-    for k, (x, y, yaw) in enumerate(((-34, -44, 14), (-30, -50, -9), (44, 58, 24))):
-        pp = EAS.spawn_actor_from_object(cube, unreal.Vector(x, y, top + 0.15 + 0.06 * k), unreal.Rotator(0, yaw, 0))
-        pp.set_actor_scale3d(unreal.Vector(0.21, 0.297, 0.001))
-        pp.static_mesh_component.set_material(0, mi_paper)
-        pp.set_folder_path("Clutter")
+    def prop_with(name, mats):
+        """Import a Blender prop and map its OBJ material slots (usemtl names) to our material instances."""
+        meshes = import_prop(name)
+        for sm in meshes:
+            for i, sl in enumerate(sm.static_materials):
+                slot = str(sl.material_slot_name)
+                mi = next((v for k, v in mats.items() if k.lower() in slot.lower()), None)
+                if mi:
+                    sm.set_material(i, mi)
+            EAL.save_loaded_asset(sm)
+        return meshes[0] if meshes else None
+
+    # ---- Our own clutter (pass 51, props.py + forms.py): patient-record sheets, a book pile, a pill bottle
+    form = os.path.join(TEXTURES_DIR, "forms", "T_PaperForm_BaseColor.jpg")
+    mi_form = make_mi(master, "MI_PaperForm", {"BaseColor": import_texture(form, f"{ROOT}/Textures/Forms", "T_PaperForm_BaseColor", "color")
+                                               if os.path.exists(form) else None},
+                      tint=(0.85, 0.82, 0.76), rough=0.92, grime_color=(0.35, 0.27, 0.18),
+                      scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
+    papers = import_prop("loose_papers")
+    for sm in papers:
+        sm.set_material(0, mi_form)
+        EAL.save_loaded_asset(sm)
+    for loc, yaw in (((-36, -46), 14), ((40, -46), -28)):
+        tag(place_model(papers, (loc[0], loc[1], 0), yaw=yaw, label="Papers", sit_on=top + 0.05)[0])
+    cover = lambda n, c: make_mi(master, n, {"BaseColor": None}, tint=c, rough=0.82, grime_color=(0.12, 0.09, 0.06),
+                                 scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.2, "MicroRough": 0.2})
+    books = prop_with("book_stack", {"BookCoverA": cover("MI_BookOxblood", (0.16, 0.045, 0.035)),
+                                     "BookCoverB": cover("MI_BookGreen", (0.045, 0.07, 0.045)),
+                                     "BookCoverC": cover("MI_BookBrown", (0.12, 0.08, 0.05)),
+                                     "Pages": make_mi(master, "MI_BookPages", {"BaseColor": None}, tint=(0.5, 0.45, 0.35), rough=0.92,
+                                                      grime_color=(0.25, 0.2, 0.14), scalars={"GrimeTiling": 6.0, "GrimeThreshold": 0.45})})
+    if books:
+        tag(place_model([books], (54, 50, 0), yaw=-100, label="Books", sit_on=top)[0])
+    pills = prop_with("pill_bottle", {"AmberBottle": make_mi(master, "MI_AmberBottle", {"BaseColor": None}, tint=(0.22, 0.08, 0.015), rough=0.3),
+                                      "Label": make_mi(master, "MI_PillLabel", {"BaseColor": None}, tint=(0.55, 0.5, 0.4), rough=0.9,
+                                                       grime_color=(0.3, 0.22, 0.15), scalars={"GrimeTiling": 8.0, "GrimeThreshold": 0.4}),
+                                      "Cap": make_mi(master, "MI_PillCap", {"BaseColor": None}, tint=(0.55, 0.55, 0.52), rough=0.6),
+                                      "Tablet": make_mi(master, "MI_Tablet", {"BaseColor": None}, tint=(0.62, 0.6, 0.55), rough=0.7)})
+    if pills:
+        tag(place_model([pills], (36, -24, 0), yaw=30, label="Pills", sit_on=top)[0])
     bowl = import_prop("brass_bowl")
     if bowl:
         for sm in bowl:
@@ -1478,17 +1510,6 @@ def build():
         tag(a); tag(a, opp_tag)
         return a
 
-    def prop_with(name, mats):
-        """Import a Blender prop and map its OBJ material slots (usemtl names) to our material instances."""
-        meshes = import_prop(name)
-        for sm in meshes:
-            for i, sl in enumerate(sm.static_materials):
-                slot = str(sl.material_slot_name)
-                mi = next((v for k, v in mats.items() if k.lower() in slot.lower()), None)
-                if mi:
-                    sm.set_material(i, mi)
-            EAL.save_loaded_asset(sm)
-        return meshes[0] if meshes else None
 
     def spawn_opponent(opp_id, mhn, outfit_mi=None, pose="rest", loc=(90.0, 0.0, 0.0), yaw=90.0, with_face=True, group_tag=None):
         """Body (seated pose), face and outfit as skeletal mesh actors; the game links face/outfit to the body."""

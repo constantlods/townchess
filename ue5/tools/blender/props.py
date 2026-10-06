@@ -761,6 +761,129 @@ def restraint_straps():
     export("restraint_straps.obj")
 
 
+def _join_uv(parts, name):
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    ob = bpy.context.active_object
+    ob.name = name
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return ob
+
+
+def _box(size, loc, mat, rot_z=0.0, bevel=0.0015, parts=None):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+    b = bpy.context.active_object
+    b.scale = size
+    b.rotation_euler.z = rot_z
+    bpy.ops.object.transform_apply(scale=True, rotation=True)
+    if bevel:
+        bv = b.modifiers.new("bevel", "BEVEL")
+        bv.width = bevel
+        bv.segments = 2
+        apply_mods(b)
+    material(b, mat)
+    if parts is not None:
+        parts.append(b)
+    return b
+
+
+def book_stack():
+    """Four worn hardbacks stacked off-square (the reference's book pile at the table's right): each a cover shell
+    (boards + rounded spine) around a cream page block set in from the edges, covers sagging slightly. Origin bottom
+    centre; the largest book at the bottom (28 x 21 cm), about 16 cm tall in all."""
+    reset()
+    parts = []
+    z = 0.0
+    books = [((0.28, 0.21, 0.045), 0.00, "M_BookCoverA"), ((0.25, 0.18, 0.035), 0.12, "M_BookCoverB"),
+             ((0.23, 0.165, 0.05), -0.08, "M_BookCoverC"), ((0.2, 0.14, 0.03), 0.22, "M_BookCoverA")]
+    for (w, d, h), rot, mat in books:
+        ox, oy = rnd.uniform(-0.012, 0.012), rnd.uniform(-0.01, 0.01)
+        c, sn = math.cos(rot), math.sin(rot)
+        def at(x, y, zz):
+            return (ox + x * c - y * sn, oy + x * sn + y * c, zz)
+        board = 0.0035
+        _box((w, d, board), at(0, 0, z + board / 2), mat, rot, parts=parts)                     # back board
+        _box((w, d, board), at(0, 0, z + h - board / 2), mat, rot, parts=parts)                 # front board
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=h / 2, depth=d, location=at(-w / 2, 0, z + h / 2))
+        sp = bpy.context.active_object                                                          # rounded spine
+        sp.rotation_euler = (math.radians(90), 0, rot)
+        sp.scale = (0.35, 1, 1)
+        bpy.ops.object.transform_apply(scale=True, rotation=True)
+        material(sp, mat)
+        parts.append(sp)
+        _box((w - 0.01, d - 0.008, h - 2 * board - 0.001), at(0.004, 0, z + h / 2), "M_Pages", rot, bevel=0.001, parts=parts)
+        z += h + 0.0005
+    _join_uv(parts, "SM_BookStack")
+    export("book_stack.obj")
+
+
+def loose_papers():
+    """Three record sheets (A4, 21 x 29.7 cm) lying slightly fanned, each curled at a corner and gently crumpled
+    (subdivided plane, smooth noise displacement), so the lamp catches ridges. Origin at the table surface."""
+    reset()
+    parts = []
+    for k, (dx, dy, rot, lift) in enumerate(((0, 0, 0.0, 0.0006), (0.03, -0.02, 0.18, 0.0012), (-0.025, 0.035, -0.12, 0.0018))):
+        bpy.ops.mesh.primitive_grid_add(x_subdivisions=24, y_subdivisions=32, size=1, location=(dx, dy, lift))
+        g = bpy.context.active_object
+        g.scale = (0.21, 0.297, 1)
+        g.rotation_euler.z = rot
+        bpy.ops.object.transform_apply(scale=True, rotation=True)
+        for v in g.data.vertices:
+            x, y = v.co.x, v.co.y
+            # corner curl (one corner lifts), plus soft crumple
+            cx, cy = 0.105 * (1 if k % 2 else -1), 0.148
+            d = math.hypot(x - cx, y - cy)
+            curl = max(0.0, 0.06 - d) ** 2 * 6.0
+            crumple = 0.0012 * (math.sin(x * 61 + k) * math.cos(y * 47 - k) + 0.5 * math.sin((x + y) * 113))
+            v.co.z += curl + crumple
+        sol = g.modifiers.new("solid", "SOLIDIFY")
+        sol.thickness = 0.0003
+        apply_mods(g)
+        material(g, "M_PaperForm")
+        parts.append(g)
+    # keep the form UVs planar (one sheet = the whole texture), not smart-projected
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    ob = bpy.context.active_object
+    ob.name = "SM_LoosePapers"
+    export("loose_papers.obj")
+
+
+def pill_bottle():
+    """Pharmacy bottle (opaque amber, 4.5 cm across, 9 cm) with a ribbed white cap and a paper label band, and a few
+    spilled tablets beside it. Origin at the base centre."""
+    reset()
+    parts = []
+    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.0225, depth=0.08, location=(0, 0, 0.04))
+    b = bpy.context.active_object
+    bv = b.modifiers.new("bevel", "BEVEL"); bv.width = 0.003; bv.segments = 3
+    apply_mods(b); material(b, "M_AmberBottle"); parts.append(b)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.0228, depth=0.045, location=(0, 0, 0.04))
+    lab = bpy.context.active_object
+    material(lab, "M_Label"); parts.append(lab)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.024, depth=0.016, location=(0, 0, 0.088))
+    cap = bpy.context.active_object
+    bv = cap.modifiers.new("bevel", "BEVEL"); bv.width = 0.002; bv.segments = 2
+    apply_mods(cap); material(cap, "M_Cap"); parts.append(cap)
+    for i in range(6):  # spilled tablets: flattened spheres
+        a = rnd.uniform(0, math.tau)
+        r = rnd.uniform(0.04, 0.09)
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=6, radius=0.004, location=(r * math.cos(a), r * math.sin(a), 0.0016))
+        t = bpy.context.active_object
+        t.scale = (1, 1, 0.42)
+        bpy.ops.object.transform_apply(scale=True)
+        material(t, "M_Tablet"); parts.append(t)
+    _join_uv(parts, "SM_PillBottle")
+    export("pill_bottle.obj")
+
+
 def export(name):
     # UE's OBJ import maps (x, y, z) -> (x, -z, -y) for this export; pre-rotating +90 deg about X makes the result
     # the usual Blender->UE mapping (x, -y, z): Z up, Blender front (-Y) = UE +Y, Blender +X = UE +X
@@ -786,6 +909,7 @@ BUILDERS = {
     "oversleeve": lambda: sleeve("SM_Oversleeve", 0.25, 0.056, 0.047, "M_Duck", "oversleeve.obj"),  # fits over a MetaHuman forearm
     "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl, "restraint_straps": restraint_straps,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.068, 0.06, "M_CoatWool", "coat_sleeve.obj"),  # fits over the upper arm
+    "book_stack": book_stack, "loose_papers": loose_papers, "pill_bottle": pill_bottle,
 }
 for k, f in BUILDERS.items():
     if not WHICH or k in WHICH:

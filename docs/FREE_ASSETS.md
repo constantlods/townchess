@@ -29,11 +29,12 @@ All Poly Haven downloads are scripted (`ue5/tools/fetch_polyhaven.py`, hero reso
 
 | Asset | Generator | Output |
 |---|---|---|
-| Cage mask, Annotator plate/coif/sleeves, ledger, pencil, tin mug, dome lamp, med cart, clipboard, wooden chessboard | `ue5/tools/blender/props.py` (Blender, scripted) | `ue5/assets/props/*.obj` |
+| Cage mask, Annotator plate/coif/sleeves, ledger, pencil, tin mug, dome lamp, med cart, clipboard, wooden chessboard, book pile, loose record sheets, pill bottle with tablets | `ue5/tools/blender/props.py` (Blender, scripted) | `ue5/assets/props/*.obj` |
 | Blood decals (spatter, pool, smear, drips: colour/coverage, relief, gloss) and handling-grime masks | `ue5/tools/textures/blood.py` (numpy/scipy/pillow, `tools/.venv`) | `ue5/assets/textures/blood`, `.../grime` |
 | Inlaid board surface (maple/walnut composite, joints, scratches, wear) | `ue5/tools/textures/board.py` | `ue5/assets/textures/board` |
 | Grime mask (blotches, streaks, smudges) | `build_scene.py` `grime_png` | built into the level |
 | Table stains: mug rings (dried rim, faint film, broken where the mug tilted) and handled-grime patches (greasy blotch with wipe streaks) | `ue5/tools/textures/stains.py` | `ue5/assets/textures/stains` |
+| Patient-record sheet (aged A4 form: typed WARD B header and fields, handwritten notes, foxing, crease, tea ring; repo OFL fonts) | `ue5/tools/textures/forms.py` | `ue5/assets/textures/forms` |
 | Piece sounds: wooden move "clack" and heavier capture (synthesised: modal resonances of a wood block plus a felt thud) | `ue5/tools/audio/clack.py` | `ue5/assets/sounds/S_TC_Move.wav`, `S_TC_Capture.wav` |
 
 ## Credits
