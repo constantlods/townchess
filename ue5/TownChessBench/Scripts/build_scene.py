@@ -1294,9 +1294,10 @@ def build():
 
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
-    assign(table, surface_material(master, "wood_table_worn", tiling=1.0, grime_color=(0.3, 0.22, 0.15), tint=(0.7, 0.6, 0.5),
+    # tiling 1 -> 2.5, normal x1.6 (pass 56): one 2K scan stretched over 1.5 m left the table edges flat next to the reference
+    assign(table, surface_material(master, "wood_table_worn", tiling=2.5, grime_color=(0.3, 0.22, 0.15), tint=(0.7, 0.6, 0.5),
                                    scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.22, "GrimeContrast": 1.8,
-                                            "GrimeStreaks": 0.5, "MicroRough": 0.2}))
+                                            "GrimeStreaks": 0.5, "MicroRough": 0.2, "NormalStrength": 1.6}))
     tlo, thi = bounds_of(table)
     # Long side runs across the player's view (along Y). Poly Haven models are centred on their origin in XY.
     yaw = 90.0 if (thi[0] - tlo[0]) > (thi[1] - tlo[1]) else 0.0
@@ -1912,7 +1913,7 @@ def build():
         # EV 8.3 (was 7.8): the frame measured mean 35 / 95th pct 139 against the reference's 27 / 97 (pass 47)
         "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 8.3)),
         "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 8.3)),
-        "bloom_intensity": 0.3, "vignette_intensity": 0.65, "film_grain_intensity": 0.35,  # grain 0.15 -> 0.35: the reference is gritty, photographic (pass 49)
+        "bloom_intensity": 0.3, "vignette_intensity": 0.65, "film_grain_intensity": 0.5,  # grain 0.15 -> 0.35: the reference is gritty, photographic (pass 49)
         "lumen_final_gather_quality": 2.0, "lumen_reflection_quality": 1.0,
         "lumen_scene_lighting_quality": 1.0, "lumen_scene_detail": 1.5,
         "scene_fringe_intensity": 0.15,

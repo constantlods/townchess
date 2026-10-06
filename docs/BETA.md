@@ -31,7 +31,7 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 | # | Criterion | Check | Status |
 |---|---|---|---|
 | V1 | Exposure and grade | default view: mean luminance 24-30 (ref 26.6), 95th percentile <= 105 (97), red/green 1.38-1.50 (1.44), green/blue 1.55-1.70 (1.62) | met (pass 54: mean 24.9, p95 103.9, r/g 1.44, g/b 1.63; `54-main.png`) |
-| V2 | Detail and wear | fine detail (mean abs Laplacian at 1045 px) >= 11.5 (ref 12.9) | not met (10.4, pass 54) |
+| V2 | Detail and wear | fine detail (mean abs Laplacian at 1045 px) >= 11.5 (ref 12.9) | not met (10.9, pass 56) |
 | V3 | Visual judge | every row of docs/pipeline/visual.md >= 6/10, average >= 7/10 | not met |
 | V4 | Hands like the reference | player hands show veins, dirt, nails in a close-up; judge score >= 7 | partial (pass 53: veins and tendons in the main view and close-ups; dirt light; not judged) |
 | V5 | No placeholder or broken asset in any view | judge finds none (floating props, world-grid materials, clipping) in the main view, Black seat, close-ups | partial |
