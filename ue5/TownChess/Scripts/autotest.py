@@ -470,7 +470,12 @@ def _tick(_dt):
                     json.dump(R, f, indent=2)
                 log(f"KILLING the client at ply {len(st.history)} (simulated crash)")
                 import signal
-                os.kill(os.getpid(), signal.SIGKILL)
+                if hasattr(signal, "SIGKILL"):
+                    os.kill(os.getpid(), signal.SIGKILL)
+                else:  # Windows: TerminateProcess on ourselves, as hard as SIGKILL (no shutdown code runs)
+                    import ctypes
+                    k32 = ctypes.windll.kernel32
+                    k32.TerminateProcess(k32.GetCurrentProcess(), 9)
         if st.status not in ("active", "waiting"):
             detail = f"{st.status} / {st.termination} winner={st.winner or '-'}"
             if EXPECT_TERMINATION:
