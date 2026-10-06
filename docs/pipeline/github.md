@@ -2,6 +2,40 @@
 
 Branch `feature/photorealistic-renderer` on GitHub constantlods/townchess, draft PR #1 into `main`.
 
+## Run 4: 2026-10-06 (BETA focus)
+
+### F1: pushed `2cab890..ad699b6` (4 commits), no force push
+- `4e1d313`: chess guardian run 4 (chess.md).
+- `826c82b` and `051326d`: visual judge run 4. The second commit adds pass 59, which the lead pushed during the run.
+- `ad699b6`: project audit run 4 (PROJECT_AUDIT.md, the BETA row audit).
+- `git pull --rebase origin feature/photorealistic-renderer` was clean: the lead's `2cab890` (BETA C2 + 59-skins)
+  came in under the 4 docs-only commits.
+- Push output: `2cab890..ad699b6  HEAD -> feature/photorealistic-renderer`. It used the refspec `HEAD:` and the
+  prescribed credential flags. Nothing went to `main`.
+
+### F2: verification before the push
+- `npm test` with TC_STOCKFISH: 479/479. Without it: 478 passed + 1 skipped (479). Both runs on the rebased head.
+- Diff `origin..HEAD`: 3 files, all docs (PROJECT_AUDIT.md, pipeline/chess.md, pipeline/visual.md). No binaries.
+  Nothing over 10 MB is tracked: the largest file is 8.3 MB, `T_HandlingGrime_Normal.png`.
+- Secrets grep (PRIVATE KEY / ghp_ / github_pat / AKIA): one hit, the audit's own prose that describes the scan.
+
+### F3: PR #1 body updated (yes), with `-F body=@file`
+- The Summary was rewritten for the beta target.
+- "Current state" is now run 4, with:
+  - both test counts;
+  - the startFen verification;
+  - the **BETA status table**: the lead's status next to this run's audit, row by row;
+  - the visual scores (average 5.2) and the top 8 fixes;
+  - the audit's open items and evidence links (58-main, 54-hud-portraits, 57/59 skins, 52-watch).
+- The sections from "Progress" down are unchanged.
+- PATCH result: `2026-10-06T09:55:26Z draft=true state=open`. The body ends with the Claude Code line.
+
+### Blocked / not done
+- Nothing was run on the build PC: another session holds `C:\TownChess\build.lock`. The audit used read-only file
+  reads only.
+- The PR is still a draft. Not merged, not marked ready.
+
+
 ## Run 3: 2026-10-05 (milestone "gameplay feel + reference HUD + packaged build")
 
 ### F1: pushed `de25f4a..5f92f46` (3 commits), no force push
@@ -58,3 +92,4 @@ The tests ran before the second rebase. The only upstream commit pulled then, `d
 - PR body updated with `-F body=@file`, including the run-2 corrections: left hand still a fist, the one-sided
   exposure bisect, cage tint not re-captured.
 - Tests: 475/475 with TC_STOCKFISH, and 474 + 1 skipped without.
+
