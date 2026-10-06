@@ -35,6 +35,7 @@ All Poly Haven downloads are scripted (`ue5/tools/fetch_polyhaven.py`, hero reso
 | Grime mask (blotches, streaks, smudges) | `build_scene.py` `grime_png` | built into the level |
 | Table stains: mug rings (dried rim, faint film, broken where the mug tilted) and handled-grime patches (greasy blotch with wipe streaks) | `ue5/tools/textures/stains.py` | `ue5/assets/textures/stains` |
 | Patient-record sheet (aged A4 form: typed WARD B header and fields, handwritten notes, foxing, crease, tea ring; repo OFL fonts) | `ue5/tools/textures/forms.py` | `ue5/assets/textures/forms` |
+| Player skin layers (veins, extensor tendons, knuckle redness, age spots, nail and crease grime; dirty: heavier dirt and dried blood specks; scarred: healed cuts and a stitched wound), painted in the MetaHuman body's UV space from each texel's 3D rest position. Derived from Epic's MetaHuman (Walter) body textures, so the outputs are not committed | `ue5/tools/textures/skin.py` (inputs from `ue5/TownChess/Scripts/export_body.py` and `ue5/tools/blender/dump_mesh.py`) | `C:\TownChess\assets\skin` (workspace only) |
 | Piece sounds: wooden move "clack" and heavier capture (synthesised: modal resonances of a wood block plus a felt thud) | `ue5/tools/audio/clack.py` | `ue5/assets/sounds/S_TC_Move.wav`, `S_TC_Capture.wav` |
 
 ## Credits

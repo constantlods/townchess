@@ -83,6 +83,14 @@ def begin():
     cc.set_editor_property("texture_target", rt)
     cc.set_editor_property("capture_every_frame", True)
     cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
+    if (CAM_LOC or CAM_FOV) and arg("TCViewCam", "1") == "1":
+        # close-ups: point the player's own view at the shot too. Virtual textures (the MetaHuman 8K skin) only stream
+        # the pages the main view asks for; a scene capture alone got the far-view mips and rendered smooth skin.
+        pc = unreal.GameplayStatics.get_player_controller(world, 0)
+        if pc:
+            pc.set_view_target_with_blend(cap, 0.0)
+            cmd(f"fov {fov:.1f}")
+            log("main view follows the close-up camera (virtual texture feedback)")
     # Scene captures do not take the level's fixed exposure from the unbound PostProcessVolume (EV 7.8 -> 8.3 changed
     # nothing in the shots, and earlier shots drifted with scene content): give the capture the volume's settings so the
     # shot is exposed and graded like the game viewport.

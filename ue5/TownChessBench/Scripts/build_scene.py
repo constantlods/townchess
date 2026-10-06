@@ -1178,6 +1178,53 @@ def look_at_rot(src, dst):
 
 # ---------------------------------------------------------------- scene
 
+SKIN_DIR = os.environ.get("TC_SKIN_DIR", os.path.join(os.path.dirname(ASSETS), "skin"))
+
+
+def player_skins(mhn):
+    """MI_PlayerSkin_<variant>: children of the cinematic body material with our skin layers (veins, tendons, nail
+    grime, dirt, scars) baked into its base colour and normal by ue5/tools/textures/skin.py. The PNGs are derived from
+    Epic's MetaHuman textures, so they live in the workspace ($TC_SKIN_DIR), not in the repo. Imported once (an 8K
+    normal takes minutes); TC_SKIN_REIMPORT=1 re-imports after regenerating."""
+    out = {}
+    root = f"/Game/TownChess/MetaHumans/BuiltCine/{mhn}/Body/Materials/MI_Body_Baked_VT"
+    parent = unreal.load_asset(root) if EAL.does_asset_exist(root) else None
+    if not parent or not os.path.isdir(SKIN_DIR):
+        log("no player skins (", root, SKIN_DIR, ")")
+        return out
+    dest = f"{ROOT}/Characters/PlayerSkin"
+    mel = unreal.MaterialEditingLibrary
+    reimport = os.environ.get("TC_SKIN_REIMPORT", "0") == "1"
+    for f in sorted(os.listdir(SKIN_DIR)):
+        if not (f.startswith("T_PlayerSkin_") and f.endswith("_BC.png")):
+            continue
+        var = f[len("T_PlayerSkin_"):-len("_BC.png")]
+        texs = {}
+        for kind, suffix in (("color", "BC"), ("normal", "N")):
+            name = f"T_PlayerSkin_{var}_{suffix}"
+            src = os.path.join(SKIN_DIR, name + ".png")
+            if reimport or not EAL.does_asset_exist(f"{dest}/{name}"):
+                if not os.path.exists(src):
+                    break
+                tex = import_texture(src, dest, name, kind)
+                tex.set_editor_property("virtual_texture_streaming", True)  # the parent samples them as virtual textures
+                tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_CHARACTER_NORMAL_MAP if kind == "normal"
+                                        else unreal.TextureGroup.TEXTUREGROUP_CHARACTER)
+                EAL.save_loaded_asset(tex)
+            texs[suffix] = unreal.load_asset(f"{dest}/{name}")
+        if len(texs) < 2:
+            continue
+        mi = AT.create_asset(f"MI_PlayerSkin_{var}", dest, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew()) \
+            if not EAL.does_asset_exist(f"{dest}/MI_PlayerSkin_{var}") else unreal.load_asset(f"{dest}/MI_PlayerSkin_{var}")
+        mel.set_material_instance_parent(mi, parent)
+        mel.set_material_instance_texture_parameter_value(mi, "Basecolor Baked VT", texs["BC"])
+        mel.set_material_instance_texture_parameter_value(mi, "Normal Baked VT", texs["N"])
+        EAL.save_loaded_asset(mi)
+        out[var] = mi
+    log("player skins", sorted(out))
+    return out
+
+
 def build():
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
     level_path = f"{ROOT}/{LEVEL}"
@@ -1674,6 +1721,11 @@ def build():
                                group_tag="TC_PlayerBody")
         if pb:
             log("player body at", [round(v, 1) for v in ploc])
+            skins = player_skins(mhn)
+            want = os.environ.get("TC_PLAYER_SKIN", "bare")
+            if want in skins:
+                pb.skeletal_mesh_component.set_material(0, skins[want])
+                log("player skin", want)
             SEATED["player_body"] = True  # the XR stand-in gloves give way to real arms
             # off by default: bisected as the cause of a 2x exposure jump (mean 39 -> 85) and visually weak; the real
             # fix for hand veins is MetaHuman 8K skin (owner action). TC_HAND_DECALS=1 brings them back for testing.
