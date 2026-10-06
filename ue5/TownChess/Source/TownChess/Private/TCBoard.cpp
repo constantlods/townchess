@@ -12,11 +12,12 @@
 
 namespace
 {
-	const FLinearColor SelectedColor(0.95f, 0.72f, 0.25f);
-	const FLinearColor MoveColor(0.55f, 0.48f, 0.32f);
-	const FLinearColor CaptureColor(0.75f, 0.18f, 0.12f);
-	const FLinearColor LastMoveColor(0.32f, 0.30f, 0.22f);
-	const FLinearColor CheckColor(0.9f, 0.08f, 0.05f);
+	// alpha = strength of the soft marker (M_TC_Marker); the opaque fallback ignores it
+	const FLinearColor SelectedColor(0.95f, 0.72f, 0.25f, 0.55f);
+	const FLinearColor MoveColor(0.85f, 0.75f, 0.5f, 0.45f);
+	const FLinearColor CaptureColor(0.8f, 0.15f, 0.1f, 0.5f);
+	const FLinearColor LastMoveColor(0.75f, 0.68f, 0.45f, 0.22f);
+	const FLinearColor CheckColor(0.95f, 0.08f, 0.05f, 0.7f);
 }
 
 ATCBoard::ATCBoard()
@@ -26,7 +27,7 @@ ATCBoard::ATCBoard()
 	SetRootComponent(Root);
 	BoardComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BoardMesh"));
 	BoardComp->SetupAttachment(Root);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Plane.Plane"));  // flat disc: the marker material fades radially over its 0..1 UVs
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ShapeMat(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	MarkerMesh = Cylinder.Object;
 	MarkerMaterial = ShapeMat.Object;
@@ -454,7 +455,7 @@ void ATCBoard::RefreshMarkers()
 		const FTCPieceVisual* At = Pieces.Find(Hover);
 		bool bShow = At && At->Code.StartsWith(C->GetMyColor());
 		for (const FString& M : S.LegalMoves) bShow |= !Selected.IsEmpty() && M.StartsWith(Selected + Hover);
-		if (bShow && Hover != Selected) AddMarker(LocalOf(Hover), FLinearColor(0.95f, 0.85f, 0.6f, 1.f), SquareSize * 0.47f, 0.06f);
+		if (bShow && Hover != Selected) AddMarker(LocalOf(Hover), FLinearColor(0.95f, 0.85f, 0.6f, 0.3f), SquareSize * 0.47f, 0.06f);
 	}
 	if (!Selected.IsEmpty())
 	{

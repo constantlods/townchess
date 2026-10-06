@@ -15,7 +15,7 @@ MODELS = [
     "alarm_clock_01", "binder_notebook", "drawer_cabinet", "painted_wooden_chair_01", "lightbulb_01",
     "old_bed_frame",
     # table clutter after the reference (pass 48): old books, medical tape, cigarettes, a magnifying glass
-    "decorative_book_set_01", "medical_tape", "cigarette_pack", "magnifying_glass_01",
+    "medical_tape", "cigarette_pack",
 ]
 TEXTURES = [
     "wood_table_worn", "concrete_floor_worn_001", "painted_plaster_wall", "cracked_concrete_wall",

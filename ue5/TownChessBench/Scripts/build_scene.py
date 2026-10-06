@@ -234,6 +234,53 @@ def emissive_material(name, color, strength):
     return m
 
 
+def marker_material():
+    """M_TC_Marker: unlit translucent disc for the board's square markers. Color (vector parameter): rgb = tint,
+    a = strength; the edge fades out radially, so a marker reads as light on the wood, not a cream sticker."""
+    name = "M_TC_Marker"
+    path = f"{ROOT}/Materials/{name}"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    m = AT.create_asset(name, f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    col = MEL.create_material_expression(m, unreal.MaterialExpressionVectorParameter, -900, 0)
+    col.set_editor_property("parameter_name", "Color")
+    col.set_editor_property("default_value", unreal.LinearColor(0.9, 0.8, 0.55, 0.4))
+    glow = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -500, -150)
+    glow.set_editor_property("const_b", 1.6)
+    MEL.connect_material_expressions(col, "", glow, "A")
+    MEL.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    uv = MEL.create_material_expression(m, unreal.MaterialExpressionTextureCoordinate, -1100, 200)
+    centre = MEL.create_material_expression(m, unreal.MaterialExpressionConstant2Vector, -1100, 320)
+    centre.set_editor_property("r", 0.5)
+    centre.set_editor_property("g", 0.5)
+    dist = MEL.create_material_expression(m, unreal.MaterialExpressionDistance, -900, 250)
+    MEL.connect_material_expressions(uv, "", dist, "A")
+    MEL.connect_material_expressions(centre, "", dist, "B")
+    d2 = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -750, 250)
+    d2.set_editor_property("const_b", 2.0)
+    MEL.connect_material_expressions(dist, "", d2, "A")
+    inv = MEL.create_material_expression(m, unreal.MaterialExpressionOneMinus, -620, 250)
+    MEL.connect_material_expressions(d2, "", inv, "")
+    sat = MEL.create_material_expression(m, unreal.MaterialExpressionSaturate, -500, 250)
+    MEL.connect_material_expressions(inv, "", sat, "")
+    soft = MEL.create_material_expression(m, unreal.MaterialExpressionPower, -380, 250)
+    soft.set_editor_property("const_exponent", 1.6)
+    MEL.connect_material_expressions(sat, "", soft, "Base")
+    alpha = MEL.create_material_expression(m, unreal.MaterialExpressionComponentMask, -700, 80)
+    for ch, on in (("r", False), ("g", False), ("b", False), ("a", True)):
+        alpha.set_editor_property(ch, on)
+    MEL.connect_material_expressions(col, "", alpha, "")
+    op = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -250, 200)
+    MEL.connect_material_expressions(soft, "", op, "A")
+    MEL.connect_material_expressions(alpha, "", op, "B")
+    MEL.connect_material_property(op, "", unreal.MaterialProperty.MP_OPACITY)
+    MEL.recompile_material(m)
+    EAL.save_loaded_asset(m)
+    return m
+
+
 FONTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "fonts"))
 
 
@@ -1174,6 +1221,7 @@ def build():
     if GAMEPLAY:
         board = EAS.spawn_actor_from_class(unreal.TCBoard, unreal.Vector(0, 0, top), unreal.Rotator(0, 0, 0))
         board.set_actor_label("Board")
+        setp(board, "marker_material", marker_material())  # soft translucent discs instead of opaque "stickers" (visual judge run 3)
         names = {"pawn": "p", "knight": "n", "bishop": "b", "rook": "r", "queen": "q", "king": "k"}
         meshes = {}
         for m in chess:
@@ -1331,10 +1379,9 @@ def build():
         lo, hi = bounds_of(meshes)
         size = max(hi[i] - lo[i] for i in range(3)) or 1.0
         place_model(meshes, (loc[0], loc[1], 0), yaw=yaw, scale=min(1.0, max_dim / size), label="Clutter_" + name, sit_on=top)
-    clutter("decorative_book_set_01", (50, 54), -105, 26.0)   # behind the mug, back right (the reference's book stack)
+    # (the book set rendered as a thin floating strip and the magnifier stood upright with a bright lens: removed, pass 48)
     clutter("medical_tape", (10, 44), 20, 7.0)
     clutter("cigarette_pack", (-24, -36), 35, 9.0)            # by the bowl, near the player's left hand
-    clutter("magnifying_glass_01", (44, -30), 70, 16.0)
     beds = import_model("old_bed_frame")
     if beds:
         place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)

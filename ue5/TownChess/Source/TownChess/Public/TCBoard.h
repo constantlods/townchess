@@ -123,7 +123,9 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Markers;
 	/** Held as properties so garbage collection can never free them while no marker happens to reference them. */
 	UPROPERTY() TObjectPtr<UStaticMesh> MarkerMesh;
-	UPROPERTY() TObjectPtr<UMaterialInterface> MarkerMaterial;
+	/** Square markers (selection, moves, last move, check). The level builder sets M_TC_Marker: a soft, unlit,
+	 *  translucent disc whose "Color" alpha is its strength; the engine's opaque shape material is only the fallback. */
+	UPROPERTY(EditAnywhere, Category = "TownChess") TObjectPtr<UMaterialInterface> MarkerMaterial;
 
 	struct FAnim
 	{
