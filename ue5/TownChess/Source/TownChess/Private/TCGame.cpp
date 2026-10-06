@@ -700,12 +700,12 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 		if (!P.AiLevel.IsEmpty()) Sub += TEXT("   ") + P.AiLevel;
 		const float W = FMath::Max(230.f * U, FMath::Max(TextWidth(Name, 0.95f), TextWidth(Sub, 0.78f)) + 32.f * U);
 		const float Bx = bRight ? X - W : X;
-		Plate(Bx, 22.f * U, W, 62.f * U, 0.6f, 0.0f);
-		DrawRect(FLinearColor(0.62f, 0.55f, 0.42f, 0.35f), Bx, 22.f * U + 62.f * U - 1.f, W, 1.f);
+		Plate(Bx, 22.f * U, W, 74.f * U, 0.6f, 0.0f);  // tall enough that the bottom rule clears the second line
+		DrawRect(FLinearColor(0.62f, 0.55f, 0.42f, 0.35f), Bx, 22.f * U + 74.f * U - 1.f, W, 1.f);
 		Text(Name, Bx + 16.f * U, 28.f * U, Ink, 0.95f);
-		Text(Sub, Bx + 16.f * U, 55.f * U, Dim, 0.78f, false, ETCUiFont::SansLight);
+		Text(Sub, Bx + 16.f * U, 57.f * U, Dim, 0.78f, false, ETCUiFont::SansLight);
 		const bool bRun = S.IsActive() && S.Turn == Col;
-		if (S.IsTimed()) Text(ClockText(C->GetDisplayClockMs(Col)), Bx + W * 0.5f, 92.f * U, bRun ? FLinearColor(1.f, 0.95f, 0.85f) : Dim, 1.9f, true, ETCUiFont::SansLight);
+		if (S.IsTimed()) Text(ClockText(C->GetDisplayClockMs(Col)), Bx + W * 0.5f, 104.f * U, bRun ? FLinearColor(1.f, 0.95f, 0.85f) : Dim, 1.9f, true, ETCUiFont::SansLight);
 	};
 	PlayerPlate(MeP, Me, 30.f * U, false);
 	PlayerPlate(ThemP, Them, Canvas->ClipX - 30.f * U, true);

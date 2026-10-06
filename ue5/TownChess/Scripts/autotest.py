@@ -321,7 +321,7 @@ def _tick(_dt):
         hud = pc.get_hud()
         check("menu shows Join by Code", "join" in list(hud.get_visible_buttons()), list(hud.get_visible_buttons()))
         hud.press_button("join")
-        check("Join by Code starts code entry", pc.get_editor_property("b_typing_code") and pc.get_editor_property("join_code") == "GAME-")
+        check("Join by Code starts code entry", pc.get_editor_property("typing_code") and pc.get_editor_property("join_code") == "GAME-")
         for k in ("A", "B", "One"):
             pc.press_key_for_test(k)
         code = pc.get_editor_property("join_code")
@@ -329,7 +329,7 @@ def _tick(_dt):
         pc.press_key_for_test("BackSpace")
         check("BackSpace removes the last character", pc.get_editor_property("join_code") == "GAME-AB", pc.get_editor_property("join_code"))
         pc.press_key_for_test("Escape")
-        check("Escape ends code entry", not pc.get_editor_property("b_typing_code"))
+        check("Escape ends code entry", not pc.get_editor_property("typing_code"))
         finish(True)
         return
 
