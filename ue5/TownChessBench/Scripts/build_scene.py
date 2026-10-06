@@ -1687,7 +1687,7 @@ def build():
             sleeve_sm = prop_with("player_sleeve", {"PlayerSleeve": mi_ps})
             watch_sm = prop_with("wristwatch", {"Strap": make_mi(master, "MI_WatchStrap", {"BaseColor": None}, tint=(0.07, 0.045, 0.03), rough=0.7),
                                                 "Steel": make_mi(master, "MI_WatchSteel", {"BaseColor": None}, metal=1.0, rough=0.35, tint=(0.55, 0.55, 0.53)),
-                                                "Dial": make_mi(master, "MI_WatchDial", {"BaseColor": None}, tint=(0.6, 0.57, 0.48), rough=0.25)})
+                                                "Dial": make_mi(master, "MI_WatchDial", {"BaseColor": None}, tint=(0.32, 0.3, 0.25), rough=0.2)})
             for side, (hand, elbow) in hands.items():
                 d = tuple(hand[i] - elbow[i] for i in range(3))
                 n = math.sqrt(sum(c * c for c in d)) or 1.0

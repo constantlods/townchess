@@ -893,7 +893,9 @@ def wristwatch():
     bpy.ops.mesh.primitive_torus_add(major_radius=0.033, minor_radius=0.003, major_segments=40, minor_segments=8,
                                      location=(0, 0, 0), rotation=(0, math.radians(90), 0))
     st = bpy.context.active_object
-    st.scale = (2.8, 0.88, 0.67)  # flat strap, wide along the arm; oval like a wrist
+    # object scale acts on the torus's own axes (before the rotation): its Z (the ring axis, now the arm) sets the strap
+    # width, its X/Y (now world Z/Y) the oval (2.8 on X stretched the ring itself into a 9 cm hoop, pass 52)
+    st.scale = (0.67, 0.88, 2.8)
     bpy.ops.object.transform_apply(scale=True, rotation=True)
     material(st, "M_Strap"); parts.append(st)
     bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.017, depth=0.008, location=(0, 0, 0.026))
