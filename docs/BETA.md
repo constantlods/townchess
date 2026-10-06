@@ -30,8 +30,8 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 
 | # | Criterion | Check | Status |
 |---|---|---|---|
-| V1 | Exposure and grade | default view: mean luminance 24-30 (ref 26.6), 95th percentile <= 105 (97), red/green 1.38-1.50 (1.44), green/blue 1.55-1.70 (1.62) | met (pass 61: mean 24.4, p95 101.7, r/g 1.45, g/b 1.64; `61-main.jpg`) |
-| V2 | Detail and wear | fine detail (mean abs Laplacian at 1045 px) >= 11.5 (ref 12.9) | not met (11.0, pass 61; 11.4 in pass 58: both hands now cover textured table) |
+| V1 | Exposure and grade | default view: mean luminance 24-30 (ref 26.6), 95th percentile <= 105 (97), red/green 1.38-1.50 (1.44), green/blue 1.55-1.70 (1.62) | met (pass 62: mean 25.7, p95 103.5, r/g 1.45, g/b 1.65; `62-main.jpg`) |
+| V2 | Detail and wear | fine detail (mean abs Laplacian at 1045 px) >= 11.5 (ref 12.9) | met (pass 62: 11.71, knife-scarred table round the board; `62-main.jpg`) |
 | V3 | Visual judge | every row of docs/pipeline/visual.md >= 6/10, average >= 7/10 | not met: judge run 4 average 5.2/10, 8 of 14 rows below 6 |
 | V4 | Hands like the reference | player hands show veins, dirt, nails in a close-up; judge score >= 7 | not met: visual judge run 4 hands 5/10 (veins overdone, dirt only in a non-default skin, nails never visible). Pass 60: veins tapered and halved, both hands in the main view, dirty skin reads at gameplay distance (`60-hands-skins-watch.jpg`); nails still not visible from the seat; default look is still `bare` (lead) |
 | V5 | No placeholder or broken asset in any view | judge finds none (floating props, world-grid materials, clipping) in the main view, Black seat, close-ups | not met: judge run 4 lists 9 defects. Pass 60 fixed 4 (trousers instead of bare knees, watch with dial/hands/lugs, pale corner plates removed, the right-border sheet removed); open: captured pawns stand at the left hand (ATCBoard::GraveyardSlot, C++), HUD "P" monogram, Annotator checker eye, lamp bulb disc, sleeves unproven; no Black-seat screenshot |

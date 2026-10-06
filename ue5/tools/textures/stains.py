@@ -3,6 +3,7 @@ table, used as decals through the same material as the blood (build_scene.py blo
 
   ring  a mug/cup ring: a slightly wobbling, broken annulus where the coffee/tea dried at the pinned contact line
         (darker rim, a faint film inside), as left by a wet tin mug base
+  scratch  knife scars and scuffs: fine scratches, a few grime-filled gouges with pale fresh-wood rims
   dirt  a handled-grime patch: a soft blotch of dark greasy dirt with anisotropic streaks (wiped, never cleaned),
         fading out radially so it never shows a decal edge
 
@@ -59,6 +60,45 @@ def dirt(n, seed):
     return col, alpha, rough
 
 
+def scratch(n, seed):
+    """Knife scars and scuffs (the reference's near table edge): many fine scratches running mostly one way, a few
+    deep gouges filled with dark grime, each with a pale rim of fresh wood; faded out radially."""
+    from PIL import ImageDraw
+    rng = np.random.default_rng(seed)
+    S = 2 * n
+    pale = Image.new("L", (S, S), 0)
+    dark = Image.new("L", (S, S), 0)
+    dp, dd = ImageDraw.Draw(pale), ImageDraw.Draw(dark)
+    for k in range(260):
+        cx, cy = rng.uniform(0.1, 0.9, 2) * S
+        ang = rng.normal(0.0, 0.25) if k % 5 else rng.uniform(0, np.pi)
+        ln = rng.uniform(0.03, 0.22) * S
+        dx, dy = np.cos(ang) * ln / 2, np.sin(ang) * ln / 2
+        pts = [(cx - dx, cy - dy), (cx + dx * 0.5 + rng.normal(0, 3), cy + dy * 0.5 + rng.normal(0, 3)), (cx + dx, cy + dy)]
+        w = int(rng.integers(1, 4))
+        dp.line(pts, fill=int(rng.uniform(90, 230)), width=w + 2)
+        dd.line(pts, fill=int(rng.uniform(120, 255)), width=w)
+    for k in range(6):  # gouges
+        cx, cy = rng.uniform(0.2, 0.8, 2) * S
+        ang = rng.normal(0.0, 0.5)
+        ln = rng.uniform(0.15, 0.35) * S
+        dx, dy = np.cos(ang) * ln / 2, np.sin(ang) * ln / 2
+        dp.line([(cx - dx, cy - dy), (cx + dx, cy + dy)], fill=255, width=14)
+        dd.line([(cx - dx, cy - dy), (cx + dx, cy + dy)], fill=255, width=7)
+    P = np.asarray(pale.resize((n, n), Image.LANCZOS)).astype(np.float64) / 255
+    D = np.asarray(dark.resize((n, n), Image.LANCZOS)).astype(np.float64) / 255
+    x, y = grid(n)
+    fade = smoothstep(0.5, 0.25, np.hypot(x, y)) * (0.6 + 0.4 * smoothstep(-0.5, 0.5, fbm(n, seed + 1, beta=2.0, fmin=2)))
+    rim = np.clip(P - D, 0, 1)
+    alpha = np.clip((rim * 0.95 + D * 0.9) * fade, 0, 1)
+    fresh = np.array([0.40, 0.28, 0.16])   # linear: freshly cut wood
+    groove = np.array([0.012, 0.009, 0.006])
+    wgt = D / np.maximum(rim + D, 1e-6)
+    col = fresh[None, None] * (1 - wgt[..., None]) + groove[None, None] * wgt[..., None]
+    rough = 0.75 + 0.15 * D
+    return col, alpha, rough
+
+
 def save(col, alpha, rough, base):
     rgb = (to_srgb(np.clip(col, 0, 1)) * 255).round()
     Image.fromarray(np.dstack([rgb, alpha * 255]).round().clip(0, 255).astype(np.uint8), "RGBA").save(base + "_BaseColor.png")
@@ -76,7 +116,7 @@ def main():
     a = ap.parse_args()
     d = os.path.join(a.out, "stains")
     os.makedirs(d, exist_ok=True)
-    for k, (name, fn) in enumerate((("Ring", ring), ("Dirt", dirt))):
+    for k, (name, fn) in enumerate((("Ring", ring), ("Dirt", dirt), ("Scratch", scratch))):
         col, alpha, rough = fn(a.size, a.seed + 50 * k)
         save(col, alpha, rough, os.path.join(d, f"T_Stain_{name}"))
         print("stain", name, f"coverage {alpha.mean():.3f}", flush=True)

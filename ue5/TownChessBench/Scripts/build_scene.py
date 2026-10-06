@@ -543,7 +543,7 @@ def blood_decals():
         out[v] = mi
     # non-blood table wear from ue5/tools/textures/stains.py (mug rings, handled grime): same decal material
     sd = os.path.join(TEXTURES_DIR, "stains")
-    for v in ("Ring", "Dirt"):
+    for v in ("Ring", "Dirt", "Scratch"):
         f = os.path.join(sd, f"T_Stain_{v}_BaseColor.png")
         if not os.path.exists(f):
             continue
@@ -1480,7 +1480,10 @@ def build():
         # pass 49: the reference has blood across the board and grime everywhere (fine detail 12.9 against our 10.5)
         ("Spatter", 9, 13, 7, 30), ("Spatter", -15, 17, 6, 200), ("Spatter", 15, -16, 8, 120), ("Smear", -27, 8, 10, 90),
         ("Dirt", 42, -8, 34, 20), ("Dirt", 38, 30, 30, 140), ("Dirt", -6, -50, 30, 260), ("Dirt", -4, 52, 28, 80),
-        ("Ring", 22, 30, 10, 0), ("Ring", 44, -40, 9, 110)]
+        ("Ring", 22, 30, 10, 0), ("Ring", 44, -40, 9, 110),
+        # pass 62: knife scars and scuffs on the table round the board (judge run 4: wide flat brown areas; V2 detail)
+        ("Scratch", -40, -8, 36, 0), ("Scratch", -38, 30, 30, 15), ("Scratch", -36, -40, 30, -10), ("Scratch", 4, -46, 34, 80),
+        ("Scratch", 6, 46, 32, 100), ("Scratch", 38, 16, 28, 170), ("Scratch", -22, 52, 30, 60), ("Scratch", 30, -40, 26, 140)]
     for k, (v, x, y, sz, yaw) in enumerate(placements):
         if v not in blood:
             continue
@@ -1898,7 +1901,7 @@ def build():
     tag(rect("Hands_Key", (-30, -40, top + 40), (0, -50, 30), 220, 2600, 70, 40, 160, vol=0.2))
     # pass 58: the table right of the board was near black (luma 9-17 against the reference's lit clutter; its fine detail
     # 4.6 vs 11-15): a dim warm spill over the right hand, the record sheets and the mug
-    tag(rect("Table_Right", (-20, 48, top + 45), (0, -60, -25), 55, 2600, 60, 40, 150, vol=0.2))  # 110 lm lifted the frame mean 24 -> 32
+    tag(rect("Table_Right", (-20, 48, top + 45), (0, -60, -25), 80, 2600, 60, 40, 150, vol=0.2))  # 55 -> 80 (pass 62, frame mean 24.4)  # 110 lm lifted the frame mean 24 -> 32
     # (the table bounce light over-lit the board: 11.7% clipped pixels; removed, Lumen GI does the bounce)
     # corridor light behind the bars: a cold glow that separates the opponent from the back wall
     rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)
