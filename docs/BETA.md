@@ -12,9 +12,9 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 | # | Criterion | Check | Status |
 |---|---|---|---|
 | G1 | Rules engine complete and the only authority | `npm test` with TC_STOCKFISH: all pass, count never drops; chess guardian run without open rules bugs | met (479/479) |
-| G2 | Every input path works in the packaged game | UE autotests cpu, drag, keys, promo, rematch, reconnect all pass on the current code | re-run in progress on the current code (oversight run 4: rematch predated the HUD code; cpu result was overwritten by the reconnect test) |
+| G2 | Every input path works in the packaged game | UE autotests cpu, drag, keys, promo, rematch, reconnect all pass on the current code | met 2026-10-06 (strict run, fresh results only: docs/evidence/autotest-suite-2026-10-06.json): cpu 52/52, drag 8/8, keys 13/13, rematch 8/8, promo 8/8; reconnect 31/31 (docs/evidence/evidence-run-2026-10-06.json, own result folder). Note: an earlier "rematch 8/8" (lead run 7) read a stale result file (empty -Extra aborted the script); the strict run replaces it |
 | G3 | Opponents at every level, incl. the Stockfish league | packaged smoke vs `sf1600` passes; levels novice..sfmax listed in the menu | met 2026-10-06: packaged `-tcsmoke=16 -tcauto=cpu:sf1600:w:untimed` vs the Annotator: 16/16 plies, 0 failures, no Stockfish process left |
-| G4 | A full game from menu to checkmate/resignation/draw to rematch, with clocks | autotest cpu (full game) + rematch; end card shows the result | evidence pending: end-card screenshot (capture -TCResign=1) + cpu full game in docs/evidence/ |
+| G4 | A full game from menu to checkmate/resignation/draw to rematch, with clocks | autotest cpu (full game) + rematch; end card shows the result | met: cpu full game 52/52 (to checkmate) + end card after resignation with Rematch/Leave and the record clipboard (docs/evidence/end-card.jpg) + rematch 8/8 |
 | G5 | Game record on the clipboard (Tab), opening name | keys autotest (Tab) + screenshot | met |
 
 ## Stability and performance
@@ -42,9 +42,9 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 |---|---|---|---|
 | C1 | Two opponents with distinct designs | caged patient, the Annotator; menu switch | met |
 | C2 | Hand customization (reference panel) | at least: bare, dirty, scarred, sleeves, watch, gloves; remembered | partial 2026-10-06: menu "Hands" switches bare / dirty / scarred skins (material swap, `59-skins-in-game.png`, log "player look: scarred ... skin scarred") and sleeves / watch; gloves and tattooed skin missing |
-| C3 | Menu, settings and HUD like the reference | find-a-game, time control, strength, opponent, hands, quality preset, view height, volume; end card; promotion card | evidence pending: settings-panel and menu screenshots in docs/evidence/ |
+| C3 | Menu, settings and HUD like the reference | find-a-game, time control, strength, opponent, hands, quality preset, view height, volume; end card; promotion card | met: docs/evidence/settings-panel.jpg (Volume, Graphics, View height), menu-credits.jpg (FIND A GAME, options, Hands, Settings), end-card.jpg; promotion card in the promo test; keys 13/13 drives the settings panel |
 | C4 | Sound | piece move/capture; ambience; end-of-game sting | met: own synthesis (clack.py, ambience.py: 29 s ward loop, 4 s sting), volume in Settings |
-| C5 | Credits and licences in game and in docs | FREE_ASSETS.md complete; a credits line in the menu | evidence pending: menu screenshot with the credits line in docs/evidence/ |
+| C5 | Credits and licences in game and in docs | FREE_ASSETS.md complete; a credits line in the menu | met: credits line on the menu (docs/evidence/menu-credits.jpg); FREE_ASSETS.md lists every download and generator |
 
 ## Release
 
