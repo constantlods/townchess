@@ -12,8 +12,8 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 | # | Criterion | Check | Status |
 |---|---|---|---|
 | G1 | Rules engine complete and the only authority | `npm test` with TC_STOCKFISH: all pass, count never drops; chess guardian run without open rules bugs | met (479/479) |
-| G2 | Every input path works in the packaged game | UE autotests cpu, drag, keys, promo, rematch, reconnect all pass on the current code | partial (reconnect not re-run since the HUD rewrite) |
-| G3 | Opponents at every level, incl. the Stockfish league | packaged smoke vs `sf1600` passes; levels novice..sfmax listed in the menu | met (earlier run; re-run at beta) |
+| G2 | Every input path works in the packaged game | UE autotests cpu, drag, keys, promo, rematch, reconnect all pass on the current code | met 2026-10-06 on the current code: cpu 72/72, drag 8/8, keys 13/13, promo 8/8, rematch 8/8, reconnect 100/100 (`reconnect.ps1`) |
+| G3 | Opponents at every level, incl. the Stockfish league | packaged smoke vs `sf1600` passes; levels novice..sfmax listed in the menu | met 2026-10-06: packaged `-tcsmoke=16 -tcauto=cpu:sf1600:w:untimed` vs the Annotator: 16/16 plies, 0 failures, no Stockfish process left |
 | G4 | A full game from menu to checkmate/resignation/draw to rematch, with clocks | autotest cpu (full game) + rematch; end card shows the result | met |
 | G5 | Game record on the clipboard (Tab), opening name | keys autotest (Tab) + screenshot | met |
 
@@ -24,7 +24,7 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 | S1 | Packaged build starts on a clean launch and plays | `test_package.ps1`: smoke 12/12, Job Object pass, Defender 0 | met |
 | S2 | Long play without errors | 10 consecutive packaged CPU-vs-engine games (autoplay), 0 desyncs, 0 crashes, no leaked processes | met 2026-10-06: `beta_checks.ps1` 10/10 (9 checkmates, 1 threefold repetition), 0 failures, 0 leftover processes |
 | S3 | Frame rate | packaged build at 2560x1440, Epic + hardware RT on the RTX 4070 Ti SUPER: average >= 60 fps, 1% low >= 45 over a 60 s game (`stat unit`/CSV profiler) | met 2026-10-06: 2560x1440, Auto (Epic + HW RT): avg 91.4 fps, 1% low 81.2 over a full game (smoke frame times after a 10 s warm-up; offscreen, so no present/vsync cost) |
-| S4 | Recovers from a core crash and from a restored game | reconnect test + smoke with a journal-restored game | met (earlier), re-run at beta |
+| S4 | Recovers from a core crash and from a restored game | reconnect test + smoke with a journal-restored game | met 2026-10-06: killed at ply 12 (TerminateProcess), no orphan core, restored at the same ply/FEN, played on to checkmate (100/100); packaged smoke resigns a restored game and plays its own |
 
 ## Look (measured against the reference's main gameplay panel)
 
