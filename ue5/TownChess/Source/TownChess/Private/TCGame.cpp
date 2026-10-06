@@ -526,7 +526,7 @@ bool ATCHUD::Hovered(float X, float Y, float W, float H) const
 void ATCHUD::Button(const FString& Id, const FString& Label, float X, float Y, float W, ETCButton Style)
 {
 	const float U = Ui();
-	const FVector2D Size(W * U, 34.f * U);
+	const FVector2D Size(W * U, 38.f * U);
 	const bool bHover = Hovered(X, Y, Size.X, Size.Y);
 	FLinearColor Ink(0.84f, 0.80f, 0.72f);
 	switch (Style)
@@ -535,7 +535,7 @@ void ATCHUD::Button(const FString& Id, const FString& Label, float X, float Y, f
 		if (bHover) Plate(X, Y, Size.X, Size.Y, 0.45f, 0.25f);
 		break;
 	case ETCButton::Boxed:    // selected row / option
-		Plate(X, Y, Size.X, Size.Y, bHover ? 0.75f : 0.55f, bHover ? 0.8f : 0.45f, FLinearColor(0.09f, 0.08f, 0.065f));
+		Plate(X, Y, Size.X, Size.Y, bHover ? 0.8f : 0.6f, bHover ? 0.8f : 0.45f, FLinearColor(0.02f, 0.018f, 0.015f));
 		break;
 	case ETCButton::Primary:  // "Find Match": filled bronze with a warm border
 		Plate(X, Y, Size.X, Size.Y, bHover ? 0.95f : 0.85f, 0.9f, bHover ? FLinearColor(0.24f, 0.17f, 0.09f) : FLinearColor(0.17f, 0.12f, 0.065f));
@@ -543,7 +543,7 @@ void ATCHUD::Button(const FString& Id, const FString& Label, float X, float Y, f
 		break;
 	}
 	if (bHover) Ink = FLinearColor(1.f, 0.94f, 0.82f);
-	const float Ty = Y + 6.f * U;
+	const float Ty = Y + 4.f * U;  // Lato's line box is tall: centre the caps in the 38 px row
 	if (Style == ETCButton::Primary) Text(Label, X + Size.X * 0.5f, Ty, Ink, 0.95f, true);
 	else Text(Label, X + 12.f * U, Ty, Ink, 0.9f);
 	Buttons.Add({Id, Label, FVector2D(X, Y), Size});
@@ -646,9 +646,9 @@ void ATCHUD::DrawUi()
 void ATCHUD::DrawMenu(UTCCoreClient* C)
 {
 	// the reference's FIND A GAME panel: a monospace title, a quiet list of modes, one filled primary button, the clock row
-	const float U = Ui(), X = 80.f * U, Y0 = 170.f * U, Step = 40.f * U, W = 300.f;
+	const float U = Ui(), X = 80.f * U, Y0 = 170.f * U, Step = 44.f * U, W = 320.f;
 	const FLinearColor Dim(0.6f, 0.56f, 0.5f);
-	Plate(X - 30.f * U, Y0 - 110.f * U, (W + 60.f) * U, 610.f * U, 0.62f, 0.0f);
+	Plate(X - 30.f * U, Y0 - 110.f * U, (W + 60.f) * U, 660.f * U, 0.62f, 0.0f);
 	Text(TEXT("FIND A GAME"), X, Y0 - 80.f * U, FLinearColor(0.9f, 0.86f, 0.78f), 1.3f, false, ETCUiFont::Title);
 	if (C->HasGame() && C->GetState().Status == TEXT("waiting"))
 	{
@@ -672,8 +672,8 @@ void ATCHUD::DrawMenu(UTCCoreClient* C)
 	// options: label on the left, the value in a small box that cycles on click
 	const auto Option = [&](const FString& Id, const FString& Label, const FString& Value)
 	{
-		Text(Label, X + 12.f * U, Y + 6.f * U, Dim, 0.85f);
-		Button(Id, Value, X + 150.f * U, Y, W - 150.f, ETCButton::Boxed);
+		Text(Label, X + 12.f * U, Y + 4.f * U, Dim, 0.85f);
+		Button(Id, Value, X + 160.f * U, Y, W - 160.f, ETCButton::Boxed);
 		Y += Step;
 	};
 	Option(TEXT("tc"), TEXT("Time Control"), TimeControl == TEXT("untimed") ? TEXT("Untimed") : TimeControl.Replace(TEXT("+"), TEXT(" + ")));
