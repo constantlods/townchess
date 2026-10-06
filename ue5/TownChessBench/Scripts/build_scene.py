@@ -1031,7 +1031,9 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
     new_w, new_l = solve(deltas)
     ARM_TARGETS = {"clasp": {"hand": (3.0, 18.0, -21.0), "elbow_z": -31.0, "elbow_x": 19.0},  # hands under the chin, cage visible
-                   "player": {"hand": (22.0, 46.0, -32.0), "elbow_z": -40.0, "elbow_x": 22.0}}  # in reach (60 cm forward gave IK error 174/561)  # head sits ~34 cm over the table
+                   # pass 60: (22, 46, -32) left the left wrist below the frame and the right hand a sliver at the corner
+                   "player": {"hand": tuple(float(v) for v in os.environ.get("TC_PLAYER_HAND", "19,54,-32").split(",")),
+                              "elbow_z": -40.0, "elbow_x": 22.0}}  # in reach (60 cm forward gave IK error 174/561)  # head sits ~34 cm over the table
     if pose_name in ARM_TARGETS and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
         # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
         head = new_w["head"][0]
@@ -1062,7 +1064,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             score_best = None
             for ux in range(10, 131, 8):
                 for uz in range(-80, 81, 10):
-                    for lx in range(20, 161, 10):
+                    for lx in range(-30, 161, 10):  # from 20 the player's right forearm sat on the bound (IK error 324, pass 60)
                         for lz in range(-80, 81, 10):
                             o = chain(side, ux, uz, lx, lz)
                             e, h = o[f"lowerarm_{side}"][0], o[f"hand_{side}"][0]
@@ -1225,6 +1227,9 @@ def player_skins(mhn):
     return out
 
 
+METAL_ARM = None
+
+
 def build():
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
     level_path = f"{ROOT}/{LEVEL}"
@@ -1255,6 +1260,11 @@ def build():
         "normal": import_texture(os.path.join(tmp, "T_TC_FlatNormal.png"), f"{ROOT}/Textures", "T_TC_FlatNormal", "normal"),
         "arm": import_texture(os.path.join(tmp, "T_TC_DefaultARM.png"), f"{ROOT}/Textures", "T_TC_DefaultARM", "linear"),
     }
+    # metallic = ARM.B x MetallicScale, and the default ARM has B = 0: every untextured "metal=1" instance rendered as a
+    # dielectric (pass 60: the board's brass corners read as paper). Metal parts without maps take this ARM instead.
+    png(os.path.join(tmp, "T_TC_MetalARM.png"), 4, 4, (255, 160, 255, 255))
+    global METAL_ARM
+    METAL_ARM = import_texture(os.path.join(tmp, "T_TC_MetalARM.png"), f"{ROOT}/Textures", "T_TC_MetalARM", "linear")
     defaults["gray"] = import_texture(os.path.join(tmp, "T_TC_White.png"), f"{ROOT}/Textures", "T_TC_WhiteGray", "gray")
     grime_png(os.path.join(tmp, "T_TC_Grime.png"))
     defaults["grime"] = import_texture(os.path.join(tmp, "T_TC_Grime.png"), f"{ROOT}/Textures", "T_TC_Grime", "linear")
@@ -1371,8 +1381,9 @@ def build():
             mi_frame = surface_material(master, "wood_cabinet_worn_long", name="MI_BoardFrame", tiling=2.0, tint=(0.55, 0.42, 0.32),
                                         scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "MicroRough": 0.15}) \
                 if os.path.isdir(os.path.join(ASSETS, "textures", "wood_cabinet_worn_long")) else surface_material(master, "wood_table_worn", name="MI_BoardFrame", tint=(0.45, 0.34, 0.26))
-            mi_brass_b = make_mi(master, "MI_BoardBrass", {"BaseColor": None}, metal=1.0, rough=0.38, tint=(0.72, 0.52, 0.26),
-                                 grime_color=(0.3, 0.25, 0.18), scalars={"GrimeTiling": 5.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0, "MicroRough": 0.2})
+            mi_brass_b = make_mi(master, "MI_BoardBrass", {"BaseColor": None, "ARM": METAL_ARM}, metal=1.0, rough=1.2, tint=(0.42, 0.29, 0.1),
+                                 # aged dull brass: tint 0.72/0.52/0.26 at rough 0.38 mirrored the lamp as cream "paper" (judge run 4)
+                                 grime_color=(0.3, 0.25, 0.18), scalars={"GrimeTiling": 5.0, "GrimeThreshold": 0.6, "GrimeContrast": 2.0, "MicroRough": 0.2})
             sm = wood_board[0]
             for i, sl in enumerate(sm.static_materials):
                 n = str(sl.material_slot_name).lower()
@@ -1498,7 +1509,8 @@ def build():
     for sm in papers:
         sm.set_material(0, mi_form)
         EAL.save_loaded_asset(sm)
-    for loc, yaw in (((-36, -46), 14), ((40, -46), -28), ((22, 66), -150), ((-14, 74), 160)):  # two more on the right, clear of the right hand (pass 58)
+    # pass 58 added two on the right; the nearer one (-14, 74) cut the frame's right border as a jagged white edge (judge run 4)
+    for loc, yaw in (((-36, -46), 14), ((40, -46), -28), ((22, 66), -150)):
         tag(place_model(papers, (loc[0], loc[1], 0), yaw=yaw, label="Papers", sit_on=top + 0.05)[0])
     cover = lambda n, c: make_mi(master, n, {"BaseColor": None}, tint=c, rough=0.82, grime_color=(0.12, 0.09, 0.06),
                                  scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.2, "MicroRough": 0.2})
@@ -1519,7 +1531,7 @@ def build():
     bowl = import_prop("brass_bowl")
     if bowl:
         for sm in bowl:
-            sm.set_material(0, mi_brass_clutter := make_mi(master, "MI_BowlBrass", {"BaseColor": None}, metal=1.0, rough=0.58, tint=(0.48, 0.35, 0.18),
+            sm.set_material(0, mi_brass_clutter := make_mi(master, "MI_BowlBrass", {"BaseColor": None, "ARM": METAL_ARM}, metal=1.0, rough=0.58, tint=(0.48, 0.35, 0.18),
                                                              grime_color=(0.25, 0.22, 0.18), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "MicroRough": 0.25}))
             EAL.save_loaded_asset(sm)
         tag(place_model(bowl, (-8, -46, 0), yaw=0, label="Bowl", sit_on=top)[0])
@@ -1762,8 +1774,11 @@ def build():
                             scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.1})
             sleeve_sm = prop_with("player_sleeve", {"PlayerSleeve": mi_ps})
             watch_sm = prop_with("wristwatch", {"Strap": make_mi(master, "MI_WatchStrap", {"BaseColor": None}, tint=(0.07, 0.045, 0.03), rough=0.7),
-                                                "Steel": make_mi(master, "MI_WatchSteel", {"BaseColor": None}, metal=1.0, rough=0.35, tint=(0.55, 0.55, 0.53)),
-                                                "Dial": make_mi(master, "MI_WatchDial", {"BaseColor": None}, tint=(0.32, 0.3, 0.25), rough=0.2)})
+                                                "Steel": make_mi(master, "MI_WatchSteel", {"BaseColor": None, "ARM": METAL_ARM}, metal=1.0, rough=0.35, tint=(0.55, 0.55, 0.53)),
+                                                "Dial": make_mi(master, "MI_WatchDial", {"BaseColor": import_texture(os.path.join(TEXTURES_DIR, "watch", "T_WatchDial_BaseColor.png"),
+                                                                                                      f"{ROOT}/Textures/Watch", "T_WatchDial_BaseColor", "color")
+                                                                                       if os.path.exists(os.path.join(TEXTURES_DIR, "watch", "T_WatchDial_BaseColor.png")) else None},
+                                                               tint=(0.55, 0.52, 0.46), rough=0.35)})  # printed dial (textures/watch.py), pass 60
             for side, (hand, elbow) in hands.items():
                 d = tuple(hand[i] - elbow[i] for i in range(3))
                 n = math.sqrt(sum(c * c for c in d)) or 1.0

@@ -649,8 +649,9 @@ def chess_board():
     # brass: corner plates and domed studs along the frame
     for sx in (-1, 1):
         for sy in (-1, 1):
-            box("Corner", (0.05, 0.05, 0.0012), (sx * (half_all - 0.025), sy * (half_all - 0.025), lip + 0.0006), "M_Brass", 0.0008)
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0042, segments=16, ring_count=8, location=(sx * (half_all - 0.018), sy * (half_all - 0.018), lip + 0.0012))
+            # (5 cm corner plates read as pale paper tiles from the seat at any brass tint: judge run 4, pass 60) a larger
+            # domed stud marks each corner instead
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0055, segments=16, ring_count=8, location=(sx * (half_all - 0.018), sy * (half_all - 0.018), lip + 0.0012))
             r = bpy.context.active_object; r.scale = (1, 1, 0.45); material(r, "M_Brass"); parts.append(r)
     for k in range(1, 4):
         t = -half_play + k * (half_play * 2) / 4
@@ -891,29 +892,59 @@ def wristwatch():
     reset()
     parts = []
     bpy.ops.mesh.primitive_torus_add(major_radius=0.033, minor_radius=0.003, major_segments=56, minor_segments=12,
-                                     location=(0, 0, 0), rotation=(0, math.radians(90), 0))
+                                     location=(0, 0, 0.004), rotation=(0, math.radians(90), 0))
     st = bpy.context.active_object
     # object scale acts on the torus's own axes (before the rotation): its Z (the ring axis, now the arm) sets the strap
     # width, its X/Y (now world Z/Y) the oval (2.8 on X stretched the ring itself into a 9 cm hoop, pass 52)
-    st.scale = (0.85, 0.97, 2.8)  # 2.8 x 3.2 cm oval: 2.2 x 2.9 sank into the MetaHuman wrist
+    st.scale = (0.74, 0.97, 2.8)  # 2.4 x 3.2 cm oval, centred 4 mm above the wrist axis: 2.8 cm hung below the wrist as a loop (pass 60)
     bpy.ops.object.transform_apply(scale=True, rotation=True)
     bpy.context.view_layer.objects.active = st
     bpy.ops.object.shade_smooth()
     material(st, "M_Strap"); parts.append(st)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.017, depth=0.008, location=(0, 0, 0.0295))
+    # pass 60 (judge run 4: faceted case, blank dial, a gap between strap and case): a 64-sided bevelled case seated
+    # on the strap, a raised bezel ring, four lugs with strap ends that run from the lugs down into the band, and a flat
+    # dial with its own planar UVs for the printed dial texture (indices, numerals, hands)
+    zc = 0.0285
+    bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.0165, depth=0.0075, location=(0, 0, zc))
     case = bpy.context.active_object
-    bv = case.modifiers.new("bevel", "BEVEL"); bv.width = 0.0015; bv.segments = 3
+    bv = case.modifiers.new("bevel", "BEVEL"); bv.width = 0.0016; bv.segments = 4
     apply_mods(case); material(case, "M_Steel"); parts.append(case)
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=8, radius=0.015, location=(0, 0, 0.0325))
-    gl = bpy.context.active_object
-    gl.scale = (1, 1, 0.22)
-    bpy.ops.object.transform_apply(scale=True)
-    material(gl, "M_Dial"); parts.append(gl)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0022, depth=0.004, location=(0.0, 0.019, 0.0295),
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.0152, minor_radius=0.0013, major_segments=64, minor_segments=10,
+                                     location=(0, 0, zc + 0.0038))
+    bez = bpy.context.active_object
+    material(bez, "M_Steel"); parts.append(bez)
+    for sx in (-1, 1):          # lugs: along the arm (X) at both sides of the strap, reaching round the wrist (Y)
+        for sy in (-1, 1):
+            _box((0.0028, 0.0075, 0.0045), (sx * 0.0072, sy * 0.0175, zc - 0.0008), "M_Steel", bevel=0.0008, parts=parts)
+    for sy in (-1, 1):          # strap ends: from between the lugs, bending down into the band
+        for k, (y, z, tilt) in enumerate(((0.0185, zc - 0.0012, 0.25), (0.0235, zc - 0.0042, 0.75))):
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(0, sy * y, z))
+            b = bpy.context.active_object
+            b.scale = (0.0165, 0.0075, 0.0028)
+            b.rotation_euler.x = -sy * tilt
+            bpy.ops.object.transform_apply(scale=True, rotation=True)
+            bvm = b.modifiers.new("bevel", "BEVEL"); bvm.width = 0.0009; bvm.segments = 2
+            apply_mods(b); material(b, "M_Strap"); parts.append(b)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.0022, depth=0.004, location=(0.0, 0.019, zc),
                                         rotation=(math.radians(90), 0, 0))
     crown = bpy.context.active_object
     material(crown, "M_Steel"); parts.append(crown)
-    _join_uv(parts, "SM_Wristwatch")
+    _join_uv(parts, "SM_WatchBody")
+    # dial: a flat disc just above the case top (zc + 3.75 mm), inside the bezel; UV = top view (12 o'clock towards the hand, +X)
+    bpy.ops.mesh.primitive_circle_add(vertices=64, radius=0.0145, fill_type="NGON", location=(0, 0, zc + 0.0041))
+    dial = bpy.context.active_object
+    me = dial.data
+    uvl = me.uv_layers.new(name=parts[0].data.uv_layers[0].name if parts else "UVMap")
+    for lp in me.loops:
+        co = me.vertices[lp.vertex_index].co
+        uvl.data[lp.index].uv = (0.5 - co.y / 0.029, 0.5 + co.x / 0.029)
+    material(dial, "M_Dial")
+    body = bpy.data.objects["SM_WatchBody"]
+    bpy.ops.object.select_all(action="DESELECT")
+    body.select_set(True); dial.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
+    bpy.context.active_object.name = "SM_Wristwatch"
     export("wristwatch.obj")
 
 

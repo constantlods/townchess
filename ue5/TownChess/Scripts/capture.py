@@ -35,6 +35,7 @@ CAM_ROT = arg("TCCamRot", "")   # ... pitch,yaw,roll
 CAM_FOV = arg("TCFov", "")
 CAM_TARGET = arg("TCCamTarget", "")  # aim the close-up at this point (x,y,z) instead of giving a rotation
 RESIGN = arg("TCResign", "") == "1"  # resign once the game runs: the end card (CHECKMATE/RESIGNED + Rematch) for the shot
+SKIN = arg("TCSkin", "")  # -TCSkin=<id>: put MI_PlayerSkin_<id> on the player's body for the shot
 HUD = arg("TCHud", "") == "1"  # draw the game HUD over the shot (what the player sees, not just the scene)
 CMDS = [c.replace("_", " ") for c in arg("TCCmds", "").split(";") if c]  # console commands, "_" for spaces (e.g. r.Fog_0)
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
@@ -103,6 +104,12 @@ def begin():
             log(f"capture uses the level's post settings (EV {ps.get_editor_property('auto_exposure_min_brightness'):.1f})")
             break
     state["cap"] = (world, rt)
+    if SKIN:  # preview a skin variant the game's look menu does not list yet (MI_PlayerSkin_<id>, built by build_scene.py)
+        mi = unreal.load_asset(f"/Game/TownChess/Characters/PlayerSkin/MI_PlayerSkin_{SKIN}")
+        for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SkeletalMeshActor):
+            if mi and a.actor_has_tag("TC_PlayerBody") and a.actor_has_tag("TC_Body"):
+                a.skeletal_mesh_component.set_material(0, mi)
+        log(f"player skin {SKIN}: {'set' if mi else 'not found'}")
     probe(world)
     log(f"capture {w}x{h} fov={fov:.1f} cam=({loc.x:.0f},{loc.y:.0f},{loc.z:.0f}) preset={PRESET}")  # the shot camera, not the player's
 
