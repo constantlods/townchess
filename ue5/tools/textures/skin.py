@@ -202,8 +202,8 @@ fade_elbow = smooth(-0.95, -0.6, tf / Lf_t)  # tf/Lf = -1 at the elbow
 n1 = perlin(qw * 0.42, 11)
 n2 = perlin(qw * 0.95, 23)
 gate = smooth(-0.15, 0.25, fbm(pos * 0.22, 2, 37))
-v1 = np.clip(1 - (np.abs(n1) / 0.075) ** 2, 0, 1) ** 0.5
-v2 = np.clip(1 - (np.abs(n2) / 0.05) ** 2, 0, 1) ** 0.5 * gate
+v1 = np.clip(1 - (np.abs(n1) / 0.1) ** 2, 0, 1) ** 2      # soft rounded profile (a sqrt profile read as flat bands)
+v2 = np.clip(1 - (np.abs(n2) / 0.065) ** 2, 0, 1) ** 2 * gate
 vein_mask = np.where(hand_back, smooth(-0.05, 0.45, dors) * (1 - smooth(0.78, 0.98, th)) * smooth(-0.1, 0.12, th), 0)
 vein_mask += np.where(forearm, fade_elbow * (0.55 + 0.45 * smooth(-0.6, 0.4, dors)), 0)
 vein_mask += np.where(hand_back & (th < 0.12), smooth(-0.3, 0.3, dors) * 0.6, 0)  # across the wrist
@@ -211,7 +211,7 @@ vein_mask = np.clip(vein_mask, 0, 1)
 # forearms: a few long trunks (gated), the backs of the hands the full network
 v1 = np.where(forearm, v1 * smooth(-0.05, 0.2, fbm(pos * 0.15, 2, 41)), v1)
 vein = np.maximum(v1, 0.65 * v2 * np.where(forearm, 0.4, 1.0)) * vein_mask
-h_vein = vein * np.where(hand_back, 0.11, 0.075)  # cm: raised veins of a thin, older hand
+h_vein = vein * np.where(hand_back, 0.13, 0.08)  # cm: raised veins of a thin, older hand
 
 # extensor tendons: from a narrow fan at the wrist to each knuckle, strongest just behind the knuckles
 h_tend = np.zeros(len(idx), np.float32)

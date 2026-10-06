@@ -1234,7 +1234,9 @@ def build():
         if not LES.load_level(level_path):
             raise RuntimeError(f"could not load {level_path}")
         keep = (unreal.WorldSettings, unreal.Brush)
-        doomed = [a for a in EAS.get_all_level_actors() if not isinstance(a, keep)]
+        # volumes are Brush subclasses: keeping them left one PostProcessVolume per build (70 by pass 54, the oldest with
+        # EV 8.5 and no grading was what captures and the game used, so grading changes since pass 28 had no effect)
+        doomed = [a for a in EAS.get_all_level_actors() if not isinstance(a, keep) or isinstance(a, unreal.Volume)]
         EAS.destroy_actors(doomed)
         log("cleared", len(doomed), "actors from", level_path)
     elif not LES.new_level(level_path):
@@ -1305,7 +1307,7 @@ def build():
     # ---- Chess set: board + 32 pieces; rotate so White faces the player (-X).
     chess = import_model("chess_set")
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
-    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.3, 0.22, 0.14), tint=(0.62, 0.52, 0.38), rough=0.72,
+    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.3, 0.22, 0.14), tint=(0.52, 0.45, 0.34), rough=0.72,  # pass 54: 0.62/0.52/0.38 was still the frame's hottest object
                            # aged, handled ivory: darker base and dirt in the crevices (the clean ivory was the frame's glare; pass 47)
                            scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.62, "GrimeContrast": 2.5, "MicroRough": 0.3, "GrimeStreaks": 0.25})
     mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.55, tint=(0.11, 0.095, 0.085),
@@ -1361,7 +1363,7 @@ def build():
                 "BaseColor": import_texture(os.path.join(bd, "T_Board_BaseColor.jpg"), f"{ROOT}/Textures/Board", "T_Board_BaseColor", "color"),
                 "Normal": import_texture(os.path.join(bd, "T_Board_Normal.jpg"), f"{ROOT}/Textures/Board", "T_Board_Normal", "normal"),
                 "ARM": import_texture(os.path.join(bd, "T_Board_ARM.jpg"), f"{ROOT}/Textures/Board", "T_Board_ARM", "linear")},
-                rough=0.85, tint=(0.5, 0.47, 0.42), grime_color=(0.3, 0.22, 0.14),
+                rough=0.85, tint=(0.42, 0.4, 0.36), grime_color=(0.3, 0.22, 0.14),  # pass 54: light squares were 1/4 of the pixels above the ref p95
                 scalars={"MicroRough": 0.1, "GrimeTiling": 2.2, "GrimeThreshold": 0.55, "GrimeContrast": 2.2, "GrimeStreaks": 0.2})
         wood_board = import_prop("chess_board") if squares else None
         if wood_board:
@@ -1516,7 +1518,7 @@ def build():
     bowl = import_prop("brass_bowl")
     if bowl:
         for sm in bowl:
-            sm.set_material(0, mi_brass_clutter := make_mi(master, "MI_BowlBrass", {"BaseColor": None}, metal=1.0, rough=0.42, tint=(0.62, 0.45, 0.22),
+            sm.set_material(0, mi_brass_clutter := make_mi(master, "MI_BowlBrass", {"BaseColor": None}, metal=1.0, rough=0.58, tint=(0.48, 0.35, 0.18),
                                                              grime_color=(0.25, 0.22, 0.18), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "MicroRough": 0.25}))
             EAL.save_loaded_asset(sm)
         tag(place_model(bowl, (-8, -46, 0), yaw=0, label="Bowl", sit_on=top)[0])
@@ -1682,6 +1684,9 @@ def build():
     mi_gown_early = make_mi(master, "MI_PatientShirt", {"BaseColor": None}, tint=(0.42, 0.4, 0.34), rough=0.9, grime_color=(0.45, 0.36, 0.24),
                             scalars={"GrimeTiling": 1.6, "GrimeThreshold": 0.32, "GrimeContrast": 1.8, "GrimeStreaks": 0.6})
     opp, smc = spawn_opponent("caged", mhn, outfit_mi=mi_gown_early, pose=os.environ.get("TC_CAGED_POSE", "clasp"))
+    skins = player_skins(mhn) if (mhn and GAMEPLAY) else {}
+    if smc and "dirty" in skins:  # the reference's patient has grimy hands too (and the clean tan ones caught the lamp)
+        smc.set_material(0, skins["dirty"])
     if smc and "head" in SEATED:
         cage = import_prop("cage_mask")
         if cage:
@@ -1721,7 +1726,6 @@ def build():
                                group_tag="TC_PlayerBody")
         if pb:
             log("player body at", [round(v, 1) for v in ploc])
-            skins = player_skins(mhn)
             want = os.environ.get("TC_PLAYER_SKIN", "bare")
             if want in skins:
                 pb.skeletal_mesh_component.set_material(0, skins[want])
@@ -1920,7 +1924,7 @@ def build():
         # measured against the reference panel (pass 47): highlights 148 vs 97 (95th pct), red/green 1.63 vs 1.44,
         # green/blue 1.45 vs 1.62 -> compress the highlights and move the grade from orange towards olive
         "color_gain_highlights": unreal.Vector4(0.74, 0.74, 0.74, 1.0),
-        "color_gain": unreal.Vector4(0.9, 1.0, 0.9, 1.0),
+        "color_gain": unreal.Vector4(0.84, 1.0, 0.96, 1.0),  # pass 54: r/g 1.54 -> ref 1.44, g/b 1.72 -> ref 1.62
     }.items():
         try:
             s.set_editor_property("override_" + k, True)
