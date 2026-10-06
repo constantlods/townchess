@@ -22,8 +22,8 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 | # | Criterion | Check | Status |
 |---|---|---|---|
 | S1 | Packaged build starts on a clean launch and plays | `test_package.ps1`: smoke 12/12, Job Object pass, Defender 0 | met |
-| S2 | Long play without errors | 10 consecutive packaged CPU-vs-engine games (autoplay), 0 desyncs, 0 crashes, no leaked processes | not run |
-| S3 | Frame rate | packaged build at 2560x1440, Epic + hardware RT on the RTX 4070 Ti SUPER: average >= 60 fps, 1% low >= 45 over a 60 s game (`stat unit`/CSV profiler) | not measured |
+| S2 | Long play without errors | 10 consecutive packaged CPU-vs-engine games (autoplay), 0 desyncs, 0 crashes, no leaked processes | met 2026-10-06: `beta_checks.ps1` 10/10 (9 checkmates, 1 threefold repetition), 0 failures, 0 leftover processes |
+| S3 | Frame rate | packaged build at 2560x1440, Epic + hardware RT on the RTX 4070 Ti SUPER: average >= 60 fps, 1% low >= 45 over a 60 s game (`stat unit`/CSV profiler) | met 2026-10-06: 2560x1440, Auto (Epic + HW RT): avg 91.4 fps, 1% low 81.2 over a full game (smoke frame times after a 10 s warm-up; offscreen, so no present/vsync cost) |
 | S4 | Recovers from a core crash and from a restored game | reconnect test + smoke with a journal-restored game | met (earlier), re-run at beta |
 
 ## Look (measured against the reference's main gameplay panel)
@@ -42,15 +42,15 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 |---|---|---|---|
 | C1 | Two opponents with distinct designs | caged patient, the Annotator; menu switch | met |
 | C2 | Hand customization (reference panel) | at least: bare, dirty, scarred, sleeves, watch, gloves; remembered | partial (bare, sleeves, watch) |
-| C3 | Menu, settings and HUD like the reference | find-a-game, time control, strength, opponent, hands, quality preset, view height, volume; end card; promotion card | partial (no settings screen, no volume) |
-| C4 | Sound | piece move/capture; ambience; end-of-game sting | partial (moves only) |
-| C5 | Credits and licences in game and in docs | FREE_ASSETS.md complete; a credits line in the menu | partial |
+| C3 | Menu, settings and HUD like the reference | find-a-game, time control, strength, opponent, hands, quality preset, view height, volume; end card; promotion card | met 2026-10-06: menu, Settings panel (volume, graphics, view height; keys autotest 13/13), end card, promotion card, portraits on the player cards (screenshots hud_caged/annotator) |
+| C4 | Sound | piece move/capture; ambience; end-of-game sting | met: own synthesis (clack.py, ambience.py: 29 s ward loop, 4 s sting), volume in Settings |
+| C5 | Credits and licences in game and in docs | FREE_ASSETS.md complete; a credits line in the menu | met: credits line on the menu; FREE_ASSETS rows for every generator and download |
 
 ## Release
 
 | # | Criterion | Check | Status |
 |---|---|---|---|
-| R1 | Install notes for a player | docs/INSTALL.md: requirements, VC++ runtime, launch, known issues | not written |
+| R1 | Install notes for a player | docs/INSTALL.md: requirements, VC++ runtime, launch, known issues | met (docs/INSTALL.md) |
 | R2 | Known limitations current | KNOWN_LIMITATIONS.md has no stale entry; every open bug has a severity | partial |
 | R3 | Beta build on the build PC | `C:\TownChess\builds\Development\Windows` passes S1 and the pipeline signs off; PR #1 body lists the beta status | not yet |
 
