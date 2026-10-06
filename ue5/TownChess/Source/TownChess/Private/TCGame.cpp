@@ -149,7 +149,7 @@ void ATCGameMode::ApplyPlayerLook(const FString& Look)
 	// skin variants are material swaps on the player's body (MI_PlayerSkin_<bare|dirty|scarred>, render artist pass 53;
 	// /Game/TownChess/Characters/PlayerSkin is always cooked); the look names at most one of them, bare otherwise
 	FString Skin = TEXT("bare");
-	for (const FString& W : Want) if (W == TEXT("dirty") || W == TEXT("scarred")) Skin = W;
+	for (const FString& W : Want) if (W == TEXT("dirty") || W == TEXT("scarred") || W == TEXT("gloves") || W == TEXT("tattooed")) Skin = W;
 	UMaterialInterface* SkinMat = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/TownChess/Characters/PlayerSkin/MI_PlayerSkin_%s.MI_PlayerSkin_%s"), *Skin, *Skin));
 	if (SkinMat)
 	{
@@ -218,7 +218,8 @@ void ATCGameMode::BeginPlay()
 	FString OpponentId = TEXT("caged");
 	FParse::Value(FCommandLine::Get(), TEXT("-tcopponent="), OpponentId);
 	ApplyOpponent(OpponentId);
-	FString Look = TEXT("bare");
+	// default: the reference panel's hands (grimy, institutional sleeve, a watch on the left wrist; render artist pass 64)
+	FString Look = TEXT("dirty+sleeves+watch");
 	GConfig->GetString(TEXT("TownChess"), TEXT("PlayerLook"), Look, GGameUserSettingsIni);
 	FParse::Value(FCommandLine::Get(), TEXT("-tclook="), Look);
 	ApplyPlayerLook(Look);
@@ -754,7 +755,8 @@ void ATCHUD::PressButton(const FString& Id)
 		if (ATCGameMode* GM = GetWorld()->GetAuthGameMode<ATCGameMode>())
 		{
 			// the reference's HAND CUSTOMIZATION: skins (bare, dirty, scarred) and accessories (sleeves, watch)
-			static const TCHAR* Looks[] = {TEXT("bare"), TEXT("dirty"), TEXT("scarred"), TEXT("sleeves"), TEXT("watch"), TEXT("dirty+sleeves+watch")};
+			static const TCHAR* Looks[] = {TEXT("dirty+sleeves+watch"), TEXT("bare"), TEXT("dirty"), TEXT("scarred"), TEXT("tattooed"),
+			                               TEXT("gloves"), TEXT("sleeves"), TEXT("watch"), TEXT("gloves+sleeves")};
 			constexpr int32 N = UE_ARRAY_COUNT(Looks);
 			int32 I = 0;
 			for (int32 k = 0; k < N; ++k) if (GM->GetPlayerLook() == Looks[k]) I = k;
@@ -938,7 +940,9 @@ void ATCHUD::DrawGame(UTCCoreClient* C)
 		const float Bx = bRight ? X - W : X;
 		Plate(Bx, 22.f * U, W, 74.f * U, 0.6f, 0.0f);  // tall enough that the bottom rule clears the second line
 		DrawRect(FLinearColor(0.62f, 0.55f, 0.42f, 0.35f), Bx, 22.f * U + 74.f * U - 1.f, W, 1.f);
-		UTexture2D* Face = P.AiLevel.IsEmpty() ? nullptr : Portrait(GM ? GM->GetOpponent() : FString());
+		// opponents: their headshot; the local player: a close-up of their own hands (the face is never seen in first
+		// person); a human opponent online keeps the monogram
+		UTexture2D* Face = !P.AiLevel.IsEmpty() ? Portrait(GM ? GM->GetOpponent() : FString()) : (Col == Me ? Portrait(TEXT("player")) : nullptr);
 		if (Face) DrawTexture(Face, Bx + Pad, 22.f * U + Pad, Pic, Pic, 0, 0, 1, 1, FLinearColor::White);
 		else
 		{

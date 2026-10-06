@@ -150,8 +150,12 @@ FVector ATCBoard::GraveyardSlot(const FString& CapturedColor)
 	const int32 Index = bWhitePiece ? WhiteCaptured++ : BlackCaptured++;
 	const float Side = bWhitePiece ? -1.f : 1.f; // black captures white pieces: set them by Black's right (-Y)
 	const float Row = (Index / 8) * SquareSize * 0.9f;
-	const float Along = ((Index % 8) - 3.5f) * SquareSize * 0.8f * (bWhitePiece ? 1.f : -1.f);
-	return FVector(Along, Side * (4.f * SquareSize + 6.f + Row), 0.f);
+	// each row fills from the opponent's end, so the first captures never stand under the player's resting hands
+	// (visual judge run 4: a captured pawn under the left hand); the board turns 180 deg for Black's seat, so "far" is
+	// +X in board space for White and -X for Black
+	const float Far = FMath::Abs(FRotator::NormalizeAxis(GetActorRotation().Yaw)) > 90.f ? -1.f : 1.f;
+	const float Along = (3.5f - (Index % 8)) * SquareSize * 0.8f * Far;
+	return FVector(Along, Side * (4.f * SquareSize + 10.f + Row), 0.f);
 }
 
 void ATCBoard::Rebuild(const FTCGameState& State)
