@@ -1,141 +1,127 @@
 # Visual judge report (stage 2)
 
-Date: 2026-10-04. This is run 2. The "since run 1" column compares against run 1, which judged `27-main.png`,
-`27-board-closeup.png`, `27-opponent-closeup.png` and `12-annotator.png`.
-Judged images: `35-main.png` (caged patient, player view), `33-opponent-closeup.png`, `31-board-closeup.png`,
-`38-annotator.png`, `38-annotator-closeup.png` and `38-caged.png`, all md5-distinct. They were checked against the
-reference `/root/townchess-work/reference-northstar.png` (main panel, 0..1045 x 0..685).
-`31-board-closeup` predates the cage, hand and strap commits but shows the grade, board and blood changes.
+Date: 2026-10-05. Run 3, base `de4a920`. The "since run 2" column compares with run 2, which judged `35-main.png`
+(frame luma 85).
+Judged images:
+- `41-hud.png`: the only capture made after this milestone's code (b116cea, `-TCHud=1`).
+- `40-main.png` and `40-opponent-closeup.png`: committed in cca78d3 at 00:14. That is **before** the quality preset
+  (ea594b5, 03:49) and the HUD, so they are run-2 verification shots, not evidence for this milestone.
+- `39-caged.png` and `39-annotator.png`.
+
+The reference is `/root/townchess-work/reference-northstar.png`. Its main panel is 0..1045 x 0..685; the HUD detail
+is in the top corners and the left column. `docs/reference/concept-reference.jpg` is the same image as a JPEG
+(mean pixel difference about 2).
 
 ## Findings first (evidence)
 
-1. **The grade fix was undone by a 2x exposure jump, so the frame is now flat and high-key.**
-   - Mean frame luma per pass (1/4 scale): 27 = 45, 29 = 39, 31 = 39, **33 = 85, 35 = 85**. The reference is 27.
-   - Saturation went 189 (27) → 139 (31) → **88 (35)**. The reference is 152, so we now overshoot into grey-pink.
-   - Board crop luma is 126; the reference is 55, and run 1 measured 93. The room top band rose from 21 to 39.
-   - No light or post line changed between 31 and 33. The commits in between are f081e11, c327541 and 44e16ed
-     (cage MI, hand decals). The capture commands are the same (`shots28.ps1` and `shots32.ps1` on townchess-win).
-     The cause is therefore outside the diffed lines. Bisect it before tuning anything else.
-   - The result: there is no lamp pool and no falloff. The white beds, chair and cart read as bright clean CG props.
-2. **The blood "rectangle" is not a texture problem.** In 35-main it is still a flat strip (sRGB 181,86,83) that
-   covers rank 6 from e to g. Its top, bottom and left edges sit exactly on square edges.
-   - `T_Blood_Pool_BaseColor.png` is a round blob (alpha bbox 209..1878 of 2048), and the radial fade in
-     `blood_decals()` (~460) is in place. Even so, the edges follow the board grid.
-   - So the clipping happens on the receiving side. Its position matches placement `("Pool", 6, 8, 11, 20)` (~1251).
-   - The run-1 edge-fade fix could not have helped.
-3. **The cage does not render as dark iron.** `MI_CageIron` has tint 0.07, but it reads cream-beige in
-   33-opponent-closeup and copper-tan in 35-main.
-   - Likely cause: `grime_color=(2.6, 1.3, 0.55)` (~1441) has values above 1. With GrimeThreshold 0.5 and Contrast
-     3.0, about half of the surface is pushed to a bright tan.
-   - The geometry is still flat rectangular strips (`cage_mask()` `band()` and `w.thickness = 0.0042`), not round
-     wire. It is thicker now, but it looks like stamped sheet metal.
-4. **The player's arm IK is far off target.** From `build-level.log` (townchess-win, 23:37):
-   `player l ... error 174.0` and `player r ... error 561.4`, against `clasp l` error 5.8 and `clasp r` 38.8.
-   - This is why the left hand is still a raised fist by the lamp post, and the right hand reaches over from the
-     edge of the frame.
-5. **The Annotator plate reads as copper or leather, not dark steel** (38-annotator-closeup):
-   - The rivets are glowing salmon beads (`mi_copper` tint 0.95,0.5,0.32 on rusty_metal_02).
-   - The eye grid is a checker of square holes. Next to the chessboard it reads as a sticker or a joke.
-   - The worn-patch rectangle at lower right is a flat, unbevelled card.
-   - The coat now reads slate grey-green, which is correct. The forearms are bare (LIM-011, as stated).
-6. **Both opponents share one clasp pose.** The hand positions are identical in 35 and 38. For the caged patient the
-   hands sit behind the black back rank and hide the queen and king. The torso is upright, with no forward lean.
-7. **Black seat:** there is no screenshot. Per the lead, the board turns 180° for Black and the camera stays put.
-   Note that `build()` still spawns a `PlayerEyeBlack` camera with tag `TC_Camera_Black` (~1595). If it is no longer
-   used, it is dead weight.
+1. **There is no visible evidence of the Epic + hardware-RT preset.**
+   - Outside the HUD, `41-hud` and `40-main` differ only where pieces moved: mean absolute difference 6/5/4 in the
+     centre crop.
+   - Frame luma is 39 against 38, saturation 140 against 142, and board luma 81 against 80.
+   - The reason: `capture.py` sets its own scalability (`-TCPreset`, default cinematic = 4) and has forced the
+     HW-RT cvars since eebb6d6 (2026-10-04), ~128-134. Every reference shot has been taken at cinematic + HWRT
+     since then, and the game's new `ATCGameMode::ApplyQualityPreset` changes nothing in these captures.
+   - So the screenshots show what the captures always showed, not what players get. No committed image supports a
+     claim that the game "looks better at Epic/HWRT". The game log line
+     `quality: epic (level 4), hardware ray tracing on` from a packaged run on the RTX 4070 Ti SUPER would be the
+     evidence.
+2. **The HUD is the right layout but not the reference's typography.** Crops at 1:1 of the top-left, top-right
+   and bottom.
+   - Reference: player plates with a portrait thumbnail, the name in a clean sans, the rating with a small icon and a
+     voice meter. The clocks are thin light sans figures. The action column has an icon per row (handshake, flag,
+     gear).
+   - Ours: Courier Prime everywhere, in caps and fairly heavy, on dark plates with a 1 px warm border. There are no
+     portraits, no icons and no Settings row.
+   - The typewriter face is right for the reference's panel captions ("MAIN GAMEPLAY VIEW", "FIND A GAME"), not for
+     the plates and clocks. The commit and pass-40 note "reads like the reference's thin typewriter UI" overstates
+     this.
+3. **The plates are unbalanced.**
+   - The left plate is the 250 px minimum ("PATIENT_65 / White 1200"). The right one grew to fit "THE PATIENT
+     (warden)" (`DrawGame` `PlayerPlate`, `W = max(250U, Tw + 28U)`), so the two clocks sit at different x offsets.
+   - Sides are swapped against the reference, which puts the opponent top-left and you top-right.
+   - The AI plate shows "Black" with no rating, while the human plate shows one.
+4. **The clock floats on the scene.** The "04:50" clock has no plate, and the lamp post runs straight behind the
+   "04" (1:1 crop). Its only separation is a 1 px shadow. The reference has the same floating clocks, but over a
+   near-black wall.
+5. **The last-move markers are flat cream discs** under d7 and d5 in `41-hud`. Next to the reference, which marks
+   nothing in the main view, they read as UI stickers lying on the board, not as light or wear. Hover uses the same
+   decal style (`ATCBoard::RefreshMarkers` / `AddMarker`).
+6. **The scene is unchanged since pass 39.** `39-caged` against `40-main` has a mean difference of 1.8/1.2/1.0, which
+   agrees with the pass-40 note. So every scene row below is judged on the same pixels as the run-2 fixes. Exposure
+   is much better than in run 2: frame luma 38 (reference 27, run 2 85), saturation 142 (reference 152).
+7. **The cage still reads bronze-tan, not dark iron** (`40-opponent-closeup`).
+   - The bars are square-section strips with a brow band and one rivet, all in a smooth tan with no rust breakup.
+   - The face behind them is the best-rendered thing in the frame: wrinkles, a wet eye and warm skin.
+8. **The player's hands are unchanged.** The left hand is still a raised fist resting on the bowl, and the right
+   hand enters from the frame edge. There is no dirt, nail grime, veins or blood at gameplay distance. Opponent-crop
+   luma is 40 against 22 in the reference, and the left-hand crop 74 against 44.
 
 ## Scores (0-10 vs reference)
 
-| Element | Run 1 | Run 2 | Since run 1 | Note |
+| Element | Run 2 | Run 3 | Since run 2 | Note |
 |---|---|---|---|---|
-| Opponent: face | 6 | 6 | same | Head now level and looking at the board; eyes and wrinkles read in the close-up. Flattened by exposure in the main view |
-| Opponent: body/pose | 3 | 4 | better | Forearms on the table, as the reference has. No lean, hands mask the back rank, and the pose is copied onto the Annotator |
-| Opponent: clothing | 2 | 4 | better | Grimy off-white shirt with stains, and a webbing strap with a brass ring. Still short T-shirt sleeves. The strap reads as a bib or yoke, not straitjacket buckles |
-| Mask (cage) | 5 | 4 | worse | Thicker, but beige or tan instead of dark iron (finding 3). Flat strips, not wire |
-| Player hands | 3 | 3 | same | Less orange, and faint vein relief at full res on the right hand. No dirt, nail grime or blood visible. Left hand is wrong (IK, finding 4). No sleeve |
-| Pieces | 5 | 5 | same | Whites are ivory now, not yellow. Still clean plastic: no chips, wear or blood |
-| Board | 4 | 4 | same | Less maroon, but brighter (luma 126 vs 55). Clean checker with no filth in the joints |
-| Blood / wear | 3 | 3 | same | Spatter is good. The pool is still a rank-aligned strip (finding 2). Nothing on pieces or hands |
-| Table | 4 | 4 | same | More neutral brown. Still smooth; no gouges or bleaching |
-| Props / clutter | 3 | 3 | same | Brass bowl is hidden under the left fist and reads as a cork coaster. Shade underside is still a flat beige disc. The Annotator's ledger reads. The paper in 31 curls into the lens |
-| Environment | 4 | 3 | worse | Exposure exposes the clean white beds, chair and cart. The reference room is near-black |
-| Lighting | 4 | 3 | worse | High-key and flat. No lamp pool, no amber/teal split (finding 1) |
-| Camera / composition | 6 | 6 | same | Same framing. Opponent small, board dominant |
-| UI / HUD | n/a | n/a | same | Not in the captures |
-| Black-seat view | n/a | n/a | n/a | No screenshot; board rotates 180° and camera stays (finding 7) |
+| Opponent: face | 6 | 6 | same | Strong in the close-up. At gameplay distance it is behind the cage |
+| Opponent: body/pose | 4 | 4 | same | Arms folded on the table, upright. The hands still sit behind the black queen and king |
+| Opponent: clothing | 4 | 4 | same | Off-white short-sleeved shirt, one strap with a ring. The reference has long canvas sleeves and cuffs |
+| Mask (cage) | 4 | 4 | same | Greyer than in 35, still tan-bronze. Flat strips |
+| Player hands | 3 | 3 | same | Fist on the bowl. Clean skin |
+| Pieces | 5 | 5 | same | Ivory and ebony Staunton, clean plastic sheen. No chips or blood |
+| Board | 4 | 5 | better | Luma 80 (reference 55, run 2 126). Inlay reads. Still clean, with only one splash |
+| Blood / wear | 3 | 4 | better | The rank-6 strip is gone, and the splash at c3-d3 is irregular. Nothing on pieces, hands or table |
+| Table | 4 | 4 | same | Brown, smooth, no gouges |
+| Props / clutter | 3 | 3 | same | The lamp head is cropped, leaving a flat beige disc at the top left. Plain bowl and one mug. The reference has a lit lamp, a brass bowl, books and a tin cup |
+| Environment | 3 | 4 | better | Dark again. Beds, wheelchair and bars read as an asylum. No WARD B in this frame |
+| Lighting | 3 | 5 | better | Low key back (38). There is still no warm lamp pool on the board, and the lamp is not in shot |
+| Camera / composition | 6 | 6 | same | Same framing. The opponent is small and the board dominates |
+| UI / HUD | n/a | 5 | new | The layout matches: plates in the corners, clocks under them, actions on the left, status at the bottom. Typography and plate content do not (findings 2-4) |
+| Black-seat view | n/a | n/a | n/a | No screenshot |
 
 ## Top 8 fixes (visual payoff per effort)
 
-1. **Get the low key back (low effort, affects every row).**
-   - Bisect the 31 → 33 jump first: rebuild at fd4c24f and at 44e16ed with the same `shots32.ps1`.
-   - Then aim for frame luma 27-35, board luma about 55 and saturation about 150:
-     - Exposure: `TC_EV` 7.8 → about 9.5-10. The display luma ratio of 2.2 is about 2-2.5 stops.
-     - Lights: sky 0.07 → 0.02, `BackWall_Wash` 4500 → 1500 lm, `Window_Cold` 2500 → 1000 lm,
-       `Corridor_Glow` 2200 → 900 lm.
-     - Grade: `color_saturation` 0.72 → 0.85.
-   - Re-measure with this report's crops.
-2. **Kill the blood strip (low).**
-   - Hide the `Pool` decal at (6, 8) and recapture to confirm it is the source.
-   - Then move pools off the playing surface onto the table and frame (keep the spatter on the board), or shrink
-     the Pool to `sz` 6.
-   - If it persists, check the board-squares receiver: `MI_BoardSquares` on the 9 x 9 grid plane from
-     `chess_board()`.
-3. **Make the cage iron (low).**
-   - In `MI_CageIron` (~1440), set `grime_color` to about (0.22, 0.1, 0.04), GrimeThreshold 0.65 and roughness
-     0.6-0.7 so the edges catch the lamp.
-   - In `cage_mask()` (props.py ~62), give the wires a round section (bevel or a curve with depth of about
-     0.25 cm) and keep the brow band flat with rivets.
-4. **Fix the player's arms (medium).**
-   - The IK errors are 174 and 561 (finding 4). Bring `ARM_TARGETS["player"]` into reach, or move the player body
-     closer so both hands rest on the near frame (x≈-30, y≈±20).
-   - Add a stained cuff or sleeve with `sleeve()` on `lowerarm_l/r`. This also hides the decal seam at the wrist.
-5. **The Annotator's plate (low).**
-   - Put the rivets and the patch on `mi_steel`, not `mi_copper`, and darken the steel tint to about 0.08 with
-     edge wear.
-   - Replace the square checker eye grid with a round drilled pattern (`annotator_mask` in props.py).
-   - Bevel the patch card.
-6. **Differentiate and lean the poses (medium).**
-   - Caged patient: pitch spine_01-03 about 15-20° forward, and lower and spread the hands so the black king and
-     queen show.
-   - Annotator: give him his own target, with the right hand holding the pencil over the ledger (CHARACTERS.md 2.x)
-     instead of the patient's clasp.
-7. **Hand skin (medium).** The procedural vein decal is too faint at gameplay distance. The real fix is the owner's
-   8K MetaHuman skin. Meanwhile, raise the dirt opacity in `M_TC_HandDirt`, add nail-bed and knuckle grime and a few
-   dried-blood flecks on the fingertips, and darken the cuticles.
-8. **Clutter reads (low).**
-   - Move the bowl from (-8, -46) to where it is visible, for example (-14, -60) beside the lamp base, clear of the
-     fist.
-   - Give the lamp shade an inner material and a recessed bulb.
-   - Keep the loose paper out of the board close-up camera.
-   - Add the WARD B stencil and dirty the white bed frames with the grime layer (they are now the brightest thing
-     in the room).
+1. **Prove or drop the quality claim (low).** Capture one packaged frame at `-tcquality=high` and one at `epic` on
+   the RTX PC, through the game camera rather than SceneCapture, and commit the pair together with the
+   `quality:` log line.
+2. **HUD typography (low).**
+   - Draw the names, ratings and buttons in a free sans: Inter or IBM Plex Sans (OFL). Keep Courier Prime for
+     captions and the "[TAB] GAME RECORD" hint.
+   - Render the clocks in a light-weight face at about 1.6x.
+   - Build the font in `ATCHUD::UiFont()` with a second runtime face, and raise `LegacyFontSize` to about 32 so the
+     1.7x clock is not upscaled from a 20 px cache at 1440p and 4K.
+3. **Plate content (low-medium).** Add a 48 px portrait per player and rating icons, each a small texture drawn with
+   `DrawTexture`. Use one width for both plates: the max of both names. Put the opponent on the left, as the
+   reference does.
+4. **Clock legibility (low).** Give the clock a faint plate (alpha 0.35), or put it inside the player plate.
+5. **Markers (low).** Replace the cream discs with a subtle warm emissive rim or a darkened square tint at about
+   0.15 opacity. Do the same for hover.
+6. **Lamp in shot with a pool (medium).** Lower or move the lamp so the shade and bulb enter the frame, as in the
+   reference's top left. Give the shade an inner emissive, and aim a narrow warm spot at the board (`build_scene.py`
+   lights block).
+7. **Hands (medium).** Uncurl the left hand onto the board edge (fix the `ARM_TARGETS["player"]` reach errors from
+   run 2). Add a sleeve cuff and dirt or blood decals on the knuckles and nails.
+8. **Cage and plate metal (low).** Darken `MI_CageIron` toward a 0.05 base with rust breakup at about 0.3 roughness
+   variance. On the Annotator plate, replace the square checker eye grid with round drilled holes (`annotator_mask`
+   in props.py).
 
 ## Character design
+- **Caged patient** (`40-*`, `39-caged`): the silhouette holds: cage head, pale shirt, forearms on the table. Against
+  the reference and CHARACTERS.md he still lacks the long stained canvas sleeves, the leather wrist cuff and the
+  clasped hands. The cage reads as tan sheet metal under the lamp. The face is excellent.
+- **The Annotator** (`39-annotator`): he sits at the table with his ledger, and the plate has a riveted seam, which
+  is an improvement. The plate is still a warm tan or bronze, not dark worked steel, and the eye grid is a square
+  checker that reads as a sticker. The coat is dark green-grey. The forearms are bare (LIM-011), and the pose is the
+  patient's folded arms.
 
-- **Caged patient** against the reference:
-  - Silhouette: cage head, pale shirt, forearms on the table. Closer than run 1.
-  - The cage material is wrong: tan instead of dark iron, and flat strips.
-  - The shirt is grimy now, which is good, but it is a short-sleeved T-shirt. The reference has long canvas sleeves
-    with frayed cuffs and a leather wrist cuff. The single strap with a big ring reads as a bib.
-  - Under the current exposure, he has no value separation from the bars behind him.
-- **The Annotator** (`38-annotator*.png`) against CHARACTERS.md 2.2-2.4:
-  - Better than run 1: the coat reads slate grey-green, the plate has rolled edges and a rivet seam, the coif dome
-    shows, and his ledger is on the table.
-  - It still fails "dark worked steel". The plate reads as copper or leather with pink rivets (finding 5).
-  - The tan oversleeves are missing (LIM-011). The forearms are bare skin, so the "two pale bars" silhouette rule
-    fails.
-  - No gloves, cut fingertip or pencil in hand. His pose is the patient's, not a clerk's.
+## Not covered by any screenshot
+Black seat, the menu ("FIND A GAME" against the reference panel), the promotion picker, check and checkmate states,
+the draw-offer row, drag in progress, hover, and the Epic/HWRT preset. The reference has panels for promotion,
+checkmate and find-a-game, and none of ours is captured.
 
 ## Checked
-
-- All six named screenshots (downscaled and full-res crops of hands, lamp, bowl and pool), plus 27/29/31/33 for the
-  brightness trend.
-- Pixel stats (luma, saturation, clipping) against the reference crops for frame, board, right hand and opponent.
-- md5 of the 31-38 files.
-- The pool decal texture's alpha.
-- build_scene.py: post (~1618), lights (~1546), `blood_decals()`, Pool placement, `MI_CageIron`, `make_mi`,
-  Annotator materials, `MI_BoardSquares`.
-- props.py `chess_board()` and `cage_mask()`.
-- `git diff fd4c24f 44e16ed`, which has no light or post change.
-- On townchess-win: the capture scripts `shots28/32/36.ps1` and `build-level.log` (IK errors, BUILD OK, no skipped
-  post settings).
+- Viewed `41-hud` and `40-main` (scaled), `40-opponent-closeup`, `39-caged` and `39-annotator`. Made 1:1 crops of
+  the HUD corners, the bottom status, the clock glyphs and the board centre.
+- Pixel stats: frame, board, opponent and hand luma and saturation, compared with the reference crops.
+- Image diffs 39 to 40 and 40 to 41.
+- The commit dates of the screenshots against the code commits.
+- `ATCHUD` (TCGame.cpp 460-712): `UiFont`, `Plate`, `Button`, `DrawGame`, `DrawToRenderTarget`.
+- `capture.py` HUD and quality handling.
+- `ApplyQualityPreset` (TCGame.cpp 69).
