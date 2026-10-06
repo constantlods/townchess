@@ -21,6 +21,7 @@ ap.add_argument("--res", type=int, default=4096)
 ap.add_argument("--out", default="ue5/assets/textures/board")
 ap.add_argument("--cache", default="tools/.cache/polyhaven")
 ap.add_argument("--seed", type=int, default=7)
+ap.add_argument("--dirt", type=float, default=1.0, help="0 = the pass-27 clean board")
 a = ap.parse_args()
 rng = np.random.default_rng(a.seed)
 N, R = 8, a.res
@@ -92,6 +93,34 @@ for _ in range(1400):
     scr[ys, xs] = rng.uniform(0.3, 1.0)
 scr = ndimage.gaussian_filter(scr, 0.6)
 bc *= (1 - 0.16 * grime)[..., None] * np.array([1.0, 0.97, 0.92])
+if a.dirt > 0:
+    # pass 55: the reference's board is filthy (mottled grey-brown grime, specks, dirt packed into the grain); ours read as
+    # clean veneer and its fine detail was half the reference's in the board band. Multi-scale grime, specks, pits.
+    def noise(scale):
+        n = ndimage.gaussian_filter(rng.standard_normal((R, R)).astype(np.float32), scale / 2.5)
+        return (n - n.mean()) / (n.std() + 1e-6)
+    mott = 0.5 * noise(96) + 0.35 * noise(24) + 0.25 * noise(6)
+    mott = np.clip(mott * 0.45 + 0.1 + grime * 0.5, 0, 1) * a.dirt
+    lightsq = np.zeros((R, R), np.float32)
+    for fy in range(N):
+        for fx in range(N):
+            if (fx + fy) % 2:
+                lightsq[R - (fy + 1) * S:R - fy * S, fx * S:(fx + 1) * S] = 1
+    grey = bc.mean(2, keepdims=True) * np.array([0.78, 0.7, 0.6], np.float32)    # grime is grey-brown, not orange
+    bc = bc * (1 - (0.55 * mott * (0.5 + 0.5 * lightsq))[..., None]) + grey * (0.25 * mott * lightsq)[..., None]
+    lum = bc.mean(2)
+    grain = lum - ndimage.gaussian_filter(lum, 3)                                  # dirt packed into the open grain
+    bc *= (1 + np.clip(grain, -0.2, 0.0) * 2.5 * a.dirt * lightsq)[..., None]
+    pr = 0.0009 * a.dirt * (0.2 + 1.6 * mott)                                     # specks cluster in the grime
+    specks = np.clip(ndimage.gaussian_filter((rng.random((R, R)) < pr).astype(np.float32), 0.8) * 5, 0, 1) \
+        + np.clip(ndimage.gaussian_filter((rng.random((R, R)) < pr * 0.15).astype(np.float32), 2.2) * 14, 0, 1)
+    bc *= (1 - 0.5 * np.clip(specks, 0, 1) * rng.uniform(0.6, 1.0, (R, R)).astype(np.float32))[..., None]
+    bc += (0.05 * mott * (1 - lightsq))[..., None] * np.array([0.9, 0.85, 0.8], np.float32)  # dust and scuffs on the dark squares
+    pits = np.clip(ndimage.gaussian_filter((rng.random((R, R)) < 0.0012 * a.dirt).astype(np.float32), 1.6) * 9, 0, 1)
+    py, px = np.gradient(pits)
+    nm[..., 0] = np.clip(nm[..., 0] + px * 2.0, 0, 1)
+    nm[..., 1] = np.clip(nm[..., 1] - py * 2.0, 0, 1)
+    arm[..., 1] = np.clip(arm[..., 1] + 0.2 * mott, 0, 1)
 bc = bc * (1 - 0.25 * scr[..., None]) + 0.06 * scr[..., None]
 arm[..., 1] = np.clip(arm[..., 1] + 0.18 * grime + 0.25 * (1 - seam), 0, 1)   # grime and joints are matte
 arm[..., 0] *= (0.6 + 0.4 * seam)                                             # AO in the joints

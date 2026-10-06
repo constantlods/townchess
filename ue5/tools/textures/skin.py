@@ -292,7 +292,7 @@ def variant(name, rng):
     scar = np.zeros(len(idx), np.float32)
     if name == "scarred":
         cand = np.nonzero((forearm | hand_back) & (dors > 0.2) & (fade_elbow > 0.6))[0]
-        for k in range(7):
+        for k in range(9):
             c = pos[cand[rng.integers(len(cand))]]
             L = Ls[1 if c[0] > 0 else -1]
             ang = rng.uniform(-1.2, 1.2) + np.pi / 2
@@ -303,7 +303,7 @@ def variant(name, rng):
             seg = a1 - a0
             tt = np.clip(((pos - a0) @ seg) / seg.dot(seg), 0, 1)
             d = np.linalg.norm(pos - (a0 + tt[:, None] * seg), axis=1)
-            wid = 0.09 if k else 0.14
+            wid = rng.uniform(0.13, 0.22) if k else 0.2   # 1.3-2.2 mm half-width: thinner vanished at the seat's distance
             prof = np.clip(1 - (d / wid) ** 2, 0, 1) ** 0.5 * smooth(0.0, 0.06, tt) * smooth(0.0, 0.06, 1 - tt)
             prof *= 0.6 + 0.4 * smooth(-0.3, 0.3, perlin(pos * 2.5, 300 + k))
             if not k:  # one stitched wound: ticks across it every ~0.6 cm
@@ -311,7 +311,7 @@ def variant(name, rng):
                 tick = (np.abs(((u_along + 0.3) % 0.6) - 0.3) < 0.05) & (d < 0.42)
                 prof = np.maximum(prof, tick * 0.8)
             scar = np.maximum(scar, prof)
-            h_scar = np.maximum(h_scar, prof * 0.035)
+            h_scar = np.maximum(h_scar, prof * 0.05)
     # colour
     col = bc_full[yy, xx].copy()
     vt = vein * 0.85
@@ -325,7 +325,7 @@ def variant(name, rng):
         sp = smooth(0.52, 0.62, perlin(pos * 3.2, 401)) * smooth(0.2, 0.6, dors) * np.where(hand_back | (cls == 3), 1, 0)
         col = col * (1 - sp[:, None] * 0.85) + np.array([0.16, 0.03, 0.025], np.float32) * sp[:, None] * 0.85
     if name == "scarred":
-        col = col * (1 - scar[:, None]) + np.clip(col * np.array([1.25, 1.02, 1.0], np.float32) + 0.04, 0, 1) * scar[:, None]
+        col = col * (1 - scar[:, None]) + np.clip(col * np.array([1.3, 1.08, 1.05], np.float32) + 0.07, 0, 1) * scar[:, None]
     out = bc_full.copy()
     delta = np.zeros((R, R, 3), np.float32)
     delta[yy, xx] = col - bc_full[yy, xx]
