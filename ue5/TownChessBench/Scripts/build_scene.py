@@ -541,6 +541,25 @@ def blood_decals():
         MEL.update_material_instance(mi)
         EAL.save_loaded_asset(mi)
         out[v] = mi
+    # non-blood table wear from ue5/tools/textures/stains.py (mug rings, handled grime): same decal material
+    sd = os.path.join(TEXTURES_DIR, "stains")
+    for v in ("Ring", "Dirt"):
+        f = os.path.join(sd, f"T_Stain_{v}_BaseColor.png")
+        if not os.path.exists(f):
+            continue
+        name = f"MI_Stain_{v}"
+        if EAL.does_asset_exist(f"{ROOT}/Materials/{name}"):
+            EAL.delete_asset(f"{ROOT}/Materials/{name}")
+        mi = AT.create_asset(name, f"{ROOT}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        MEL.set_material_instance_parent(mi, m)
+        MEL.set_material_instance_texture_parameter_value(mi, "BaseColor", import_texture(f, f"{ROOT}/Textures/Stains", f"T_Stain_{v}_BaseColor", "color"))
+        rf = os.path.join(sd, f"T_Stain_{v}_Roughness.png")
+        if os.path.exists(rf):
+            MEL.set_material_instance_texture_parameter_value(mi, "Roughness", import_texture(rf, f"{ROOT}/Textures/Stains", f"T_Stain_{v}_Roughness", "gray"))
+        MEL.set_material_instance_scalar_parameter_value(mi, "Darken", 1.0)  # already the right colour
+        MEL.update_material_instance(mi)
+        EAL.save_loaded_asset(mi)
+        out[v] = mi
     log("blood decals", sorted(out))
     return out
 
@@ -1332,7 +1351,11 @@ def build():
     blood = blood_decals()
     placements = [  # variant, x, y, size (cm), yaw: board squares, the near frame, the table
         ("Spatter", -4, -10, 14, 75),  # (the decal at (6, 8) clipped to a straight-edged stain on f/g: removed) ("Spatter", 16, 14, 9, 200), ("Smear", -18, -2, 16, 0),
-        ("Pool", -30, 34, 18, 140), ("Spatter", 30, -30, 12, 300), ("Smear", -28, -40, 22, 160), ("Spatter", 20, 40, 10, 40)]
+        ("Pool", -30, 34, 18, 140), ("Spatter", 30, -30, 12, 300), ("Smear", -28, -40, 22, 160), ("Spatter", 20, 40, 10, 40),
+        # pass 49: the reference has blood across the board and grime everywhere (fine detail 12.9 against our 10.5)
+        ("Spatter", 9, 13, 7, 30), ("Spatter", -15, 17, 6, 200), ("Spatter", 15, -16, 8, 120), ("Smear", -27, 8, 10, 90),
+        ("Dirt", 42, -8, 34, 20), ("Dirt", 38, 30, 30, 140), ("Dirt", -6, -50, 30, 260), ("Dirt", -4, 52, 28, 80),
+        ("Ring", 22, 30, 10, 0), ("Ring", 44, -40, 9, 110)]
     for k, (v, x, y, sz, yaw) in enumerate(placements):
         if v not in blood:
             continue
@@ -1488,6 +1511,7 @@ def build():
         opp = EAS.spawn_actor_from_object(body_mesh, unreal.Vector(*loc), unreal.Rotator(0, 0, yaw))  # mesh faces +Y; yaw 90 -> -X
         opp.set_actor_label(f"Opponent_{opp_id}")
         smc = opp.skeletal_mesh_component
+        setp(smc, "receives_decals", False)  # table blood/stains must never land on hands or forearms
         tag(opp); tag(opp, opp_tag); tag(opp, "TC_Body")
         setp(smc, "animation_mode", unreal.AnimationMode.ANIMATION_SINGLE_NODE)
         data = unreal.SingleAnimationPlayData()
@@ -1509,6 +1533,7 @@ def build():
                 f = EAS.spawn_actor_from_object(mesh, unreal.Vector(*loc), unreal.Rotator(0, 0, yaw))
                 f.set_actor_label(f"Opponent_{opp_id}_{label}")
                 f.skeletal_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+                setp(f.skeletal_mesh_component, "receives_decals", False)
                 f.attach_to_actor(opp, "", R.KEEP_WORLD, R.KEEP_WORLD, R.KEEP_WORLD, False)
                 if mi:
                     for i in range(f.skeletal_mesh_component.get_num_materials()):

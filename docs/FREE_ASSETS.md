@@ -33,6 +33,7 @@ All Poly Haven downloads are scripted (`ue5/tools/fetch_polyhaven.py`, hero reso
 | Blood decals (spatter, pool, smear, drips: colour/coverage, relief, gloss) and handling-grime masks | `ue5/tools/textures/blood.py` (numpy/scipy/pillow, `tools/.venv`) | `ue5/assets/textures/blood`, `.../grime` |
 | Inlaid board surface (maple/walnut composite, joints, scratches, wear) | `ue5/tools/textures/board.py` | `ue5/assets/textures/board` |
 | Grime mask (blotches, streaks, smudges) | `build_scene.py` `grime_png` | built into the level |
+| Table stains: mug rings (dried rim, faint film, broken where the mug tilted) and handled-grime patches (greasy blotch with wipe streaks) | `ue5/tools/textures/stains.py` | `ue5/assets/textures/stains` |
 | Piece sounds: wooden move "clack" and heavier capture (synthesised: modal resonances of a wood block plus a felt thud) | `ue5/tools/audio/clack.py` | `ue5/assets/sounds/S_TC_Move.wav`, `S_TC_Capture.wav` |
 
 ## Credits
