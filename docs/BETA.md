@@ -41,7 +41,7 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 | # | Criterion | Check | Status |
 |---|---|---|---|
 | C1 | Two opponents with distinct designs | caged patient, the Annotator; menu switch | met |
-| C2 | Hand customization (reference panel) | at least: bare, dirty, scarred, sleeves, watch, gloves; remembered | partial (bare, sleeves, watch) |
+| C2 | Hand customization (reference panel) | at least: bare, dirty, scarred, sleeves, watch, gloves; remembered | partial (actor looks bare, sleeves, watch; skins dirty and scarred built as `MI_PlayerSkin_*` but the game cannot switch skins yet; no gloves) |
 | C3 | Menu, settings and HUD like the reference | find-a-game, time control, strength, opponent, hands, quality preset, view height, volume; end card; promotion card | met 2026-10-06: menu, Settings panel (volume, graphics, view height; keys autotest 13/13), end card, promotion card, portraits on the player cards (screenshots hud_caged/annotator) |
 | C4 | Sound | piece move/capture; ambience; end-of-game sting | met: own synthesis (clack.py, ambience.py: 29 s ward loop, 4 s sting), volume in Settings |
 | C5 | Credits and licences in game and in docs | FREE_ASSETS.md complete; a credits line in the menu | met: credits line on the menu; FREE_ASSETS rows for every generator and download |
