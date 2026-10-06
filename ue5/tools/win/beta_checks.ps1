@@ -25,6 +25,7 @@ function RunGame([string]$tag, [string[]]$extra) {
 }
 for ($i = 1; $i -le $Games; $i++) { $res.games += RunGame "game$i" @('-windowed', '-ResX=1280', '-ResY=720') }
 $w, $h = $PerfRes.Split('x')
-$res.perf = RunGame 'perf' @('-windowed', "-ResX=$w", "-ResY=$h")
+# -RenderOffscreen ignores -ResX/-ResY (the first run rendered 888x500): set the resolution with r.SetRes as well
+$res.perf = RunGame 'perf' @('-windowed', "-ResX=$w", "-ResY=$h", "-ExecCmds=`"r.SetRes ${PerfRes}w`"")
 $res.s2 = if (@($res.games | Where-Object { -not $_.pass -or $_.leftover }).Count -eq 0) { "PASS $Games/$Games" } else { 'FAIL' }
 $res | ConvertTo-Json -Depth 4 | Tee-Object -FilePath (Join-Path $Logs 'beta-checks.json')
