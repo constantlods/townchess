@@ -85,8 +85,7 @@ def begin():
     cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
     state["cap"] = (world, rt)
     probe(world)
-    loc = pcm.get_camera_location()
-    log(f"capture {w}x{h} fov={pcm.get_fov_angle():.1f} cam=({loc.x:.0f},{loc.y:.0f},{loc.z:.0f}) preset={PRESET}")
+    log(f"capture {w}x{h} fov={fov:.1f} cam=({loc.x:.0f},{loc.y:.0f},{loc.z:.0f}) preset={PRESET}")  # the shot camera, not the player's
 
 
 def probe(world):
