@@ -19,8 +19,8 @@ for f in sorted(glob.glob(os.path.join(a.shots, "portrait_*.png"))):
     oid = os.path.basename(f)[len("portrait_"):-4]
     im = Image.open(f).convert("RGB")
     w, h = im.size
-    s = int(h * 0.82)
-    x0, y0 = (w - s) // 2, int(h * 0.05)
+    s = h  # the full height: the whole head and mask (0.82 cropped it to a strip of cage)
+    x0, y0 = (w - s) // 2, 0
     im = im.crop((x0, y0, x0 + s, y0 + s)).resize((256, 256), Image.LANCZOS)
     x = np.asarray(im).astype(float) / 255.0
     lum = x @ [0.2126, 0.7152, 0.0722]
