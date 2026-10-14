@@ -1,130 +1,115 @@
 # Visual judge report (stage 2)
 
-Date: 2026-10-06. Run 4 (BETA focus), base `d466ca1`. Reference: `docs/reference/concept-reference.jpg`, main panel
-(top-left, 0..1045 x 0..685) plus the HAND CUSTOMIZATION, PIECE INTERACTION and CHESS PIECES panels.
-Judged images (newest passes only):
-- main view: `58-main.png` (current default), `54-hud-portraits.png` (Annotator), `51-clutter.png`;
-- menu: `52-menu-hands.png`;
-- hands: `53-hands-veins.png`, `53-hand-before-after.png`, `57-skin-variants.png` (bare / dirty / scarred / patient's
-  hands), `57-forearm-closeup.png`, `52-watch.png`;
-- board: `55-board-before-after.png`.
-
-No Black-seat screenshot exists in passes 51-59, so that row is not scored. Added during this run: `59-skins-in-game.png`
-(2cab890, dirty above / scarred below, switched from the menu). The dirty skin now shows real grime smudges on the
-back of the hand. The scar is a single small pink line, and the bare knee fills the lower left again (finding 1).
+Date: 2026-10-13. Run "baseline 2026-10-13" (independent judge, role 15), base `a82c55d`. Reference:
+`docs/reference/concept-reference.jpg`, main panel (top-left, 0..1045 x 0..685) plus the HAND CUSTOMIZATION panel.
+Judged: `docs/graphics/baseline/base_main.jpg`, `base_black.jpg`, `base_hands.jpg`, `base_opponent.jpg` (all 1920x1080)
+and `metrics.json`. The specialists' Phase A outputs were not read. Previous run: run 4 (2026-10-06, base `d466ca1`).
 
 ## Findings first (evidence)
 
-1. **The player's bare legs show in every downward view.** In `53-hands-veins`, `57-skin-variants` (all three skin
-   panels) and `52-watch`, two smooth, unclothed knees/thighs fill the lower half of the frame under the table edge.
-   They read as a naked mannequin. Cause: the player body is `spawn_opponent("player", ..., outfit_mi=mi_gown_early)`
-   (build_scene.py ~1726), which only attaches what is in the MetaHuman `Clothing` folder (the shirt). Nothing covers
-   or hides the legs. This is a V5 failure in the close-ups.
-2. **The main view shows one hand, not two.** In `58-main`, the player's left hand is cropped at the bottom-left
-   (knuckles only, wrist off-frame). The right hand is a sliver of fingertip at the bottom-right corner (x~1460,
-   y~1060). The reference's main panel has two full hands with wrists and sleeves resting at the board's near edge.
-   The veins of pass 53 are only readable in close-ups.
-3. **The hand detail is half there.**
-   - Veins: present, but embossed like worms of even thickness and too regular (`57-forearm-closeup`).
-   - Dirt: the default skin is `bare` (build_scene.py ~1731, `TC_PLAYER_SKIN` default). "Dirty" is a faint mottle
-     in the 2x2 grid.
-   - Nails: not visible in any committed image (the fingertips point away from the camera or are cropped).
-   - Scarred: indistinguishable from bare at this exposure (`57-skin-variants`, bottom-left).
-4. **The watch is a placeholder-grade model** (`52-watch`). The case is faceted (low segment count) with a blank cream
-   dial, no hands and no indices. The strap does not meet the case: a visible gap, and the strap stands off the
-   wrist. The menu says "Sleeves + Watch" in `52-menu-hands`, but that same frame shows a bare hand with no sleeve.
-   No image shows the sleeves in the main view.
-5. **The board's brass corner plates read as pale paper tiles** (`58-main`, `52-menu-hands`: four cream squares with
-   specks at the frame corners). This is `MI_BoardBrass` (build_scene.py ~1374, metal 1, tint 0.72/0.52/0.26,
-   rough 0.38) mirroring the lamp. It does not read as brass.
-6. **The opponent's clothing is still a short-sleeved tan tee**, with a ring buckle centred on the chest that reads
-   as a logo (`58-main`, `57-skin-variants` bottom-right). The reference has a long-sleeved, filthy canvas jacket
-   with cuffs. The patient's dirty hands (pass 57) are a clear win: the speckled grime reads at gameplay distance.
-7. **The Annotator's plate** (`54-hud-portraits`) is a flat tan shield. Its "checker eye opening" (props.py
-   `annotator_mask`, drilled squares) reads as a texture-test checker at gameplay distance. The plate also lights
-   flat and bright: the brightest object above the board.
-8. **What is better:** exposure and grade match (V1 pass 58). The board squares now carry grime and pits (pass 55,
-   right half). The pieces sit darker and read as ivory/ebony. The HUD has portraits on the opponent card. Clutter
-   (pill bottle with blood, papers, books, tin mug, tape) fills the table like the reference.
+1. **The hand close-up shows a broken asset** (`base_hands`). It is the worst image in the set.
+   - The hand mesh is deformed: the fingers are stretched, and the finger silhouettes double over each other
+     (x 0-500, y 380-480). The fingers slide into the palm.
+   - The hand clips through the white pieces: a pawn (x 330, y 520) and a knight (x 280-430, y 560-900) pass through the
+     fingers.
+   - The dirt is stamped dark blotches of one size, like decals. The veins are even-width tubes. No nails are visible.
+   - The watch dial is printed upside down or mirrored: "12" sits near the 6 o'clock position and "3" sits on the left
+     (x 1470-1700, y 280-360). The strap is a flat, untextured box with blocky lugs.
+   - The sleeve shows stair-step banding along its edge (x 1550-1920), and its fabric is untextured.
+2. **Grading does the work, not the assets** (see "Post-processing hiding weak assets" below).
+   - `metrics.json`: rg 1.44 / gb 1.64 match the reference (1.44 / 1.62) exactly, and the mean is 25.6 vs 26.6.
+   - Fine detail is 11.19 against 12.94 (`base_black` 10.6), even with film grain 0.5 adding noise.
+   - The colour match comes from the global desaturation and the warm grade (build_scene.py ~1965-1980). Every material
+     collapses to one brown.
+3. **The lamp is dead as a light source** (`base_main` x 230-640, y 0-200). The shade is a dull dented dome with no
+   lit rim, no glow and no hot pool under it. The brightest thing above the board is the opponent's bald orange
+   scalp (p95 102 vs 97). In the reference, the lamp is the key: a hot cone on the left of the board, with the room
+   falling off to black.
+4. **The table texture looks procedural** (`base_main` x 1300-1900, y 600-1000 and x 0-650, y 600-760).
+   - The "knife scars" are hundreds of straight, uniform hairlines, like scattered pine needles. They are not gouges.
+   - Between them, the wood is a flat dark brown. The reference has peeling varnish, pale worn patches and grime.
+   - Source: `Scratch` decals (build_scene.py ~1484) using the stains.py `scratch` texture.
+5. **The main view now frames hands, board and opponent like the reference** (better than run 4).
+   - The left hand has a wrist, sleeve and watch, and the dirt reads.
+   - The right hand is a cropped, shadowed fist at the bottom-right, with no wrist (x 1350-1650, y 870-1080).
+6. **The opponent's face is good in the close-up** (`base_opponent`). The MetaHuman skin, eyes and wrinkles are the
+   best asset in the build. But it is clean and dry: no sweat, grime or blood. The cage is clean, smooth bronze with
+   one rivet. The reference shows a heavier, riveted, rusted iron cage helmet.
+   - The gown is a long-sleeved olive/beige garment with a pale bib panel, and is far less filthy than the
+     reference's stained canvas jacket. The round dark buckle disc still sits at mid-chest (`base_main` x 990, y 435).
+7. **The Black seat works** (`base_black`). The board is flipped correctly (black pieces near), and the HUD swaps
+   colours. It inherits every main-view defect. Fine detail is lower (10.6).
 
 ## Scores (0-10 vs the reference)
 
-| Element | Run 3 | Run 4 | Change | Note |
+| Element | Run 4 | Baseline 10-13 | Change | Note |
 |---|---|---|---|---|
-| Opponent: face | 6 | 5 | worse | Bald, orange, mostly hidden behind the cage at gameplay distance. The reference reads as a wet, gaunt face |
-| Opponent: body/pose | 4 | 6 | better | Folded arms with dirty hands in front of the pieces. Stiff and upright, but credible |
-| Opponent: clothing | 4 | 4 | same | Short-sleeved tee with a chest ring (finding 6) |
-| Mask | 4 | 5 | better | The cage reads dark iron now. The Annotator plate is flat, with a checker eye (finding 7) |
-| Player hands | 3 | 4 | better | Veins exist (close-ups). Main view: one cropped hand. No nails, light dirt, bare legs (findings 1-3) |
-| Pieces | 5 | 6 | better | Darker, grimier ivory. Good Staunton silhouettes. Still no chips or blood on pieces |
-| Board | 5 | 6 | better | Grime, pits and grain on the squares (pass 55). The corner plates read as paper (finding 5) |
-| Blood / wear | 4 | 5 | better | Splashes on 3 squares, a stained pill bottle. Nothing on the table edge, hands or pieces |
-| Table | 4 | 4 | same | Wide flat brown areas left and right of the board. No gouges or drips. V2 detail is 11.4 against 11.5 |
-| Props / clutter | 3 | 5 | better | Lamp, bowl, pills, papers, books, mug, tape. The lamp shade is a blotchy procedural orange, and the bowl reads wooden, not brass |
-| Environment | 4 | 5 | better | Beds, bars, wheelchair, linoleum. The bed springs are a hard blue-white grid. No WARD B sign or window |
-| Lighting | 5 | 6 | better | The grade matches V1. The lamp lights its own shade from outside, and the bulb is a flat white disc. No hot pool on the board |
-| Camera / composition | 6 | 6 | same | The board dominates the lower half, and the hands are cropped out. The reference frames hands + board + opponent |
-| UI / HUD | 5 | 6 | better | Cards with a portrait, clean sans, quiet action list. The human card has a "P" monogram, and there are no row icons |
-| Black-seat view | n/a | n/a | n/a | No screenshot |
-| **Average (14 scored rows)** | 4.4 | **5.2** | +0.8 | **BETA V3 not met**: 8 of 14 rows are below 6, and the average is below 7 |
+| Opponent: face | 5 | 6 | better | Strong MetaHuman close-up. Clean, dry and orange-lit, with a bald scalp as the hottest highlight |
+| Opponent: body/pose | 6 | 6 | same | Folded arms, upright and stiff. The hands sit over the black back rank |
+| Opponent: clothing | 4 | 5 | better | Long sleeves now. Clean olive cloth, a pale bib, a chest disc |
+| Mask | 5 | 6 | better | The cage reads clearly. Too clean and smooth, no rust or rivets |
+| Player hands | 4 | 5 | better | Two hands in the main view, dirt by default, a watch. The close-up is broken (finding 1) |
+| Pieces | 6 | 6 | same | Good Staunton shapes. A plastic ivory sheen, white speckle noise on the rook crowns, no chips or blood |
+| Board | 6 | 6 | same | Frame and grime are fine, and the corner plates no longer read as paper. The squares look printed and flat |
+| Blood / wear | 5 | 5 | same | 4-5 splats on the squares. None on the pieces, hands or table edge at gameplay scale |
+| Table | 4 | 4 | same | Needle-like straight scratches over flat brown (finding 4) |
+| Props / clutter | 5 | 5 | same | The books, mug and pill bottle are OK. The tape roll is a white blob. The clipboard is a pale tilted slab (right) |
+| Environment | 5 | 5 | same | Bed springs are a glowing blue-white grid, and the wheelchair helps. No WARD B sign, no window, no wall texture |
+| Lighting | 6 | 5 | worse | The lamp emits nothing visible and the board is evenly lit. The scalp is the key highlight (finding 3) |
+| Camera / composition | 6 | 7 | better | Hands + board + opponent, like the reference. The right hand is cropped |
+| UI / HUD | 6 | 6 | same | Clean cards. The player portrait is an unreadable skin smear. No row icons, plain timers |
+| Black-seat view | n/a | 6 | new | Correct flip. Same defects as the main view |
+| **Average** | 5.2 (14 rows) | **5.53** (15 rows; 5.50 on the 14 comparable rows) | +0.3 | **Not at BETA** (needs 7). 6 of 15 rows are 5 or lower |
 
-**V4 (hands: veins, dirt, nails; >= 7): 5/10, not met.** Veins are present but exaggerated. Dirt reads in the
-dirty skin (`59-skins-in-game`), but `bare` is the default and the main view shows no dirt. Nails have never been
-visible in an image. "Scarred" is one small mark.
+**V4 (hands: veins, dirt, nails; >= 7): 5/10, not met.** The dirt reads at gameplay distance. Up close, the veins are
+tubes and the dirt is blotch decals. No nails are visible in any image, and the close-up mesh is deformed and clips.
 
-**V5 (placeholder/broken assets): not met.** Every item seen:
-1. Bare player knees/thighs below the table in all downward views (`53-hands-veins`, `57-skin-variants`, `52-watch`).
-2. The watch: faceted case, blank dial, strap gap / stand-off (`52-watch`).
-3. The board corner "brass" plates render as cream paper squares (`58-main`, `52-menu-hands`).
-4. "Sleeves + Watch" is selected, yet the frame shows a bare hand (`52-menu-hands`). The sleeves are unproven in any image.
-5. A captured pawn clips into / sits under the player's fingers (`53-hand-before-after` left, `51-clutter` pawns at the hand).
-6. Jagged white paper edge at the right border (`58-main` x 1830-1920, y 800-900), and an untextured pale tilted slab
-   at the right (`54-hud-portraits` / `58-main` x 1650-1920, y 540-720).
-7. The Annotator's checker eye reads as a texture-test checker (`54-hud-portraits`).
-8. HUD monogram "P" tile instead of a portrait for the human player (`58-main`; TCGame.cpp ~940).
-9. The lamp bulb is a flat white disc under the shade (`58-main`, x 480-560, y 180-230).
-No world-grid (default checker) materials were found in any judged image.
+**V5 (placeholder/broken/clipping): not met.** Every defect seen:
+1. Hand mesh deformation: stretched, overlapping fingers (`base_hands` x 0-500, y 380-480).
+2. The hand clips through a white pawn and knight (`base_hands` x 280-430, y 500-900).
+3. The watch dial is upside down or mirrored (`base_hands`). The strap is an untextured flat box.
+4. Stair-step banding on the player sleeve edge, and the fabric is untextured (`base_hands` x 1550-1920).
+5. The opponent's hands/fingers overlap the black king/queen tops on the back rank (`base_main` x 880-1000, y 520-560).
+   This needs a close-up to confirm whether it is clipping or occlusion.
+6. The clipboard sheet is a pale tilted slab with a blank grid, and reads as untextured (`base_main` x 1680-1920,
+   y 540-720).
+7. The tape roll is an untextured white blob (`base_main` x 1490-1560, y 670-730).
+8. White firefly speckles on the near rook crowns, a denoiser artefact (`base_main` x 580-620, y 870-900).
+9. The bed springs render as an emissive-looking blue-white wire grid (`base_main` x 120-690, y 230-400).
+10. The HUD player portrait is an unreadable smear (top-left card).
+No default world-grid materials were seen.
 
-## Top 8 fixes (visual payoff per effort, with the cause in code)
+## Post-processing hiding weak assets
+- **Saturation 0.72 + warm grade**: the colour metrics match by grading, and every material ends up the same brown.
+  Wood, cloth, brass and skin have no hue separation. Check the scene with the grade off: if the materials only
+  match through the LUT, the grade is hiding them.
+- **Film grain 0.5 + vignette 0.65**: the grain masks the low texture resolution on the pieces, the gown and the
+  table. The vignette crushes the frame corners, which hide an empty room (left and right are black).
+- **Detail metric**: 11.19 counts that grain as detail. The real asset detail is lower than the number says.
 
-1. **Hide or clothe the player's legs.** Cause: build_scene.py `spawn_opponent("player")` (~1726) attaches only the
-   MetaHuman shirt. Fix: in `ATCGameMode` (the place where the head is hidden for `TC_PlayerBody`), call
-   `HideBoneByName("thigh_l"/"thigh_r", PBO_None)` on the player body; or attach a dark institutional trouser
-   (MetaHuman free clothing, or a props.py cloth tube on the thighs, like `player_sleeve`).
-2. **Two hands in the main view.** Cause: the player pose targets "hands resting on the board's near corners"
-   (build_scene.py ~925, `build_seated_pose(..., pose_name="player")`), and the camera crops them. Move both hand
-   targets ~8-10 cm towards the camera and ~6 cm inward, wrist slightly pronated so the nails show, until both wrists
-   are in frame. Make "sleeves" the default look so the forearm edge matches the reference.
-3. **Default skin "dirty", and calmer veins.** Cause: `TC_PLAYER_SKIN` default `bare` (build_scene.py ~1731) and the
-   default look in `ATCGameMode::ApplyPlayerLook`. In `ue5/tools/textures/skin.py`: halve the vein normal strength,
-   vary the width (taper, branch), add knuckle creases and nail-bed grime, and darken the scar albedo so "scarred"
-   reads.
-4. **The patient's jacket.** Cause: `MI_PatientShirt` (build_scene.py ~1685) on the MetaHuman short-sleeve outfit.
-   Fix: put the Annotator's `coat_sleeve` and `oversleeve` props (props.py) on the patient in a canvas tint, with
-   grime and blood (grime_color), so the long sleeves and cuffs match. Darken the `restraint_straps` buckle
-   (`MI_Buckle` ~1711) to rough iron so it stops reading as a chest logo.
-5. **The board corner plates.** Cause: `MI_BoardBrass` (build_scene.py ~1374). Tint ~(0.30, 0.20, 0.08), rough 0.6,
-   grime threshold 0.3: aged dull brass. Check in a close-up that the slot name match `"brass" in n` catches the
-   `Corner` boxes from props.py `chess_board` (~652).
-6. **The watch.** Cause: props.py `wristwatch()` (~887) and its attachment (build_scene.py ~1774). Raise the segments
-   (case 48, crystal bevel), add lugs that join case and strap, and add a dial texture (indices + hands, from code).
-   Measure the strap against the MetaHuman wrist (the case stands ~1 cm proud).
-7. **The lamp reads cheap.** Cause: `dome_lamp` materials (build_scene.py ~1389-1400). Swap the blotchy shade for
-   Poly Haven painted/rusty metal (CC0) with a darker exterior and an emissive, warm interior. Hide the bare bulb disc
-   (emissive bulb mesh, or a diffuser), and raise the key spot's lumens with a tighter cone, so the board gets the
-   reference's hot pool and the room falls off.
-8. **Table detail (also V2 11.4 -> 11.5).** Cause: `surface_material(master, "wood_table_worn", tiling=2.5, ...)`
-   (build_scene.py ~1298). Use a heavier-worn CC0 plank set (ambientCG Planks/WoodFloor with scratches). Add
-   gouge/knife-scar and blood-drip decals along the near edge (`ue5/tools/textures/stains.py`), and a darker
-   vignette at the left and right of the board.
-Also worth doing (lower payoff): row icons and a human portrait in the HUD (TCGame.cpp `DrawGame` ~938); a thinner
-checker eye (or a slot) in props.py `annotator_mask`; trim the jagged record-sheet edge at the right.
+## Three largest remaining weaknesses
+1. **Player hands as an asset** (deformation, clipping, decal dirt, no nails, watch dial/strap, sleeve).
+2. **The lighting has no motivated key.** The lamp is dark, there is no pool on the board, and the scalp is the
+   highlight.
+3. **Material quality on large surfaces** (the table's needle scratches, flat brown wood, clean gown, clean cage).
+   This is masked by the grade.
+
+## Top 8 fixes (payoff per effort, cause in code)
+1. Hand pose/skin weights in the close-up: check the `player:` IK targets and finger curls in
+   `build_seated_pose(..., "player")`. Add collision offsets so the fingers rest beside the pieces, not through them.
+2. Watch dial: flip the U/V in props.py `wristwatch()` (~902) or in textures/watch.py. Bevel and texture the strap
+   (`MI_WatchStrap`, build_scene.py ~1790).
+3. Lamp: raise the `M_TC_Bulb` emissive and the key spot intensity, tighten the cone onto the board's left half
+   (build_scene.py ~1405, ~1891), and light the inside of the shade.
+4. Table: replace the stains.py `scratch` hairlines with a few deep, wide gouges. Swap `wood_table_worn` for a CC0
+   worn/peeling-varnish set (ambientCG).
+5. Grime pass on the patient: dirty gown (`MI_PatientShirt`), rust/edge wear on the cage, and a sweat/roughness mask
+   on the face.
+6. Sleeve: add cloth normal/albedo to `MI_PlayerSleeve` (CC0 fabric), and smooth the normals on props.py `sleeve()`.
+7. Pieces: chips, blood and less specular sheen. Raise the denoiser/spp, or clamp emissive fireflies on the rook crowns.
+8. Clipboard sheet and tape roll: texture them, or darken the sheet; dim the bed-spring material.
 
 ## Character design
-- **Caged patient vs the reference:** the silhouette is right (hunched, caged head, folded arms). The materials are
-  wrong: a clean, orange-lit bald head and a short-sleeved tee against the reference's grimy long canvas. The cage
-  now reads iron (better). The hands are the best part (dirty, grimy speckles).
-- **The Annotator (CHARACTERS.md: clerk, riveted two-leaf plate, coat):** the plate reads, but as a flat, bright tan
-  shield, brighter than anything else above the board. The coat is near-black and does not separate from the
-  room. The ledger and pencil are not visible in `54-hud-portraits`. Readability in the lamp light: the plate yes,
-  the body no.
+- **Caged patient**: the silhouette is right (hunched, caged, folded arms). The face is the best asset, but it is
+  clean. The reference reads as a filthy, wet patient in a stained jacket; ours reads as a clean orderly.
+- **The Annotator**: not in this baseline set, so not judged.
