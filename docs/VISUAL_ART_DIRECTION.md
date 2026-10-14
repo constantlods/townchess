@@ -292,7 +292,8 @@ are on the 1920x1080 baseline frames (regions in pixels).
 
 ### Noted for the lead (outside my files)
 
-- `base_black.jpg` shows **no clocks** under the player cards (`base_main` shows 04:48/04:58). This looks like a HUD
-  bug for the Black seat (TCGame.cpp `DrawGame`). It is not a look issue, but the judge will see it.
+- `base_black.jpg` shows **no clocks** under the player cards (`base_main` shows 04:48/04:58). Either the capture
+  was untimed or the HUD drops the clocks for the Black seat (TCGame.cpp `DrawGame`); check which. It is not a look
+  issue, but the judge will see it.
 - `ApplyView` re-focuses on the board actor's centre. With f/16 (section 6) this is harmless. If DOF stays at f/2.8,
   the near rank goes soft at every view height.
