@@ -27,6 +27,9 @@ WARM_SEC = float(arg("TCWarmSec", 25))
 PRESET = PRESETS.get(arg("TCPreset", "cinematic").lower(), 4)
 # -TCSource=basecolor|normal|final: debug the material inputs directly (G-buffer captures)
 SOURCES = {"final": "SCS_FINAL_TONE_CURVE_HDR", "basecolor": "SCS_BASE_COLOR", "normal": "SCS_NORMAL"}
+# G-buffer views the capture has no source for: the engine's buffer-visualization material as a post blendable
+BUFFER_VIS = {"roughness": "/Engine/BufferVisualization/Roughness", "metallic": "/Engine/BufferVisualization/Metallic",
+              "specular": "/Engine/BufferVisualization/Specular", "ao": "/Engine/BufferVisualization/AmbientOcclusion"}
 SOURCE = arg("TCSource", "final").lower()
 PLAY = int(arg("TCPlay", "0"))          # play this many plies (our side: first legal move) before the shot
 CLIPBOARD = arg("TCClipboard", "") == "1"  # raise the game-record clipboard for the shot
@@ -85,6 +88,13 @@ def begin():
     cc.set_editor_property("texture_target", rt)
     cc.set_editor_property("capture_every_frame", True)
     cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
+    if SOURCE in BUFFER_VIS:  # e.g. -TCSource=roughness (materials audit request): grey = the G-buffer value
+        mat = unreal.load_asset(BUFFER_VIS[SOURCE])
+        state["vis_mat"] = mat  # applied after the level's post settings are copied (below), which would replace it
+        if mat:
+            cc.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+        else:
+            log(f"no buffer visualization material for {SOURCE}")
     if (CAM_LOC or CAM_FOV) and arg("TCViewCam", "1") == "1":
         # close-ups: point the player's own view at the shot too. Virtual textures (the MetaHuman 8K skin) only stream
         # the pages the main view asks for; a scene capture alone got the far-view mips and rendered smooth skin.
@@ -103,6 +113,14 @@ def begin():
             ps = ppv.get_editor_property("settings")
             log(f"capture uses the level's post settings (EV {ps.get_editor_property('auto_exposure_min_brightness'):.1f})")
             break
+    if state.get("vis_mat"):
+        pps = cc.get_editor_property("post_process_settings")
+        wb = unreal.WeightedBlendables()
+        wb.set_editor_property("array", [unreal.WeightedBlendable(1.0, state["vis_mat"])])
+        pps.set_editor_property("weighted_blendables", wb)
+        cc.set_editor_property("post_process_settings", pps)
+        cc.set_editor_property("post_process_blend_weight", 1.0)
+        log(f"buffer visualization: {SOURCE}")
     state["cap"] = (world, rt)
     if SKIN:  # preview a skin variant the game's look menu does not list yet (MI_PlayerSkin_<id>, built by build_scene.py)
         mi = unreal.load_asset(f"/Game/TownChess/Characters/PlayerSkin/MI_PlayerSkin_{SKIN}")
