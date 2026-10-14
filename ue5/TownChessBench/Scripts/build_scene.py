@@ -86,6 +86,12 @@ def setup_texture(tex, kind):
     elif kind == "gray":
         tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_GRAYSCALE)
         tex.set_editor_property("srgb", False)
+    elif kind == "color":
+        # explicit (pass C3): the importer guesses "normal map" for bluish images. rough_linen_diff (mean sRGB 145/171/205)
+        # came in as TC_NORMALMAP + linear: BC5 keeps only R/G, so the patient's jacket rendered base colour (127, 129, 0)
+        # "lime" and the Annotator's linen read yellow-green (materials audit: the jacket sleeves)
+        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_DEFAULT)
+        tex.set_editor_property("srgb", True)
 
 
 def import_texture(path, dest, name, kind):
@@ -167,7 +173,26 @@ def build_master_material(defaults):
     MEL.connect_material_expressions(bcm, "", bcf, "A")
     MEL.connect_material_expressions(dirty, "", bcf, "B")
     MEL.connect_material_expressions(gmask, "", bcf, "Alpha")
-    MEL.connect_material_property(bcf, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    # Handling detail (pass C3, materials audit finding 2/3): blood.py's tileable T_HandlingGrime maps at their own
+    # tiling, so untextured instances get relief and a varied gloss instead of one flat colour with one roughness.
+    # Mask: R smudges, G scratches, B fingerprints, A lacquer chips. Off by default (strengths 0).
+    duv = expr(unreal.MaterialExpressionMultiply, -1200, 800)
+    MEL.connect_material_expressions(uv, "", duv, "A")
+    MEL.connect_material_expressions(scalar("DetailTiling", 6.0, -1400, 840), "", duv, "B")
+    dnm = tex_param("DetailNormal", defaults.get("detail_normal") or defaults["normal"], unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, -1000, 800)
+    dmk = tex_param("DetailMask", defaults.get("detail_mask") or defaults["arm"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, -1000, 1000)
+    for s in (dnm, dmk):
+        MEL.connect_material_expressions(duv, "", s, "UVs")
+    # smudges darken the colour a little (DetailDarken x R)
+    ddk = expr(unreal.MaterialExpressionMultiply, -350, -650)
+    MEL.connect_material_expressions(dmk, "R", ddk, "A")
+    MEL.connect_material_expressions(scalar("DetailDarken", 0.0, -500, -700), "", ddk, "B")
+    d1m = expr(unreal.MaterialExpressionOneMinus, -250, -650)
+    MEL.connect_material_expressions(ddk, "", d1m, "")
+    bcd = expr(unreal.MaterialExpressionMultiply, -120, -550)
+    MEL.connect_material_expressions(bcf, "", bcd, "A")
+    MEL.connect_material_expressions(d1m, "", bcd, "B")
+    MEL.connect_material_property(bcd, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
     # Normal strength: lerp flat → sampled.
     flat = expr(unreal.MaterialExpressionConstant3Vector, -700, 120)
@@ -177,7 +202,19 @@ def build_master_material(defaults):
     MEL.connect_material_expressions(flat, "", nl, "A")
     MEL.connect_material_expressions(nm, "RGB", nl, "B")
     MEL.connect_material_expressions(nstr, "", nl, "Alpha")
-    MEL.connect_material_property(nl, "", unreal.MaterialProperty.MP_NORMAL)
+    # + detail: n + (d - (0,0,1)) x DetailNormalStrength, renormalised (a cheap whiteout-style blend)
+    dsub = expr(unreal.MaterialExpressionSubtract, -700, 800)
+    MEL.connect_material_expressions(dnm, "RGB", dsub, "A")
+    MEL.connect_material_expressions(flat, "", dsub, "B")
+    dmul = expr(unreal.MaterialExpressionMultiply, -550, 800)
+    MEL.connect_material_expressions(dsub, "", dmul, "A")
+    MEL.connect_material_expressions(scalar("DetailNormalStrength", 0.0, -700, 900), "", dmul, "B")
+    nadd = expr(unreal.MaterialExpressionAdd, -320, 100)
+    MEL.connect_material_expressions(nl, "", nadd, "A")
+    MEL.connect_material_expressions(dmul, "", nadd, "B")
+    nnorm = expr(unreal.MaterialExpressionNormalize, -200, 100)
+    MEL.connect_material_expressions(nadd, "", nnorm, "")
+    MEL.connect_material_property(nnorm, "", unreal.MaterialProperty.MP_NORMAL)
 
     MEL.connect_material_property(arm, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
     # Roughness: ARM.G, or a separate roughness map (Poly Haven model textures) when UseRoughTex = 1
@@ -206,12 +243,35 @@ def build_master_material(defaults):
     radd = expr(unreal.MaterialExpressionAdd, -200, 400)
     MEL.connect_material_expressions(rg, "", radd, "A")
     MEL.connect_material_expressions(mcs, "", radd, "B")
+    # handling detail: smudges and scratches dull the surface, fingerprints (skin oil) polish it: + DetailRough x (R + G - 0.5 B)
+    drs = expr(unreal.MaterialExpressionAdd, -700, 1000)
+    MEL.connect_material_expressions(dmk, "R", drs, "A")
+    MEL.connect_material_expressions(dmk, "G", drs, "B")
+    dfp = expr(unreal.MaterialExpressionMultiply, -700, 1100)
+    MEL.connect_material_expressions(dmk, "B", dfp, "A")
+    dfp.set_editor_property("const_b", 0.5)
+    drd = expr(unreal.MaterialExpressionSubtract, -550, 1000)
+    MEL.connect_material_expressions(drs, "", drd, "A")
+    MEL.connect_material_expressions(dfp, "", drd, "B")
+    drm = expr(unreal.MaterialExpressionMultiply, -400, 1000)
+    MEL.connect_material_expressions(drd, "", drm, "A")
+    MEL.connect_material_expressions(scalar("DetailRough", 0.0, -550, 1100), "", drm, "B")
+    radd2 = expr(unreal.MaterialExpressionAdd, -150, 500)
+    MEL.connect_material_expressions(radd, "", radd2, "A")
+    MEL.connect_material_expressions(drm, "", radd2, "B")
     rsat = expr(unreal.MaterialExpressionSaturate, -100, 400)
-    MEL.connect_material_expressions(radd, "", rsat, "")
+    MEL.connect_material_expressions(radd2, "", rsat, "")
     MEL.connect_material_property(rsat, "", unreal.MaterialProperty.MP_ROUGHNESS)
     ms = scalar("MetallicScale", 0.0, -700, 560)
     mm = expr(unreal.MaterialExpressionMultiply, -450, 540)
-    MEL.connect_material_expressions(arm, "B", mm, "A")
+    # metalness: ARM.B, or a Poly Haven model's own metal map when UseMetalTex = 1 (bed frame, wheelchair: pass C3)
+    mtex = tex_param("MetalTex", defaults["gray"], unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE, -900, 1300)
+    MEL.connect_material_expressions(uvm, "", mtex, "UVs")
+    msel = expr(unreal.MaterialExpressionLinearInterpolate, -650, 620)
+    MEL.connect_material_expressions(arm, "B", msel, "A")
+    MEL.connect_material_expressions(mtex, "R", msel, "B")
+    MEL.connect_material_expressions(scalar("UseMetalTex", 0.0, -800, 700), "", msel, "Alpha")
+    MEL.connect_material_expressions(msel, "", mm, "A")
     MEL.connect_material_expressions(ms, "", mm, "B")
     MEL.connect_material_property(mm, "", unreal.MaterialProperty.MP_METALLIC)
 
@@ -617,6 +677,9 @@ def import_prop(name):
     return meshes
 
 
+FLAT_DETAIL = {"DetailTiling": 4.0, "DetailNormalStrength": 0.6, "DetailRough": 0.25, "DetailDarken": 0.12}
+
+
 def make_mi(master, name, textures, tiling=1.0, rough=1.0, metal=0.0, tint=None, scalars=None, grime_color=None):
     path = f"{ROOT}/Materials/{name}"
     if EAL.does_asset_exist(path):
@@ -634,6 +697,11 @@ def make_mi(master, name, textures, tiling=1.0, rough=1.0, metal=0.0, tint=None,
         MEL.set_material_instance_vector_parameter_value(mi, "Tint", unreal.LinearColor(*tint, 1.0))
     if grime_color:
         MEL.set_material_instance_vector_parameter_value(mi, "GrimeColor", unreal.LinearColor(*grime_color, 1.0))
+    # untextured instances (one flat tint, flat normal, one roughness: the "plastic/CG" look, materials audit finding
+    # 2) get the handling-detail layer unless they set their own Detail* values (pass C3)
+    if not textures.get("BaseColor") and not textures.get("Normal"):
+        for k, v in FLAT_DETAIL.items():
+            MEL.set_material_instance_scalar_parameter_value(mi, k, v)
     for k, v in (scalars or {}).items():
         MEL.set_material_instance_scalar_parameter_value(mi, k, v)
     MEL.update_material_instance(mi)
@@ -728,9 +796,14 @@ def model_material(master, model, prefix, name, **kw):
             maps["Normal"] = t
         elif "_rough_" in stem:
             maps["RoughTex"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "gray")
+        elif "_metal_" in stem:
+            maps["MetalTex"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "gray")
     sc = dict(kw.pop("scalars", {}) or {})
     if "RoughTex" in maps:
         sc["UseRoughTex"] = 1.0
+    if "MetalTex" in maps:
+        sc["UseMetalTex"] = 1.0
+        kw.setdefault("metal", 1.0)
     log("model material", name, sorted(maps))
     return make_mi(master, name, maps, scalars=sc, **kw)
 
@@ -1396,6 +1469,40 @@ def player_skins(mhn):
     return out
 
 
+def outfit_slot_material(spec, orig):
+    """The outfit colour `spec` (an M_TC_PBR instance: its Tint) on a MetaHuman garment slot, as a child of the slot's
+    own garment material so the garment's fold/seam normals, AO, weave micro-normals and fuzz stay (pass C3; before,
+    the flat M_TC_PBR instance replaced every slot and the patient's torso had no fold in the normal buffer)."""
+    if not (spec and orig) or "DefaultGarment" not in orig.get_path_name():
+        return spec
+    name = f"{spec.get_name()}_{orig.get_name()}"
+    dest = f"{ROOT}/Characters/Outfit"
+    path = f"{dest}/{name}"
+    if path in _OUTFIT_MIS:
+        return _OUTFIT_MIS[path]
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    try:
+        tint = MEL.get_material_instance_vector_parameter_value(spec, "Tint")
+    except Exception:
+        return spec
+    mi = AT.create_asset(name, dest, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    MEL.set_material_instance_parent(mi, orig)
+    # the garment shader brightens its colours (Tint 0.42/0.40/0.34 as diffuse_color read near-white in the base-colour
+    # buffer, first C3 try): half the M_TC_PBR tint gives the drab, used off-white of the flat instance
+    col = unreal.LinearColor(tint.r * 0.5, tint.g * 0.5, tint.b * 0.5, 1.0)
+    for p in ("diffuse_color_1", "diffuse_color_2", "B_diffuse_color_1"):
+        MEL.set_material_instance_vector_parameter_value(mi, p, col)
+    MEL.update_material_instance(mi)
+    EAL.save_loaded_asset(mi)
+    log("outfit material", name)
+    _OUTFIT_MIS[path] = mi
+    return mi
+
+
+_OUTFIT_MIS = {}
+
+
 METAL_ARM = None
 
 
@@ -1437,6 +1544,11 @@ def build():
     defaults["gray"] = import_texture(os.path.join(tmp, "T_TC_White.png"), f"{ROOT}/Textures", "T_TC_WhiteGray", "gray")
     grime_png(os.path.join(tmp, "T_TC_Grime.png"))
     defaults["grime"] = import_texture(os.path.join(tmp, "T_TC_Grime.png"), f"{ROOT}/Textures", "T_TC_Grime", "linear")
+    # handling-detail maps generated by ue5/tools/textures/blood.py (tileable): the master's DetailNormal / DetailMask
+    gdir = os.path.join(TEXTURES_DIR, "grime")
+    if os.path.exists(os.path.join(gdir, "T_HandlingGrime_Normal.png")):
+        defaults["detail_normal"] = import_texture(os.path.join(gdir, "T_HandlingGrime_Normal.png"), f"{ROOT}/Textures/Grime", "T_HandlingGrime_Normal", "normal")
+        defaults["detail_mask"] = import_texture(os.path.join(gdir, "T_HandlingGrime_Mask.png"), f"{ROOT}/Textures/Grime", "T_HandlingGrime_Mask", "linear")
     master = build_master_material(defaults)
 
     mi_floor = surface_material(master, "old_linoleum_flooring_01", tiling=3.0, tint=(0.55, 0.55, 0.48),
@@ -1450,7 +1562,7 @@ def build():
     # cell bars: the same scan darkened (stretched once round a thin cylinder it read as tan wood in the base colour)
     mi_bar = surface_material(master, "rusty_metal_02", name="MI_BarIron", tiling=3.0, metal=0.6, tint=(0.16, 0.145, 0.135), rough=0.8,
                               scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
-    mi_cloth = surface_material(master, "rough_linen", name="MI_OpponentCloth", tiling=6.0, tint=(0.24, 0.23, 0.2), grime_color=(0.35, 0.25, 0.16),
+    mi_cloth = surface_material(master, "rough_linen", name="MI_OpponentCloth", tiling=6.0, tint=(0.25, 0.155, 0.09), grime_color=(0.35, 0.25, 0.16),
                                 scalars={"GrimeTiling": 1.5, "GrimeThreshold": 0.35, "GrimeContrast": 2.0, "GrimeStreaks": 0.5})
     mi_leather = surface_material(master, "brown_leather", name="MI_Gloves", tiling=4.0, tint=(0.38, 0.28, 0.2), rough=0.8,
                                   scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "MicroRough": 0.2})
@@ -1487,11 +1599,24 @@ def build():
     # ---- Chess set: board + 32 pieces; rotate so White faces the player (-X).
     chess = import_model("chess_set")
     # Hero materials: scanned maps + handling wear (micro smudges on the pieces, grime worked into the board)
-    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.3, 0.22, 0.14), tint=(0.52, 0.45, 0.34), rough=0.72,  # pass 54: 0.62/0.52/0.38 was still the frame's hottest object
-                           # aged, handled ivory: darker base and dirt in the crevices (the clean ivory was the frame's glare; pass 47)
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.62, "GrimeContrast": 2.5, "MicroRough": 0.3, "GrimeStreaks": 0.25})
-    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(2.2, 2.0, 1.8), rough=0.55, tint=(0.11, 0.095, 0.085),
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.7, "GrimeContrast": 2.0, "MicroRough": 0.25, "GrimeStreaks": 0.15})
+    # pass C3 (materials audit: "black plastic and clean satin ivory"). Scan diffuse file means: white 0.75, black 0.18;
+    # both roughness maps median 0.29. The 8K diffuse PNGs come in linear (the base-colour buffer showed the black
+    # pieces at tint x 0.18, not x 0.027: a first C3 try with tint 1.3 rendered them light grey), so tints are against
+    # 0.18 / 0.75 as linear values.
+    # White = aged boxwood: yellower than the old ivory tint and brighter
+    # (linear ~0.51/0.46/0.38 vs 0.39/0.34/0.26: more albedo for the specular the rougher varnish no longer gives;
+    # a yellower 0.7/0.6/0.42 pushed the C2.3 frame to r/g 1.50-1.51, g/b 1.70;
+    # 0.56/0.45/0.27 and 0.64/0.55/0.38 at roughness 0.40 read tan next to the black pieces under the C2.2 light),
+    # satin varnish roughness ~0.33 (0.29 x 1.15; was ~0.21, the frame's hottest speculars)
+    mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.42, 0.3, 0.17), tint=(0.68, 0.61, 0.5), rough=1.15,
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.58, "GrimeContrast": 2.2, "MicroRough": 0.22, "GrimeStreaks": 0.3,
+                                    "GrimeRoughness": 0.6, "DetailTiling": 3.0, "DetailNormalStrength": 0.35, "DetailRough": 0.2, "DetailDarken": 0.1})
+    # Black = ebony / dark stained wood: albedo ~0.03 linear, dark brown (0.18/0.155/0.135 x 0.18; was a neutral 0.11 ->
+    # ~0.02), roughness ~0.42 (0.29 x 1.45; was ~0.16, the mirror-streak "black plastic") varied by the micro and
+    # handling layers; the grime layer lightens (worn varnish, paler wood showing at rims)
+    mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(1.6, 1.35, 1.15), rough=1.45, tint=(0.18, 0.155, 0.135),
+                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.62, "GrimeContrast": 2.0, "MicroRough": 0.25, "GrimeStreaks": 0.2,
+                                    "GrimeRoughness": 0.62, "DetailTiling": 3.0, "DetailNormalStrength": 0.35, "DetailRough": 0.22, "DetailDarken": 0.0})
     mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.36, 0.25, 0.16), tint=(0.8, 0.63, 0.44),
                            scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.3, "GrimeContrast": 2.5, "MicroRough": 0.2})
     assign(chess, mi_pw, lambda n: "white" in n)
@@ -1592,8 +1717,12 @@ def build():
         place_model(clock, (-8, 46, 0), yaw=-150, label="Clock", sit_on=top)
     # ---- Game record: an asylum medical cart at the right edge of frame; the clipboard rests on it and Tab lifts it
     # to a reading pose (ATCClipboard, docs/CLIPBOARD_CRITIQUE.md).
-    mi_cart = make_mi(master, "MI_CartSteel", {"BaseColor": None}, metal=1.0, rough=0.5, tint=(0.5, 0.5, 0.48),
-                      grime_color=(0.4, 0.33, 0.25), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.2})
+    # metallic = ARM.B x MetallicScale: without METAL_ARM (B = 0) the "steel" was a grey dielectric (materials audit
+    # finding 5, the same bug pass 60 fixed for the brass). Worn institutional steel: f0 ~0.45, roughness ~0.47 varied
+    # by grime (matte, darker) and the handling layer (smudges dull it, fingerprints polish it)
+    mi_cart = make_mi(master, "MI_CartSteel", {"BaseColor": None, "ARM": METAL_ARM}, metal=1.0, rough=0.75, tint=(0.45, 0.44, 0.42),
+                      grime_color=(0.35, 0.29, 0.22), scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.2,
+                                                              "GrimeRoughness": 0.8, "DetailTiling": 3.0, "DetailNormalStrength": 0.5, "DetailRough": 0.35})
     mi_rubber = make_mi(master, "MI_Rubber", {"BaseColor": None}, tint=(0.03, 0.03, 0.03), rough=0.8)
     mi_hardboard = make_mi(master, "MI_Hardboard", {"BaseColor": None}, tint=(0.3, 0.2, 0.12), rough=0.75,
                            scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.2})
@@ -1738,6 +1867,13 @@ def build():
     clutter("cigarette_pack", (-24, -36), 35, 9.0)            # by the bowl, near the player's left hand
     beds = import_model("old_bed_frame")
     if beds:
+        # the FBX importer's material rendered base colour 255 white (materials audit): the scan's own maps on the
+        # layered master instead. The scan is warm rusty paint (mean sRGB 114/99/90); the white beds were the frame's
+        # main cool/neutral area, and with the scan at a warm tint the C2.3 main view went to r/g 1.51, g/b 1.72 (V1
+        # out; at x1.0-1.4 still 1.50/1.71). Tinted to a pale grey-green institutional paint over the rust instead
+        # (scan x 2.4/2.7/3.2: painted areas ~0.45 linear, the rusty patches stay dark)
+        assign(beds, model_material(master, "old_bed_frame", "old_bed_frame", "MI_OldBedFrame", tint=(2.4, 2.7, 3.2), grime_color=(0.45, 0.4, 0.36),
+                                    scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "GrimeStreaks": 0.5, "MicroRough": 0.15}))
         place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)
         place_model(beds, (cx + L / 2 - 55, 125, 0), yaw=90, label="BedB", sit_on=0.0)
     # barred window high on the back wall, left of the opponent: cold glow + rusty bars (the window rect light sits in it)
@@ -1777,6 +1913,9 @@ def build():
     cabinet = import_model("drawer_cabinet")
     place_model(cabinet, (cx + L / 2 - 40, -140, 0), yaw=180, label="Cabinet", sit_on=0.0)
     wheel = import_model("wheelchair_01")
+    if wheel:  # same importer-material problem as the beds (white frame in the base-colour buffer)
+        assign(wheel, model_material(master, "wheelchair_01", "wheelchair_01", "MI_Wheelchair", tint=(0.7, 0.68, 0.64), grime_color=(0.38, 0.3, 0.22),
+                                     scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.15}))
     place_model(wheel, (cx + L / 2 - 70, 150, 0), yaw=-140, label="Wheelchair", sit_on=0.0)
     desk = import_model("metal_office_desk")
     _, dlo, dhi = place_model(desk, (cx - 40, W / 2 - 45, 0), yaw=90, label="Desk", sit_on=0.0)
@@ -1857,7 +1996,7 @@ def build():
                 f.attach_to_actor(opp, "", R.KEEP_WORLD, R.KEEP_WORLD, R.KEEP_WORLD, False)
                 if mi:
                     for i in range(f.skeletal_mesh_component.get_num_materials()):
-                        f.skeletal_mesh_component.set_material(i, mi)
+                        f.skeletal_mesh_component.set_material(i, outfit_slot_material(mi, f.skeletal_mesh_component.get_material(i)))
                 tag(f); tag(f, opp_tag); tag(f, "TC_FollowBody")
         else:
             for i in range(smc.get_num_materials()):
@@ -2031,7 +2170,7 @@ def build():
         # shirt (judge run 4: clothing 4/10; the reference's jacket is long-sleeved and filthy); material per actor, the
         # meshes stay the Annotator's (prop_with re-imports delete older meshes)
         if smc:
-            mi_jacket = surface_material(master, "rough_linen", name="MI_PatientJacket", tiling=5.0, tint=(0.42, 0.34, 0.23), rough=0.95,
+            mi_jacket = surface_material(master, "rough_linen", name="MI_PatientJacket", tiling=5.0, tint=(0.46, 0.26, 0.13), rough=0.95,
                                          grime_color=(0.32, 0.17, 0.1), scalars={"GrimeTiling": 1.4, "GrimeThreshold": 0.3, "GrimeContrast": 1.8,
                                                                                     "GrimeStreaks": 0.7, "MicroRough": 0.1})
             arm_sleeves(smc, "Patient", "TC_Opponent_caged", mi_jacket)

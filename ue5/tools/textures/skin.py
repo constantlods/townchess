@@ -244,7 +244,14 @@ log("veins/tendons", round(float((vein > 0.3).mean()), 3))
 
 # knuckle redness, age spots
 knuck_red = np.where((cls == 3) | ((cls == 2) & (th > 0.8)), smooth(0.1, 0.7, dors), 0) * smooth(0.0, 0.5, fbm(pos * 0.8, 2, 51) + 0.3)
-spots = np.where(hand_back | forearm, smooth(0.42, 0.6, fbm(pos * 1.6, 2, 61)), 0) * smooth(0.0, 0.4, dors)
+# a few faint freckles (pass C3: the 0.42..0.6 threshold of fBm 1.6/cm made a second set of 3-10 mm round spots,
+# half of the "leopard" pattern); small (fBm 4/cm), sparse (top ~3 %) and weak (see variant())
+spots = np.where(hand_back | forearm, smooth(0.62, 0.75, fbm(pos * 4.0, 2, 61)), 0) * smooth(0.0, 0.4, dors)
+# subdermal variation on the flat MetaHuman forearm (one tan from wrist to elbow): low-frequency blood-flow mottling,
+# a redder wrist crease and knuckle band, a paler and cooler underside
+sub_mot = np.where(hand_back | forearm | (cls == 3), fbm(pos * 0.3, 3, 63), 0).astype(np.float32)
+wrist_red = np.where(hand_back | forearm, np.exp(-((th + 0.02) / 0.09) ** 2), 0) * smooth(-0.2, 0.4, dors)
+underside = np.where(hand_back | forearm, smooth(-0.05, -0.55, dors), 0)
 
 # trousers on the legs: drab cotton drill, folds behind the knees and over the thighs, a coarse weave
 leg = cls == 5
@@ -392,6 +399,18 @@ curv = np.gradient(n4[..., 0], axis=1) - np.gradient(n4[..., 1], axis=0)
 del n4
 crease_raw = ndimage.gaussian_filter(curv, 3.0)
 crease = np.clip(-crease_raw / (np.percentile(np.abs(crease_raw[yy, xx]), 90) + 1e-6), 0, 1)
+# fine creases (knuckle wrinkles, the lines over the finger joints, the nail folds) at a third of the scale
+crease_fr = ndimage.gaussian_filter(curv, 1.1)
+crease_f = np.clip(-crease_fr / (np.percentile(np.abs(crease_fr[yy, xx]), 95) + 1e-6), 0, 1)
+del curv, crease_raw, crease_fr
+# where the fine creases count: the joints. The body's corrective joint bones (*_mcp, *_pip, *_dip) own exactly the
+# skin over the knuckles, and their texels (softened ~0.3 cm) gate the fine-crease dirt; everywhere else the fine
+# curvature is pore/skin texture and drew a reptile-scale maze when it was used as dirt (first C3 try)
+JOINT = np.array([("_mcp_" in g_ or "_pip_" in g_ or "_dip_" in g_) for g_ in G] + [False])
+joint_img = ndimage.gaussian_filter(dense(JOINT[grp].astype(np.float32)), 8.0)
+joint = np.clip(joint_img[yy, xx] * 2.0, 0, 1)
+del joint_img
+log("joint texels", int((joint > 0.5).sum()))
 
 cm_img = dense(cmpt, float(np.median(cmpt)))
 cm_img = ndimage.grey_dilation(cm_img, size=3)
@@ -409,13 +428,23 @@ arm_mask = dense(np.ones(len(idx), np.float32)) > 0
 
 def variant(name, rng):
     grime_amt = {"bare": 0.35, "dirty": 1.0, "scarred": 0.45, "tattooed": 0.5, "gloves": 0.6}[name]
-    # dirt: blotches, creases, around the nails and on the finger pads' sides
-    blot = smooth(-0.05, 0.35, fbm(pos * 0.5, 3, 71 + len(name)))
-    fine = smooth(0.1, 0.45, fbm(pos * 3.0, 2, 83))
+    # dirt (pass C3): driven by cavity, not by noise blobs. The old blot x fine fBm through hard smoothsteps made
+    # isolated 3-10 mm patches, each a 58 % darker hole: the "leopard" close-up. Now dirt sits in the skin's creases
+    # (two scales of the normal map's concave curvature: wrist and knuckle folds, finger-joint lines), along the sides
+    # of the fingers and in the webs between them, and a broad low-contrast film (fBm 0.15/cm, wide smoothstep)
+    # modulates how much of it there is; the film itself darkens at most ~20 % and shifts the skin grey-brown.
+    film = smooth(-0.55, 0.55, fbm(pos * 0.15, 3, 71 + len(name)))
     cre = crease[yy, xx]
-    g = np.clip(0.55 * blot * (0.4 + 0.6 * fine) + 0.45 * cre * (0.3 + 0.7 * blot), 0, 1)
-    g *= np.where(cls == 4, 0.2, 1.0) * np.where(cls == 3, 1.3, 1.0) * np.where(hand_back | (cls == 3), 1.0, 0.6)
-    grime = np.clip(g * grime_amt, 0, 1)
+    cre_f = crease_f[yy, xx]
+    fside = np.where(cls == 3, np.exp(-(dors / 0.3) ** 2), 0)                  # finger sides (dorsal normal ~ 0)
+    web = np.where((cls == 2) & (th > 0.82), smooth(0.82, 1.0, th) * np.exp(-(dors / 0.45) ** 2), 0)  # webs between fingers
+    wristb = np.where(hand_back | forearm, np.exp(-((th + 0.02) / 0.07) ** 2), 0)   # the wrist's flexion folds
+    cav = np.clip(0.75 * cre_f * joint + 0.45 * cre_f * wristb + 0.15 * smooth(0.6, 1.0, cre)
+                  + 0.18 * fside + 0.35 * web, 0, 1)
+    g = cav * (0.55 + 0.45 * film)
+    g *= np.where(cls == 4, 0.2, 1.0) * np.where(hand_back | (cls == 3), 1.0, 0.6)
+    grime = np.clip(g * grime_amt, 0, 0.9)
+    film_amt = film * grime_amt * np.where(cls == 4, 0.3, 1.0) * np.where(hand_back | (cls == 3), 1.0, 0.75)
     nail_dirt = np.clip(rim[yy, xx] * (0.5 + 0.5 * grime_amt) + nail[yy, xx] * 0.25 * grime_amt, 0, 1)
     h_scar = np.zeros(len(idx), np.float32)
     scar = np.zeros(len(idx), np.float32)
@@ -446,8 +475,17 @@ def variant(name, rng):
     vt = vein * 0.85
     col *= (1 - np.stack([0.20 * vt, 0.13 * vt, 0.02 * vt], 1))
     col = col * (1 - 0.12 * knuck_red[:, None]) + col * np.array([1.18, 0.86, 0.84], np.float32) * 0.12 * knuck_red[:, None]
-    col *= 1 - 0.18 * spots[:, None] * np.array([0.7, 0.9, 1.0], np.float32)
-    gc = np.array([0.42, 0.33, 0.24], np.float32)
+    # subdermal: +-5 % blood-flow mottling (redder where positive), a redder wrist crease, a paler cooler underside
+    col *= 1 + sub_mot[:, None] * np.array([0.06, 0.03, 0.025], np.float32)
+    col = col * (1 - 0.1 * wrist_red[:, None]) + col * np.array([1.15, 0.9, 0.88], np.float32) * 0.1 * wrist_red[:, None]
+    col = col * (1 - 0.12 * underside[:, None]) + np.clip(col * np.array([1.06, 1.08, 1.12], np.float32), 0, 1) * 0.12 * underside[:, None]
+    col *= 1 - 0.07 * spots[:, None] * np.array([0.7, 0.9, 1.0], np.float32)
+    # grime film: grey-brown, at most ~20 % darker (a uniform layer of handling dirt, not patches)
+    lum = (col * np.array([0.2126, 0.7152, 0.0722], np.float32)).sum(1, keepdims=True)
+    filmc = lum * np.array([1.0, 0.93, 0.82], np.float32) * 0.8
+    col = col * (1 - 0.35 * film_amt[:, None]) + filmc * 0.35 * film_amt[:, None]
+    # cavity dirt: dark grey-brown worked into the creases (multiply, so it follows the skin's own shading)
+    gc = np.array([0.5, 0.43, 0.36], np.float32)
     col = col * (1 - grime[:, None]) + col * gc * grime[:, None]
     # nail plates: paler and pinker than the finger, a whiter free edge (no image showed a nail before pass 60)
     nl = nail[yy, xx]
@@ -456,7 +494,8 @@ def variant(name, rng):
     col = col * (1 - 0.35 * free[:, None]) + np.array([0.78, 0.72, 0.62], np.float32) * 0.35 * free[:, None]
     col = col * (1 - nail_dirt[:, None]) + np.array([0.06, 0.045, 0.035], np.float32) * nail_dirt[:, None]
     if name == "dirty":  # dried blood specks on the knuckles and the back of the hand
-        sp = smooth(0.52, 0.62, perlin(pos * 3.2, 401)) * smooth(0.2, 0.6, dors) * np.where(hand_back | (cls == 3), 1, 0)
+        # few and small (pass C3: perlin 3.2/cm above 0.52 gave 3-6 mm specks, part of the spot pattern), knuckles only
+        sp = smooth(0.58, 0.66, perlin(pos * 6.0, 401)) * smooth(0.3, 0.7, dors) * np.where((cls == 3) | (hand_back & (th > 0.75)), 1, 0)
         col = col * (1 - sp[:, None] * 0.85) + np.array([0.16, 0.03, 0.025], np.float32) * sp[:, None] * 0.85
     if name == "scarred":
         col = col * (1 - scar[:, None]) + np.clip(col * np.array([1.3, 1.08, 1.05], np.float32) + 0.07, 0, 1) * scar[:, None]
@@ -485,7 +524,7 @@ def variant(name, rng):
         h_extra = h_glove
     # legs: trousers in every variant (the player body wears only the shirt: the bare knees showed in the hand close-ups)
     cloth = np.array([0.19, 0.18, 0.15], np.float32) * (0.85 + 0.3 * (0.5 + 0.5 * cloth_mot))[:, None]
-    cloth *= 1 - 0.15 * blot[:, None] * np.array([0.9, 1.0, 1.1], np.float32)
+    cloth *= 1 - 0.15 * film[:, None] * np.array([0.9, 1.0, 1.1], np.float32)
     col = np.where(leg[:, None], cloth, col)
     out = bc_full.copy()
     delta = np.zeros((R, R, 3), np.float32)
