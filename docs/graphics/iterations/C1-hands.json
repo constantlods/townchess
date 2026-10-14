@@ -1,0 +1,19 @@
+{
+ "commit": "see git log (C1 hands)",
+ "metrics_main": {
+  "mean": 22.8,
+  "p95": 96.4,
+  "rg": 1.45,
+  "gb": 1.64,
+  "detail": 10.13,
+  "below8": 49.3
+ },
+ "fingertips_vs_table_79.95": {
+  "pinky_l": 80.8,
+  "thumb_l": 81.8,
+  "thumb_r": 82.0,
+  "index_l_on_frame(81.87)": 80.1,
+  "middle_l_on_frame": 79.5
+ },
+ "tests": "cpu 52/52, drag 8/8 at the first C1 build (same logic)"
+}
