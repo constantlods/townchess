@@ -107,3 +107,15 @@ permission rule; until then local work runs only through Houtini/Ollama calls th
 | L2 | Same | qwen3:8b CPU | 558 tok | one detail wrong, 111 s | rejected |
 | L3 | Same | qwen2.5-coder:7b RX 6650 XT | 573 tok | correct, 8.5 s | accepted (benchmark only) |
 | L4 | Review capture.py begin() for bugs | qwen2.5-coder:7b RX 6650 XT | 1199 tok, 10.1 s | 6 findings, all false positives (module globals were outside the snippet) | rejected; lesson: task specs must include the interface context (globals/signatures) the snippet uses |
+
+## Status 2026-10-14 (evening): C2 lighting and C3 materials integrated
+
+| Task | Owner | State | Evidence |
+|---|---|---|---|
+| C2 lighting (lamp shadows only, lamp key, haze, grade) | rendering architect | done, lead-reviewed: C2.2 rejected for white-piece readability (white median 11.6), fixed in C2.3 with a shadowless table bounce (white 74.8, white/black 17.8) | C2-*.jpg, C2-lighting.json; GPU 11.57 -> 8.42 ms (editor, 1440p auto); packaged offscreen 116.1 / 96.3 fps |
+| C3 materials (crease dirt, jacket fix, wood pieces, bed/cart scans, detail layer) | materials | done, lead-reviewed; judge pending | C3-*.jpg, C3-materials.json; tests cpu 78/78, drag 8/8 |
+| D1 screen percentage per tier | lead | coded (Cinematic 100, Epic 83, High 67, Medium 58, Low 50; `-tcscreenpct=`); packaged benchmark pending | TCGame.cpp ApplyQualityPreset |
+| C4 board/props/room V5 defects | board/environment | started | |
+
+Open after C2/C3: V2 detail (C3 metric 9.47 on the new recipe, lower than C2 because the white bed grids were background detail);
+Black seat r/g 1.514 (V1 limit 1.50); pieces have no cavity bake; skin roughness not driven by dirt; lamp source not visible.
