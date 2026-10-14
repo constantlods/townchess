@@ -276,3 +276,17 @@ Ranked by impact on what the owner sees, each with an acceptance test that can f
 | 3 | The lamp is not a light source in frame (lamp cell luma 7 against 36) and the hands/near table are lit from the camera (bottom row 52 against 22): flat skin, flat board, no pool | Lamp emissive about 150-300 inner, bulb visible about 2000+; Hands_Key to the lamp side at half power or removed; tighter key cone | Grid: lamp cell ≥ 25, board centre brightest, bottom row ≤ board centre; V1 met; judge lighting ≥ 6 | M | RA (lights) + materials (emissive) + board/env (bulb) |
 | 4 | The grade replaces lighting: highlight gain 0.74, saturation 0.72, vignette 0.65, grain 0.5 + sharpen; pieces roughened to 0.72 for p95. Result: 47.7% of pixels < 8 (ref 33.8%), missing speculars (p99.9 217.8 against 232.9), grain inflating V2 | Neutral grade, grain 0.15-0.2, vignette 0.4; p95 via EV and light ratios; lacquer pieces (roughness about 0.3-0.4) | V1 in range; pixels < 8 ≤ 38%; median ≥ 12; p99.9 ≥ 225; V2 ≥ 11.5 with grain 0; judge sees piece highlights | S-M | RA (post) + materials (pieces) |
 | 5 | No atmosphere: volumetric fog paid for (0.19 ms + 1.65 ms async) but invisible; the room behind the opponent is black (top row 9-16 against 12-26) | Lit beams from window and corridor through denser, lower fog; keep ambient low; less vignette | Top-row grid mean ≥ 15 with visible shafts; pixels < 8 ≤ 38%; judge background row ≥ 6 | M | rendering architect |
+
+## C2 status (2026-10-14, implementation)
+
+Measured on the build PC; evidence in `docs/graphics/iterations/C2-*.jpg` and `C2-lighting.json`, GPU numbers in
+PERFORMANCE_BENCHMARKS.md ("C2"). Commits 7499b8d (C2.1) and d5014f1 (C2.2).
+
+| Defect | State | Evidence |
+|---|---|---|
+| D1 screen percentage | open (lead): recommendation Epic 83%, High 67%, Medium 58%; never auto | native 1440p now 16.63 ms (58 fps editor offscreen), 75% 10.66 ms, auto 8.13 ms |
+| D2 shadowed lights | done: 3 shadowed lights (Lamp_Key, Lamp_Opponent, Window_Cold) | GPU 11.57 → 7.75 ms at auto; Lights + ShadowsDenoiser 6.75 → 2.78 ms (target 2.5 missed by 0.28 ms: Window_Cold must keep its shadow, without it r/g fell to 1.33) |
+| D3 lamp as key | partly: Hands_Key and Table_Right removed, key re-aimed at the board centre, one soft Lamp_Bounce from the lamp's side | pieces side-lit from the lamp with long shadows; board 42.5 > right hand 40.0 > left hand 23.0; the shade itself is still out of frame and its emissive dark (board/environment and materials) |
+| D4 grade | done except the 38% bound: below luma 8 49.5% → 38.6%, median 8.3 → 13.7, grain 0.5 → 0.2, sharpen 1.0 → 0.5 | V1 met (27.2 / 102.0 / 1.425 / 1.599); detail 11.21 (V2 not met) |
+| D5 atmosphere | done: fog 0.045, falloff 0.001 | room behind the opponent 9.0 → 19.1, top row 13.7 → 24.5 |
+| D6, D8, D9 | not started | |
