@@ -962,12 +962,15 @@ SEAT_EYE_X, SEAT_EYE_DZ, SEAT_PITCH, SEAT_FOCAL = (float(v) for v in os.environ.
 SEAT = {}  # filled by build(): "top" (table top z), "eye" (default-view eye, world)
 # Measured (capture -TCProbe=Player, docs/graphics/iterations/phaseA-hands-character.md): the runtime body stands 18.5 cm
 # higher than this solver's model (head 132.5 vs 114.0) while x/y agree within 2.6 cm; the body actor is lowered by it.
-PLAYER_Z_FIX = float(os.environ.get("TC_PLAYER_ZFIX", 18.5))
+# 18.5 lowered the hands ~3.1 cm into the table (lead probe 2026-10-14: fingertip joints 77.2-78.7 vs top 79.95): 15.3
+PLAYER_Z_FIX = float(os.environ.get("TC_PLAYER_ZFIX", 15.3))
 # Rest pose in table space (cm; x towards the board, |y| outwards, z over the table top). Wrists on the table in front of
 # the board's near corners, fingers forward and slightly inward so index/middle pads lie on the side frame beside the
 # a1/h1 corner and ring/pinky on the table: no finger over a square (squares |x|,|y| <= 23.2, frame to 27.65, top 1.92).
+# Wrists 5.5 cm nearer the board than the first try (-40.5, 27.5): there the hands rested at the table's near edge,
+# almost out of the default view (lead verification 2026-10-14, hv_main).
 PLAYER_REST = {k: float(v) for k, v in zip(("wrist_x", "wrist_y", "wrist_z", "yaw", "mcp_z", "elbow_z", "elbow_y"),
-                                            os.environ.get("TC_PLAYER_REST", "-40.5,27.5,3.2,4,2.0,14,22").split(","))}
+                                            os.environ.get("TC_PLAYER_REST", "-35.0,25.0,3.2,4,2.0,14,22").split(","))}
 BOARD_HALF, BOARD_PLAY_HALF, BOARD_FRAME_Z, BOARD_SURF_Z = 27.65, 23.2, 1.92, 1.71  # props.py chess_board()
 
 
