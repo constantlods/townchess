@@ -1,6 +1,6 @@
 # Session audit (session compliance)
 
-Auditor run 1, 2026-10-13, base `6f71140` (feature/photorealistic-renderer). Scope: the owner's two directives of
+Auditor run 1, 2026-10-13, base `6f71140` (rows 37/53 and M8 updated for `93f1134`) (feature/photorealistic-renderer). Scope: the owner's two directives of
 2026-10-13 ("TOWNCHESS: AAA VISUAL TRANSFORMATION, RENDERING ENGINEERING, AND LOCAL AI AGENT WORKFORCE", Phases 0-10,
 called **D1**; "AAA VISUAL TRANSFORMATION AND MULTI-AGENT DEVELOPMENT DIRECTIVE", sections 1-13, called **D2**), the
 follow-up (**F**: start Visual Director, Rendering Architect, Hands, Materials and Visual Judge on the same baseline,
@@ -66,7 +66,7 @@ Phase A agents were still running when this audit was written. Their deliverable
 | 34 | 13 Camera/composition standard | prog | part of A1 |
 | 35 | 14 Profiling reports, benchmark script (docs/graphics/PERFORMANCE_BENCHMARKS.md) | prog | absent; RA running |
 | 36 | 15 Judge: ranked defect report per milestone | done | docs/pipeline/visual.md @6f71140 (avg 5.53; V4/V5 not met) |
-| 37 | D1 final: docs/TOWNCHESS_VISUAL_TRANSFORMATION_PLAN.md (9 sections) | todo | announced at l.11670, not written |
+| 37 | D1 final: docs/TOWNCHESS_VISUAL_TRANSFORMATION_PLAN.md (9 sections) | prog | 93f1134 (pushed during this audit): all 9 sections; causes and milestones wait on Phase A |
 
 ### Benchmark scene (D1 Phase 4, D2 §8)
 | # | Content | Status | Evidence / what is missing |
@@ -90,7 +90,7 @@ Phase A agents were still running when this audit was written. Their deliverable
 |---|---|---|---|
 | 51 | Inventory installed models and host | done | l.11683: qwen3:8b and qwen2.5:7b-q4_K_M on the Proxmox host. Not written to a doc. Windows PC not checked |
 | 52 | VRAM/RAM, quantisation | prog | host 15 GB RAM, no GPU (RX 6650 XT is vfio-bound to the stopped VM 131): CPU-only inference |
-| 53 | Inference speed and context limits | prog | trial running at l.11802; no result recorded |
+| 53 | Inference speed and context limits | done | plan §6 (93f1134): Ollama CPU about 7 tok/s |
 | 54 | Remote inference secured? | done | ollama listens on 127.0.0.1:11434 only (l.11683). Not documented |
 | 55 | Model capability per task; concurrency with rendering | todo | |
 | 56 | houtini-lm: licence, activity, platform, security, MCP fit | prog | gh metadata (Apache-2.0, pushed 2026-10-10) + README read. No written evaluation |
@@ -129,7 +129,7 @@ Phase A agents were still running when this audit was written. Their deliverable
 | 81 | Windows rules (workspace only, no system change, changes recorded) | prog | baseline.ps1 written inside C:\TownChess (ok). WINDOWS_SETUP row 13 is inaccurate (M11) |
 | 82 | F: a session auditor exists | done | this file |
 
-Tally: **done 23, in progress 36, not started 22, blocked 1** (82 rows, standing rules included).
+Tally: **done 24, in progress 36, not started 21, blocked 1** (82 rows, standing rules included).
 
 ## 2. Mistakes and risks (newest first)
 
@@ -164,8 +164,8 @@ Tally: **done 23, in progress 36, not started 22, blocked 1** (82 rows, standing
   merged roles' deliverables must still be produced: lighting setups, camera standard, profiling reports and the
   opponent pass. Six agents running at once on the same limit risks the cut-offs the status file itself mentions.
   *Fix:* stagger the next wave.
-- **M8. Promised deliverables are missing.** TOWNCHESS_VISUAL_TRANSFORMATION_PLAN.md was announced first
-  (l.11670) and has not been written. Five of the six §13 documents do not exist yet. Use the `docs/` path from D2.
+- **M8. Promised deliverables are missing.** The plan landed in 93f1134 while this audit ran. Four of the six §13
+  documents still do not exist: VISUAL_ART_DIRECTION, RENDERER_AUDIT, ASSET_PIPELINE, PERFORMANCE_BENCHMARKS.
 - **M9. No QA has run since 2026-10-06.** Pipeline run 5 was cut off and never rerun. Before any visual change merges,
   rerun npm test (at least 479), the UE autotests and test_package.
 - **M10. Local-LLM work is undocumented.** The model list, the CPU-only constraint (the RX 6650 XT is passed through
@@ -188,7 +188,7 @@ Tally: **done 23, in progress 36, not started 22, blocked 1** (82 rows, standing
 2. Commit the benchmark script and a per-run manifest (commit, exe date, preset, resolution, camera, lights). Re-shoot
    the baseline at 2560x1440. Add the second-environment scene and a verified captured piece.
 3. Step B: VD and RA consolidate into one ranked queue, top 3-5 failures. Write
-   docs/TOWNCHESS_VISUAL_TRANSFORMATION_PLAN.md (9 sections, short, linking the audits).
+   sections 3 and 7 of docs/TOWNCHESS_VISUAL_TRANSFORMATION_PLAN.md from it.
 4. First real implementation, the judge's #1 defect: hand pose and contact (fingers through pieces, deformed fingers,
    right hand cropped, mirrored dial). Re-capture with identical cameras and have the judge re-score.
 5. Lamp as key light and de-grade, then materials (table scars, sleeve banding). Measure before/after with
