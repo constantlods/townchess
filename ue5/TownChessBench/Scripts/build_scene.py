@@ -1308,7 +1308,8 @@ def spot(label, loc, rot, lumens, kelvin, radius, cone, src=2.0, vol=1.0, shadow
 
 
 def rect(label, loc, rot, lumens, kelvin, w, h, radius, vol=0.3, shadows=False):
-    a = EAS.spawn_actor_from_class(unreal.RectLight, unreal.Vector(*loc), unreal.Rotator(*rot))
+    rot = rot if isinstance(rot, unreal.Rotator) else unreal.Rotator(*rot)
+    a = EAS.spawn_actor_from_class(unreal.RectLight, unreal.Vector(*loc), rot)
     c = a.rect_light_component
     setp(c, "intensity_units", unreal.LightUnits.LUMENS)
     setp(c, "intensity", lumens)
@@ -2060,7 +2061,8 @@ def build():
 
     # ---- Lighting: warm practical lamp (key), cool fluorescent fill, cool rim.
     lamp_head = (lamp_bulb[0], lamp_bulb[1], lamp_bulb[2] - 3)  # just under the bulb, inside the shade
-    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (10, -5, top)), 450, 2800, 600, 52, src=2.5, vol=1.2))  # cone 65 -> 52: a pool on the board (pass 61)
+    # cone 65 -> 52: a pool on the board (pass 61); C2: aimed at the board centre (was 10 cm beyond it), 450 -> 520 lm
+    tag(spot("Lamp_Key", lamp_head, look_at_rot(lamp_head, (0, -4, top)), 520, 2800, 600, 56, src=2.5, vol=1.2))
     bulb = point("Lamp_Bulb", (lamp_head[0], lamp_head[1], lamp_head[2] + 9), 60, 2400, 60, src=2.0, shadows=False)  # lights the shade and base
     tag(bulb)
     rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 150, 5600, 120, 15, 900, vol=0.2)
@@ -2069,26 +2071,28 @@ def build():
     # opponent onto the board and hands (r/g 1.44 -> 1.33); the window bars' shadow also shapes its shafts in the fog
     rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0, shadows=True)
     point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0, shadows=False)
-    tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (70, 0, top + 45)), 220, 2400, 400, 40, src=2.5, vol=0.6))
+    # aimed at the opponent's chest and hands, not his head (C2: the bald scalp was the brightest thing above the board)
+    tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (68, 0, top + 18)), 170, 2400, 400, 40, src=2.5, vol=0.6))
     rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
-    # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)
-    # the player's hands are hero assets in the reference: a soft warm light from the lamp side keeps them readable
-    tag(rect("Hands_Key", (-30, -40, top + 40), (0, -50, 30), 200, 2600, 70, 40, 160, vol=0.2))  # 220 -> 200 (pass 63): both hands now in the main view lifted p95 to 106
-    # pass 58: the table right of the board was near black (luma 9-17 against the reference's lit clutter; its fine detail
-    # 4.6 vs 11-15): a dim warm spill over the right hand, the record sheets and the mug
-    tag(rect("Table_Right", (-20, 48, top + 45), (0, -60, -25), 80, 2600, 60, 40, 150, vol=0.2))  # 55 -> 80 (pass 62, frame mean 24.4)  # 110 lm lifted the frame mean 24 -> 32
+    # pass C2: no subject fills without a source (VISUAL_ART_DIRECTION section 4.5). Hands_Key (200 lm from the camera
+    # side, 40 cm over the near table) and Table_Right (80 lm) are gone. The lamp sits beyond the board's left half, so
+    # with its key alone every piece was backlit (s2: board mean 57 -> 23, pieces in silhouette): one soft warm bounce
+    # from the lamp's side (its light off the papers and table left of the board), low and from the left, at half power.
+    tag(rect("Lamp_Bounce", (-12, -62, top + 22), look_at_rot((-12, -62, top + 22), (-8, 0, top)), 100, 2700, 90, 50, 170, vol=0.0))
     # (the table bounce light over-lit the board: 11.7% clipped pixels; removed, Lumen GI does the bounce)
     # corridor light behind the bars: a cold glow that separates the opponent from the back wall
     rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)
 
     sky = EAS.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 400), unreal.Rotator(0, 0, 0))
-    setp(sky.light_component, "intensity", 0.07)  # lift the blacks a little: the reference never crushes the room
+    setp(sky.light_component, "intensity", 0.07)  # lift the blacks a little: the reference never crushes the room (C2: 0.09 changed nothing measurable)
     sky.set_folder_path("Lights")
 
     fog = EAS.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
     fc = fog.component
-    setp(fc, "fog_density", 0.035)
-    setp(fc, "fog_height_falloff", 0.002)
+    # C2: denser, flatter haze (0.035 / 0.002 was invisible: the room behind the opponent rendered black) so the lamp's
+    # cone, the window and the corridor glow scatter visibly behind the opponent
+    setp(fc, "fog_density", float(os.environ.get("TC_FOG", 0.045)))
+    setp(fc, "fog_height_falloff", 0.001)
     setp(fc, "enable_volumetric_fog", True)
     setp(fc, "volumetric_fog_scattering_distribution", 0.7)
     setp(fc, "volumetric_fog_extinction_scale", 1.0)
@@ -2151,19 +2155,21 @@ def build():
         # EV 8.3 (was 7.8): the frame measured mean 35 / 95th pct 139 against the reference's 27 / 97 (pass 47)
         "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 8.3)),
         "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 8.3)),
-        "bloom_intensity": 0.3, "vignette_intensity": 0.65, "film_grain_intensity": 0.5,  # grain 0.15 -> 0.35: the reference is gritty, photographic (pass 49)
+        # C2: vignette 0.65 -> 0.4 and grain 0.5 -> 0.2 (the grain fed the V2 detail metric without being detail)
+        "bloom_intensity": 0.3, "vignette_intensity": 0.4, "film_grain_intensity": float(os.environ.get("TC_GRAIN", 0.2)),
+        "film_toe": 0.5,  # C2: 0.55 -> 0.5 lifts the deepest shadows a little (0.45 read milky)
         "lumen_final_gather_quality": 2.0, "lumen_reflection_quality": 1.0,
         "lumen_scene_lighting_quality": 1.0, "lumen_scene_detail": 1.5,
         "scene_fringe_intensity": 0.15,
         # grading towards the reference (visual judge: our saturation 189/255 vs 150): desaturated, cooler shadows
-        "color_saturation": unreal.Vector4(0.72, 0.72, 0.72, 1.0),
+        "color_saturation": unreal.Vector4(0.8, 0.8, 0.8, 1.0),
         "color_saturation_shadows": unreal.Vector4(0.85, 0.9, 1.0, 0.9),
-        "color_gain_shadows": unreal.Vector4(0.92, 0.97, 1.05, 1.0),
-        "color_contrast": unreal.Vector4(1.06, 1.06, 1.06, 1.0),
+        "color_gain_shadows": unreal.Vector4(0.97, 0.98, 1.01, 1.0),  # C2: was 0.92/0.97/1.05 (cooled and crushed the room)
+        "color_contrast": unreal.Vector4(1.0, 1.0, 1.0, 1.0),
         # measured against the reference panel (pass 47): highlights 148 vs 97 (95th pct), red/green 1.63 vs 1.44,
         # green/blue 1.45 vs 1.62 -> compress the highlights and move the grade from orange towards olive
-        "color_gain_highlights": unreal.Vector4(0.74, 0.74, 0.74, 1.0),
-        "color_gain": unreal.Vector4(0.84, 1.0, 0.96, 1.0),  # pass 54: r/g 1.54 -> ref 1.44, g/b 1.72 -> ref 1.62
+        "color_gain_highlights": unreal.Vector4(0.78, 0.78, 0.78, 1.0),  # C2: 0.74 -> 0.78, specular peaks on the pieces
+        "color_gain": unreal.Vector4(0.92, 1.0, 0.88, 1.0),  # C2: warmer (0.84/1/0.96 before): the lifted toe and the haze cooled the frame  # pass 54: r/g 1.54 -> ref 1.44, g/b 1.72 -> ref 1.62
     }.items():
         try:
             s.set_editor_property("override_" + k, True)

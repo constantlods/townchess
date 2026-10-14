@@ -1,0 +1,8 @@
+{
+ "what": "C2 lighting/post/atmosphere (rendering architect). Metrics: frame resized to 1045 px, Rec.709 luma, PNG captures (capture.ps1 -Preset epic, benchmark cameras); reference panel: mean 26.6, p95 97.1, r/g 1.443, g/b 1.619, below8 33.8%, median 15.0, detail 12.94",
+ "c1_before": {"mean": 23.0, "p95": 98.2, "rg": 1.447, "gb": 1.643, "detail": 11.28, "below8": 49.5, "median": 8.3, "p999": 219.1, "board": 56.1, "lhand": 20.3, "rhand": 28.1, "scalp_p95": 95.2, "room": 9.0, "top_row": 13.7, "grain": 0.5, "sharpen": 1.0},
+ "c2_main": {"mean": 27.2, "p95": 102.0, "rg": 1.425, "gb": 1.599, "detail": 11.21, "below8": 38.6, "median": 13.7, "p999": 217.9, "board": 42.5, "board_p95": 134.7, "lhand": 23.0, "rhand": 40.0, "scalp_p95": 89.8, "room": 19.1, "top_row": 24.5, "grain": 0.2, "sharpen": 0.5},
+ "c2_black": {"mean": 27.3, "p95": 102.9, "rg": 1.432, "gb": 1.603, "detail": 11.08, "below8": 38.9, "median": 13.6},
+ "gpu_editor_1440p_ms": {"c1_auto": 11.57, "s1b_auto": 7.75, "c2_auto": 8.13, "c2_sp75": 10.66, "c2_sp100": 16.63},
+ "tests": "cpu 142/142 + drag 8/8 (C2.1 build); cpu 120/120 + drag 8/8 (C2.2 build)"
+}

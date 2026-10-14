@@ -118,6 +118,27 @@ the packaged runs; its numbers are compared with each other, the packaged run at
 percentage.** The D2 target (Lights + ShadowsDenoiser ≤ 2.5 ms) is missed by 0.28 ms because Window_Cold keeps a shadow;
 without it the image fails V1.
 
+Then the lighting hierarchy and grade (C2.2, details in VISUAL_REBUILD_ROADMAP.md): Hands_Key and Table_Right removed,
+one unshadowed Lamp_Bounce from the lamp's side, fog 0.035 → 0.045, new grade. Same probe, plus 400 frames at
+`r.ScreenPercentage 75` and 300 at 100 in the same session:
+
+| C2.2 state | GPU ms | Lights + ShadowsDenoiser | VolumetricFog | TSR | Avg fps (editor) | 1% low |
+|---|---|---|---|---|---|---|
+| auto (60.6%, 1552x873) | 8.13 | 1.41 + 1.52 | 0.20 | 1.14 | 116.6 | 102.5 |
+| 75% (1920x1080) | 10.66 | 2.10 + 2.34 | 0.30 | 1.33 | 89.4 | 79.9 |
+| 100% (native 2560x1440) | 16.63 | 3.82 + 4.10 | 0.56 | 1.78 | 58.0 | 53.5 |
+
+Native 1440p went from 25.9 ms (Phase A, 10 shadowed lights) to 16.6 ms. The fog and bounce cost about 0.4 ms over
+s1b, which is inside run-to-run noise for the total.
+
+**Screen percentage per tier (recommendation to the lead for `ApplyQualityPreset`):**
+- Epic (RTX 4070 Ti SUPER, 1440p): **83%** (2125x1195). Interpolating the measured 75% (10.7 ms) and 100% (16.6 ms),
+  83% costs about 12.5 ms (estimate): about 80 fps offscreen, leaving margin for present cost and the 1% low (≥ 45).
+  100% measured 58 fps offscreen, under the 60 fps average target once present cost is added.
+- High: 67% (unchanged from the RX 6650 XT measurement in PERFORMANCE.md).
+- Medium: 58%.
+- Never leave it at auto: at 1440p on this display auto gives 60.6%, the soft frame the owner complained about.
+
 ## RX 6650 XT
 
 Nothing was measured on the RX 6650 XT for the current scene. VM 131 is stopped and must not be started without the
