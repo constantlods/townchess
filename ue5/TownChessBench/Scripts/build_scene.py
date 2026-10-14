@@ -2079,6 +2079,10 @@ def build():
     # with its key alone every piece was backlit (s2: board mean 57 -> 23, pieces in silhouette): one soft warm bounce
     # from the lamp's side (its light off the papers and table left of the board), low and from the left, at half power.
     tag(rect("Lamp_Bounce", (-12, -62, top + 22), look_at_rot((-12, -62, top + 22), (-8, 0, top)), 100, 2700, 90, 50, 170, vol=0.0))
+    # C2.3: the lamp's light coming back off the lit table, the papers and the player's own body: a low, wide, shadowless
+    # warm bounce from the player's side so the camera-facing sides of the white pieces stay light (C2.2 left them tan,
+    # close to the black set; lead review). Kept low and dim so the hands stay under the board.
+    tag(rect("Table_Bounce", (-62, 0, top + 8), look_at_rot((-62, 0, top + 8), (0, 0, top + 4)), float(os.environ.get("TC_TBOUNCE", 90)), 2900, 110, 25, 150, vol=0.0))
     # (the table bounce light over-lit the board: 11.7% clipped pixels; removed, Lumen GI does the bounce)
     # corridor light behind the bars: a cold glow that separates the opponent from the back wall
     rect("Corridor_Glow", (cx + L / 2 - 30, 40, 230), (0, -70, 0), 2200, 7200, 80, 30, 500, vol=2.0)
@@ -2153,8 +2157,8 @@ def build():
     for k, v in {
         "auto_exposure_method": unreal.AutoExposureMethod.AEM_HISTOGRAM,
         # EV 8.3 (was 7.8): the frame measured mean 35 / 95th pct 139 against the reference's 27 / 97 (pass 47)
-        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 8.3)),
-        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 8.3)),
+        "auto_exposure_min_brightness": float(os.environ.get("TC_EV", 8.45)),
+        "auto_exposure_max_brightness": float(os.environ.get("TC_EV", 8.45)),
         # C2: vignette 0.65 -> 0.4 and grain 0.5 -> 0.2 (the grain fed the V2 detail metric without being detail)
         "bloom_intensity": 0.3, "vignette_intensity": 0.4, "film_grain_intensity": float(os.environ.get("TC_GRAIN", 0.2)),
         "film_toe": 0.5,  # C2: 0.55 -> 0.5 lifts the deepest shadows a little (0.45 read milky)

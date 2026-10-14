@@ -128,13 +128,21 @@ one unshadowed Lamp_Bounce from the lamp's side, fog 0.035 → 0.045, new grade.
 | 75% (1920x1080) | 10.66 | 2.10 + 2.34 | 0.30 | 1.33 | 89.4 | 79.9 |
 | 100% (native 2560x1440) | 16.63 | 3.82 + 4.10 | 0.56 | 1.78 | 58.0 | 53.5 |
 
-Native 1440p went from 25.9 ms (Phase A, 10 shadowed lights) to 16.6 ms. The fog and bounce cost about 0.4 ms over
+C2.3 (Table_Bounce added, EV 8.45; the state that ships), same probe:
+
+| C2.3 state | GPU ms | Lights + ShadowsDenoiser | VolumetricFog | TSR | Avg fps (editor) | 1% low |
+|---|---|---|---|---|---|---|
+| auto (60.6%) | 8.42 | 1.54 + 1.51 | 0.22 | 1.19 | 112.0 | 96.1 |
+| 75% | 11.14 | 2.23 + 2.43 | 0.31 | 1.39 | 85.7 | 76.7 |
+| 100% | 17.32 | 4.01 + 4.26 | 0.58 | 1.83 | 55.7 | 51.1 |
+
+Against C1 (11.57 ms) C2.3 saves 3.15 ms at auto (-27%). Native 1440p went from 25.9 ms (Phase A, 10 shadowed lights) to 16.6 ms. The fog and bounce cost about 0.4 ms over
 s1b, which is inside run-to-run noise for the total.
 
 **Screen percentage per tier (recommendation to the lead for `ApplyQualityPreset`):**
-- Epic (RTX 4070 Ti SUPER, 1440p): **83%** (2125x1195). Interpolating the measured 75% (10.7 ms) and 100% (16.6 ms),
-  83% costs about 12.5 ms (estimate): about 80 fps offscreen, leaving margin for present cost and the 1% low (≥ 45).
-  100% measured 58 fps offscreen, under the 60 fps average target once present cost is added.
+- Epic (RTX 4070 Ti SUPER, 1440p): **83%** (2125x1195). Interpolating the measured C2.3 75% (11.1 ms) and 100% (17.3 ms),
+  83% costs about 13 ms (estimate): about 75 fps offscreen, leaving margin for present cost and the 1% low (≥ 45).
+  100% measured 55.7 fps offscreen (C2.3), under the 60 fps average target once present cost is added.
 - High: 67% (unchanged from the RX 6650 XT measurement in PERFORMANCE.md).
 - Medium: 58%.
 - Never leave it at auto: at 1440p on this display auto gives 60.6%, the soft frame the owner complained about.

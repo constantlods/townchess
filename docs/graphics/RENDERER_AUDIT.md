@@ -280,13 +280,13 @@ Ranked by impact on what the owner sees, each with an acceptance test that can f
 ## C2 status (2026-10-14, implementation)
 
 Measured on the build PC; evidence in `docs/graphics/iterations/C2-*.jpg` and `C2-lighting.json`, GPU numbers in
-PERFORMANCE_BENCHMARKS.md ("C2"). Commits 7499b8d (C2.1) and d5014f1 (C2.2).
+PERFORMANCE_BENCHMARKS.md ("C2"). Commits 7499b8d (C2.1), d5014f1 (C2.2, rejected by the lead: white pieces dark from the seat) and C2.3 (Table_Bounce, EV 8.45).
 
 | Defect | State | Evidence |
 |---|---|---|
-| D1 screen percentage | open (lead): recommendation Epic 83%, High 67%, Medium 58%; never auto | native 1440p now 16.63 ms (58 fps editor offscreen), 75% 10.66 ms, auto 8.13 ms |
+| D1 screen percentage | open (lead): recommendation Epic 83%, High 67%, Medium 58%; never auto | C2.3: native 1440p 17.32 ms (55.7 fps editor offscreen), 75% 11.14 ms, auto 8.42 ms |
 | D2 shadowed lights | done: 3 shadowed lights (Lamp_Key, Lamp_Opponent, Window_Cold) | GPU 11.57 → 7.75 ms at auto; Lights + ShadowsDenoiser 6.75 → 2.78 ms (target 2.5 missed by 0.28 ms: Window_Cold must keep its shadow, without it r/g fell to 1.33) |
-| D3 lamp as key | partly: Hands_Key and Table_Right removed, key re-aimed at the board centre, one soft Lamp_Bounce from the lamp's side | pieces side-lit from the lamp with long shadows; board 42.5 > right hand 40.0 > left hand 23.0; the shade itself is still out of frame and its emissive dark (board/environment and materials) |
-| D4 grade | done except the 38% bound: below luma 8 49.5% → 38.6%, median 8.3 → 13.7, grain 0.5 → 0.2, sharpen 1.0 → 0.5 | V1 met (27.2 / 102.0 / 1.425 / 1.599); detail 11.21 (V2 not met) |
-| D5 atmosphere | done: fog 0.045, falloff 0.001 | room behind the opponent 9.0 → 19.1, top row 13.7 → 24.5 |
+| D3 lamp as key | partly: Hands_Key and Table_Right removed, key re-aimed at the board centre, a soft Lamp_Bounce from the lamp's side and a low shadowless Table_Bounce from the player's side (the lamp stands beyond the board, so the key alone backlit the white pieces: white median 72.7 → 11.6 in C2.2, 74.8 in C2.3) | C2.3: board 54.3 > right hand 43.3 > left hand 31.0; scalp p95 83.8 < board p95 133.3; white/black piece median ratio 17.8 (≥ 2.5); the shade itself is still out of frame and its emissive dark (board/environment and materials) |
+| D4 grade | done: below luma 8 49.5% → 32.3%, median 8.3 → 15.9, grain 0.5 → 0.2, sharpen 1.0 → 0.5 | V1 met (C2.3: 29.1 / 99.7 / 1.473 / 1.661); detail 11.15 (V2 not met) |
+| D5 atmosphere | done: fog 0.045, falloff 0.001 | room behind the opponent 9.0 → 17.4, top row 13.7 → 22.7 (C2.3) |
 | D6, D8, D9 | not started | |
