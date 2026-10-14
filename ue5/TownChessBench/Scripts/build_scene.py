@@ -931,6 +931,85 @@ POSES = {
 }
 
 
+def _vsub(a, b):
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def _vadd(a, b, s=1.0):
+    return (a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s)
+
+
+def _vnorm(v):
+    n = math.sqrt(sum(c * c for c in v)) or 1.0
+    return (v[0] / n, v[1] / n, v[2] / n)
+
+
+def _vcross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def _vlen(v):
+    return math.sqrt(sum(c * c for c in v))
+
+
+# ---- The player's resting hands (hands/character specialist, pass C1).
+# Seat camera standard (docs/VISUAL_ART_DIRECTION.md section 6) at the game's DEFAULT view height. The C++
+# ATCPlayerController::ApplyView moves the level camera by the view-height slider V (default 0.6, TCGame.h): +28 cm * V
+# up, +5 cm * V forward, pitch -10 deg * V, focal * (1 - 0.2 V). The level camera is placed so that the DEFAULT view lands
+# on the standard (eye x -90, z top+34, pitch -14.5, 30 mm); the player's body is anchored to that same eye.
+VIEW_DEFAULT, VIEW_UP, VIEW_FWD, VIEW_PITCH, VIEW_FOCAL = 0.6, 28.0, 5.0, 10.0, 0.2
+SEAT_EYE_X, SEAT_EYE_DZ, SEAT_PITCH, SEAT_FOCAL = (float(v) for v in os.environ.get("TC_SEAT_CAM", "-90,34,-14.5,30").split(","))
+SEAT = {}  # filled by build(): "top" (table top z), "eye" (default-view eye, world)
+# Measured (capture -TCProbe=Player, docs/graphics/iterations/phaseA-hands-character.md): the runtime body stands 18.5 cm
+# higher than this solver's model (head 132.5 vs 114.0) while x/y agree within 2.6 cm; the body actor is lowered by it.
+PLAYER_Z_FIX = float(os.environ.get("TC_PLAYER_ZFIX", 18.5))
+# Rest pose in table space (cm; x towards the board, |y| outwards, z over the table top). Wrists on the table in front of
+# the board's near corners, fingers forward and slightly inward so index/middle pads lie on the side frame beside the
+# a1/h1 corner and ring/pinky on the table: no finger over a square (squares |x|,|y| <= 23.2, frame to 27.65, top 1.92).
+PLAYER_REST = {k: float(v) for k, v in zip(("wrist_x", "wrist_y", "wrist_z", "yaw", "mcp_z", "elbow_z", "elbow_y"),
+                                            os.environ.get("TC_PLAYER_REST", "-40.5,27.5,3.2,4,2.0,14,22").split(","))}
+BOARD_HALF, BOARD_PLAY_HALF, BOARD_FRAME_Z, BOARD_SURF_Z = 27.65, 23.2, 1.92, 1.71  # props.py chess_board()
+
+
+def board_surface(x, y):
+    """Height over the table top of what lies under world (x, y), and its name: frame, squares or table."""
+    if abs(x) <= BOARD_HALF and abs(y) <= BOARD_HALF:
+        if abs(x) < BOARD_PLAY_HALF and abs(y) < BOARD_PLAY_HALF:
+            return BOARD_SURF_Z, "squares"
+        return BOARD_FRAME_Z, "frame"
+    return 0.0, "table"
+
+
+def _finger_rest(p1, p2, p3, N, to_world, top, dip=6.0):
+    """Curl one finger (joints p1..p3 = _01.._03, component space) about its own hinge axis so the _03 joint sits 0.9 cm
+    over the surface under it and the pad (estimated tip) 0.55 cm over it, with no joint below the surface.
+    Returns (axis, a, b, c): component-space rotations in degrees for _01, _02 (relative) and _03."""
+    L = _vnorm(_vcross(_vnorm(_vsub(p3, p1)), N))
+    seg1, seg2 = _vsub(p2, p1), _vsub(p3, p2)
+    l3 = 0.75 * _vlen(seg2)
+    def surf(c):  # clearance of a component-space point over what lies under it (world z: P.z + c.z)
+        w = to_world(c)
+        return w[2] - top - board_surface(w[0], w[1])[0]
+    best = None
+    for a in range(-30, 61, 2):
+        qa = _axis(L, a)
+        q2 = _qrot(qa, seg1)
+        j2 = _vadd(p1, q2)
+        for b in range(-10, 61, 3):
+            qab = _axis(L, a + b)
+            j3 = _vadd(j2, _qrot(qab, seg2))
+            d3 = _vnorm(_qrot(_axis(L, a + b + dip), seg2))
+            tip = _vadd(j3, d3, l3)
+            cost = (surf(j3) - 0.9) ** 2 + (surf(tip) - 0.55) ** 2 + 0.0004 * (a * a + b * b)
+            if any(board_surface(*to_world(c)[:2])[1] == "squares" for c in (j3, tip)):
+                cost += 50.0  # never rest a finger on the playing squares
+            if surf(j2) < 0.8:
+                cost += 10.0 * (0.8 - surf(j2)) ** 2 + 5.0
+            if best is None or cost < best[0]:
+                best = (cost, a, b)
+    return L, best[1], best[2], dip
+
+
 def _nlerp(a, b, t):
     """Normalised lerp between two quaternions (x, y, z, w), taking the short way round."""
     if sum(a[i] * b[i] for i in range(4)) < 0:
@@ -1055,34 +1134,117 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
                 tp, qp = t_w, q_w
             return out
         best = {}
+        player = pose_name == "player" and "eye" in SEAT
+        if player:
+            # Table-space targets (pass C1): the body actor is placed from the default-view eye (build(): ploc), so the
+            # model maps component c -> world (P.x + c.y, P.y - c.x, P.z + c.z) with P below (yaw -90).
+            top = SEAT["top"]
+            ex, _, ez = SEAT["eye"]
+            P = (ex - (head[1] + 9.0), head[0], ez - (head[2] + 8.0))
+            to_world = lambda c: (P[0] + c[1], P[1] - c[0], P[2] + c[2])
+            to_comp_dir = lambda d: (-d[1], d[0], d[2])
+            rest = PLAYER_REST
         for side, sx in (("l", 1.0), ("r", -1.0)):
             # which way is "this arm's side": the upper arm's x sign in the seated torso
             sign = 1.0 if new_w[f"upperarm_{side}"][0][0] > head[0] else -1.0
             tg = ARM_TARGETS[pose_name]
             target = (head[0] + sign * tg["hand"][0], head[1] + tg["hand"][1], head[2] + tg["hand"][2])
             elbow_z = head[2] + tg["elbow_z"]  # elbows on the table: the table top is ~31 cm under the seated head
+            elbow_x, w_hand, w_ez, w_ex = tg["elbow_x"], 1.0, 0.5, 0.3
+            if player:
+                # component x = P.y - world y: this side's wrist at world y = -sign * |y|
+                target = (head[0] + sign * rest["wrist_y"], rest["wrist_x"] - P[0], top + rest["wrist_z"] - P[2])
+                elbow_z, elbow_x = top + rest["elbow_z"] - P[2], rest["elbow_y"]
+                w_hand, w_ez, w_ex = 4.0, 0.2, 0.1  # the wrist position is the contact: it dominates
+            def score(ux, uz, lx, lz):
+                o = chain(side, ux, uz, lx, lz)
+                e, h = o[f"lowerarm_{side}"][0], o[f"hand_{side}"][0]
+                err = w_hand * sum((h[i] - target[i]) ** 2 for i in range(3)) + w_ez * (e[2] - elbow_z) ** 2
+                err += w_ex * (abs(e[0] - head[0]) - elbow_x) ** 2   # elbows spread, forearms in a V
+                if (h[0] - head[0]) * sign < -1.0:   # hands meet, they do not cross
+                    err += 300
+                if e[1] < head[1] + 6:   # elbows forward of the chest, on the table
+                    err += 400
+                if player and e[2] < top + 4.0 - P[2]:  # the elbow never sinks into the table
+                    err += 400
+                return err
             score_best = None
             for ux in range(10, 131, 8):
                 for uz in range(-80, 81, 10):
                     for lx in range(-30, 161, 10):  # from 20 the player's right forearm sat on the bound (IK error 324, pass 60)
                         for lz in range(-80, 81, 10):
-                            o = chain(side, ux, uz, lx, lz)
-                            e, h = o[f"lowerarm_{side}"][0], o[f"hand_{side}"][0]
-                            err = sum((h[i] - target[i]) ** 2 for i in range(3)) + 0.5 * (e[2] - elbow_z) ** 2
-                            err += 0.3 * (abs(e[0] - head[0]) - tg["elbow_x"]) ** 2   # elbows spread, forearms in a V
-                            if (h[0] - head[0]) * sign < -1.0:   # hands meet, they do not cross
-                                err += 300
-                            if e[1] < head[1] + 6:   # elbows forward of the chest, on the table
-                                err += 400
+                            err = score(ux, uz, lx, lz)
                             if score_best is None or err < score_best:
                                 score_best, best[side] = err, (ux, uz, lx, lz)
+            if player:  # refine around the coarse optimum (the 8-10 deg grid left the wrist 2-3 cm off its target)
+                for step in (3, 1):
+                    b0 = best[side]
+                    for dux in range(-3, 4):
+                        for duz in range(-3, 4):
+                            for dlx in range(-3, 4):
+                                for dlz in range(-3, 4):
+                                    cand = (b0[0] + dux * step, b0[1] + duz * step, b0[2] + dlx * step, b0[3] + dlz * step)
+                                    err = score(*cand)
+                                    if err < score_best:
+                                        score_best, best[side] = err, cand
             log(pose_name, side, "best", best[side], "error", round(score_best, 1), "target", [round(v, 1) for v in target])
         for side in ("l", "r"):
             ux, uz, lx, lz = best[side]
             deltas[f"upperarm_{side}"] = _qmul(_axis(Z, uz), _axis(X, ux))
             deltas[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
         new_w, new_l = solve(deltas)
-        SEATED[f"{pose_name}_hands"] = {s_: (new_w[f"hand_{s_}"][0], new_w[f"lowerarm_{s_}"][0]) for s_ in ("l", "r")}
+        if player:
+            # Lay each hand flat: fingers forward (slightly inward), index towards the board's centre line, the knuckles
+            # rest["mcp_z"] over whatever lies under them (wrist extension instead of the forearm's downward line).
+            for it in range(2):
+                for side in ("l", "r"):
+                    sgn = 1.0 if new_w[f"upperarm_{side}"][0][0] > head[0] else -1.0  # +1: this hand at world -y
+                    hb = f"hand_{side}"
+                    if not all(f"{f}_{side}" in new_w for f in ("middle_01", "index_01", "pinky_01")):
+                        continue
+                    h = new_w[hb][0]
+                    m1 = new_w[f"middle_01_{side}"][0]
+                    hl = _vlen(_vsub(m1, h))
+                    yaw = math.radians(rest["yaw"])
+                    hw = to_world(h)
+                    # medial (towards the board centre line) is world +y for the hand at -y
+                    fx, fy = math.cos(yaw), sgn * math.sin(yaw)
+                    mw = (hw[0] + fx * hl, hw[1] + fy * hl)
+                    drop = hw[2] - (top + board_surface(*mw)[0] + rest["mcp_z"])
+                    pitch = math.asin(max(-0.7, min(0.7, drop / hl)))
+                    D = to_comp_dir((fx * math.cos(pitch), fy * math.cos(pitch), -math.sin(pitch)))
+                    T = to_comp_dir((-math.sin(yaw), sgn * math.cos(yaw), 0.0))
+                    F = _vnorm(_vsub(m1, h))
+                    S = _vsub(new_w[f"index_01_{side}"][0], new_w[f"pinky_01_{side}"][0])
+                    R = _qmul(_quat_from_axes(D, T), _qinv(_quat_from_axes(F, S)))
+                    deltas[hb] = _qmul(R, deltas.get(hb, (0.0, 0.0, 0.0, 1.0)))
+                new_w, new_l = solve(deltas)
+            # fingers and thumb: pads on the frame/table, joints never below the surface
+            for side in ("l", "r"):
+                hb = f"hand_{side}"
+                if f"middle_01_{side}" not in new_w:
+                    continue
+                F = _vnorm(_vsub(new_w[f"middle_01_{side}"][0], new_w[hb][0]))
+                S = _vsub(new_w[f"index_01_{side}"][0], new_w[f"pinky_01_{side}"][0])
+                N = _vnorm(_vcross(F, S))
+                N = N if N[2] < 0 else (-N[0], -N[1], -N[2])  # out of the palm: down
+                for f in ("thumb", "index", "middle", "ring", "pinky"):
+                    bs = [f"{f}_0{k}_{side}" for k in (1, 2, 3)]
+                    if not all(b in new_w for b in bs):
+                        continue
+                    L, a, b, c = _finger_rest(*(new_w[b][0] for b in bs), N, to_world, top)
+                    for bone, ang in zip(bs, (a, b, c)):
+                        deltas[bone] = _qmul(_axis(L, ang), deltas.get(bone, (0.0, 0.0, 0.0, 1.0)))
+                    log("player finger", side, f, "curl", a, b, c)
+            new_w, new_l = solve(deltas)
+            # predicted contact in world space (compare with capture -TCProbe=Player)
+            for side in ("l", "r"):
+                for b in (f"hand_{side}", f"index_03_{side}", f"middle_03_{side}", f"ring_03_{side}", f"pinky_03_{side}", f"thumb_03_{side}"):
+                    if b in new_w:
+                        w = to_world(new_w[b][0])
+                        z0, what = board_surface(w[0], w[1])
+                        log("player rest", b, "world", [round(v, 1) for v in w], "over", what, "by", round(w[2] - top - z0, 1))
+        SEATED[f"{pose_name}_hands"] ={s_: (new_w[f"hand_{s_}"][0], new_w[f"lowerarm_{s_}"][0]) for s_ in ("l", "r")}
         for s_ in ("l", "r"):  # arm bone transforms, for props aimed along the arm (player hand options, sleeves)
             SEATED[f"{pose_name}:lowerarm_{s_}"] = new_w[f"lowerarm_{s_}"]
             SEATED[f"{pose_name}:upperarm_{s_}"] = new_w[f"upperarm_{s_}"]
@@ -1745,10 +1907,14 @@ def build():
     # 0. The player's own arms (first person): the reference shows real hands with sleeves resting on the board,
     #    not floating gloves. Eyes at the camera (x=-87, z=top+42); ATCGameMode hides the head (tag TC_PlayerBody).
     if mhn and GAMEPLAY and os.environ.get("TC_PLAYER_BODY", "1") == "1":
+        SEAT.update(top=top, eye=(SEAT_EYE_X, 0.0, top + SEAT_EYE_DZ))  # the default-view eye (camera block below)
         probe = unreal.load_asset(f"{MH_ROOT}/{mhn}/Body/SKM_{mhn}_BodyMesh")
         build_seated_pose(probe, idle, f"{ROOT}/Anims", "A_TC_Probe_player", own_proportions=True, pose_name="player")
         hx, hy, hz = SEATED["head"][0]
-        ploc = (-87.0 - (hy + 9.0), hx, top + 42.0 - (hz + 8.0))  # component +Y (forward) -> world +X with yaw -90
+        # component +Y (forward) -> world +X with yaw -90; eyes 9 cm before and 8 cm over the head bone; lowered by the
+        # measured runtime offset (PLAYER_Z_FIX) so the solver's table-space hand targets hold in the game
+        ex, _, ez = SEAT["eye"]
+        ploc = (ex - (hy + 9.0), hx, ez - (hz + 8.0) - PLAYER_Z_FIX)
         pb, _ = spawn_opponent("player", mhn, outfit_mi=mi_gown_early, pose="player", loc=ploc, yaw=-90.0, with_face=False,
                                group_tag="TC_PlayerBody")
         if pb:
@@ -1923,8 +2089,13 @@ def build():
     fog.set_folder_path("Atmosphere")
 
     # ---- Camera: seated eye height, natural focal length, focus on the board.
-    eye = (-87.0, 0.0, top + 42.0)
-    PITCH = -19.0  # the reference's pitch: the player's own hands show at the bottom; the bowed opponent keeps his head in frame
+    # Pass C1 (hands specialist, camera block lent by the lead): the art-direction standard at the DEFAULT view height
+    # 0.6. The level camera sits where ApplyView's offsets bring it onto the standard: 16.8 cm lower, 3 cm back, pitch
+    # 6 deg higher, focal 30 / 0.88 = 34.1 mm. (Was eye (-87, top+42), pitch -19, 30 mm before the offsets: at the default
+    # view that put the board's near edge at the frame bottom and cut both wrists.)
+    v = VIEW_DEFAULT
+    eye = (SEAT_EYE_X - VIEW_FWD * v, 0.0, top + SEAT_EYE_DZ - VIEW_UP * v)
+    PITCH = SEAT_PITCH + VIEW_PITCH * v
     cam = EAS.spawn_actor_from_class(unreal.CineCameraActor, unreal.Vector(*eye), unreal.Rotator(0, PITCH, 0))
     cam.set_actor_label("PlayerEye")
     tag(cam, "TC_Camera_White")
@@ -1933,11 +2104,13 @@ def build():
     setp(fb, "sensor_width", 36.0)
     setp(fb, "sensor_height", 20.25)
     setp(cc, "filmback", fb)
-    setp(cc, "current_focal_length", 30.0)
-    setp(cc, "current_aperture", 2.8)
+    setp(cc, "current_focal_length", SEAT_FOCAL / (1.0 - VIEW_FOCAL * v))
+    setp(cc, "current_aperture", 16.0)
     fs = cc.get_editor_property("focus_settings")
-    setp(fs, "focus_method", unreal.CameraFocusMethod.MANUAL)
-    setp(fs, "manual_focus_distance", 97.0)
+    # no depth of field (the standard: f/16 or DOF off; ApplyView rewrites the manual distance to the board centre,
+    # ~96 cm, where f/16 would still soften the hands at 60 cm): everything from the hands to the opponent is sharp
+    setp(fs, "focus_method", getattr(unreal.CameraFocusMethod, "DISABLE", unreal.CameraFocusMethod.MANUAL))
+    setp(fs, "manual_focus_distance", 85.0)
     setp(cc, "focus_settings", fs)
     if not GAMEPLAY:
         setp(cam, "auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
