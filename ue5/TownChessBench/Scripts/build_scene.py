@@ -1287,7 +1287,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
 # ---------------------------------------------------------------- lights / camera / post
 
-def spot(label, loc, rot, lumens, kelvin, radius, cone, src=2.0, vol=1.0):
+def spot(label, loc, rot, lumens, kelvin, radius, cone, src=2.0, vol=1.0, shadows=True):
     rot = rot if isinstance(rot, unreal.Rotator) else unreal.Rotator(*rot)
     a = EAS.spawn_actor_from_class(unreal.SpotLight, unreal.Vector(*loc), rot)
     c = a.spot_light_component
@@ -1301,12 +1301,13 @@ def spot(label, loc, rot, lumens, kelvin, radius, cone, src=2.0, vol=1.0):
     setp(c, "source_radius", src)
     setp(c, "soft_source_radius", src * 2)
     setp(c, "volumetric_scattering_intensity", vol)
+    setp(c, "cast_shadows", shadows)
     a.set_actor_label(label)
     a.set_folder_path("Lights")
     return a
 
 
-def rect(label, loc, rot, lumens, kelvin, w, h, radius, vol=0.3):
+def rect(label, loc, rot, lumens, kelvin, w, h, radius, vol=0.3, shadows=False):
     a = EAS.spawn_actor_from_class(unreal.RectLight, unreal.Vector(*loc), unreal.Rotator(*rot))
     c = a.rect_light_component
     setp(c, "intensity_units", unreal.LightUnits.LUMENS)
@@ -1317,6 +1318,7 @@ def rect(label, loc, rot, lumens, kelvin, w, h, radius, vol=0.3):
     setp(c, "source_height", h)
     setp(c, "attenuation_radius", radius)
     setp(c, "volumetric_scattering_intensity", vol)
+    setp(c, "cast_shadows", shadows)  # pass C2: only the lamp's two spots cast shadows (each shadowed fill cost 0.2-0.6 ms of RT rays + denoiser)
     a.set_actor_label(label)
     a.set_folder_path("Lights")
     return a
@@ -2063,8 +2065,10 @@ def build():
     tag(bulb)
     rect("Fluorescent_Fill", (cx + 120, 60, H - 6), (0, -90, 0), 150, 5600, 120, 15, 900, vol=0.2)
     # cold window light from back-left (fill, 3-4 stops under the key) and a back-rim on the opponent's shoulder
-    rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0)
-    point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0)
+    # keeps its shadow (C2): it faces the camera from the back wall, and without one its 7500 K light passed through the
+    # opponent onto the board and hands (r/g 1.44 -> 1.33); the window bars' shadow also shapes its shafts in the fog
+    rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0, shadows=True)
+    point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0, shadows=False)
     tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (70, 0, top + 45)), 220, 2400, 400, 40, src=2.5, vol=0.6))
     rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
     # the lamp's light bouncing off the table fills the frame warm (the reference's amber everywhere near the table)

@@ -100,6 +100,24 @@ VSM instead of RT shadows (`rtsoff`) costs the same: Lights 4.24 ms + ShadowDept
 high) differ by a mean of 2.0/255 per pixel and have identical mean, p95 and detail. So **the shadow method changes
 neither the cost nor the look of this view. The cost is the number of shadowed lights.**
 
+## C2 (2026-10-14): lighting changes measured one at a time
+
+Method: for each change the level is rebuilt (`setup_content.ps1`), the benchmark seat cameras are captured
+(`capture.ps1 -Preset epic`, the shots of `benchmark.ps1`) and the editor `-game` (default preset → epic + HW RT, auto
+screen percentage) records a CSV profile of 570 frames at 2560x1440 (`r.SetRes 2560x1440w`, `r.GPUCsvStatsEnabled 1`,
+after 30 s warm-up). Scripts `ra_iter.ps1` / `ra_gpu.py` in `C:\TownChess\work\ra\`. The editor runs offscreen like
+the packaged runs; its numbers are compared with each other, the packaged run at the end is in the table below.
+
+| Step | GPU ms | Lights + ShadowsDenoiser ms | Avg fps (editor) | Image (main view) |
+|---|---|---|---|---|
+| c1: C1 state (10 shadowed lights) | 11.57 | 3.06 + 3.69 = 6.75 | 82.8 | mean 23.0, p95 98.2, r/g 1.447, g/b 1.643, below 8: 49.5% |
+| s1: shadows only on Lamp_Key + Lamp_Opponent | 7.96 | 1.12 + 0.64 = 1.76 | 117.9 | **rejected**: Window_Cold (2500 lm, 7500 K, facing the camera from the back wall) then lit the board and hands through the opponent: r/g 1.33, g/b 1.45, p95 108.7 (V1 fails) |
+| s1b: + Window_Cold keeps its shadow | **7.75** | 1.36 + 1.42 = **2.78** | **122.1** | kept: mean 24.0, p95 95.6, r/g 1.414, g/b 1.591, below 8: 45.3%; same look, piece shadows unchanged |
+
+**Shadows on 3 lights instead of 10 save 3.8 ms of GPU time (11.57 → 7.75 ms, -33%) at the auto 60.6% screen
+percentage.** The D2 target (Lights + ShadowsDenoiser ≤ 2.5 ms) is missed by 0.28 ms because Window_Cold keeps a shadow;
+without it the image fails V1.
+
 ## RX 6650 XT
 
 Nothing was measured on the RX 6650 XT for the current scene. VM 131 is stopped and must not be started without the
