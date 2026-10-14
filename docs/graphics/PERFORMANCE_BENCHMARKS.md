@@ -136,7 +136,10 @@ C2.3 (Table_Bounce added, EV 8.45; the state that ships), same probe:
 | 75% | 11.14 | 2.23 + 2.43 | 0.31 | 1.39 | 85.7 | 76.7 |
 | 100% | 17.32 | 4.01 + 4.26 | 0.58 | 1.83 | 55.7 | 51.1 |
 
-Against C1 (11.57 ms) C2.3 saves 3.15 ms at auto (-27%). Native 1440p went from 25.9 ms (Phase A, 10 shadowed lights) to 16.6 ms. The fog and bounce cost about 0.4 ms over
+Against C1 (11.57 ms) C2.3 saves 3.15 ms at auto (-27%). **Packaged** (f140362, `package.ps1` + `beta_checks.ps1 -Games 0`, 2560x1440 auto,
+offscreen, a 54-ply smoke game to checkmate): **116.1 fps average, 96.3 fps 1% low**, against 86.9 / 72.1 at the
+baseline (+34% average). V2 with grain 0 (same build, `TC_GRAIN=0`): detail 11.06 against 11.17 at grain 0.2, so the
+grain now adds about 0.1 to the metric. Native 1440p went from 25.9 ms (Phase A, 10 shadowed lights) to 16.6 ms. The fog and bounce cost about 0.4 ms over
 s1b, which is inside run-to-run noise for the total.
 
 **Screen percentage per tier (recommendation to the lead for `ApplyQualityPreset`):**
