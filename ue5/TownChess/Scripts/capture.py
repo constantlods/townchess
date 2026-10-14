@@ -128,7 +128,9 @@ def probe(world):
     for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SkeletalMeshActor):
         smc = a.skeletal_mesh_component
         if a.actor_has_tag("TC_PlayerBody") and a.actor_has_tag("TC_Body"):
-            for bone in ("lowerarm_l", "hand_l", "lowerarm_r", "hand_r"):
+            # arms, hands and fingertips (contact checks: a resting hand's fingertips sit ~1 cm above the table/board)
+            for bone in ("lowerarm_l", "hand_l", "lowerarm_r", "hand_r", "index_03_l", "middle_03_l", "pinky_03_l", "thumb_03_l",
+                         "index_03_r", "middle_03_r", "pinky_03_r", "thumb_03_r", "head"):
                 if smc.does_socket_exist(bone):
                     t = smc.get_socket_transform(bone, unreal.RelativeTransformSpace.RTS_WORLD)
                     x = unreal.MathLibrary.transform_direction(t, unreal.Vector(1, 0, 0))
