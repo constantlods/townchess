@@ -40,11 +40,30 @@ Visual judge on the baseline (docs/pipeline/visual.md, 2026-10-13): average 5.53
 BETA V3/V4/V5 not met. The judge's warning stands: the colour match is partly bought with desaturation, warm grade, grain
 and vignette, which hide weak textures and an empty room. Numbers measure the image; they do not prove quality.
 
-## 3. Primary causes of the dated look
+## 3. Primary causes of the dated look (Phase A, five independent inspections of the same baseline)
 
-To be filled from the Phase A specialist inspections (visual director, rendering architect, hands/character,
-materials) and the judge. Lead's first look: hand clipping through pieces and deformed fingers; grime as stamped blotches;
-no key-light pool from the lamp; cheap large surfaces (table, room); post-processing carrying the image.
+Sources: docs/pipeline/visual.md (judge), docs/VISUAL_ART_DIRECTION.md (visual director), docs/graphics/RENDERER_AUDIT.md
+(rendering architect), docs/graphics/iterations/phaseA-hands-character.md, docs/graphics/iterations/phaseA-materials.md.
+Ranked by effect on the player; every item was found by at least two inspectors unless noted.
+
+1. **The hands float and look like rubber.** The player body sits 18.5 cm higher than the pose solver assumes (probe:
+   head z 132.5 vs 114 planned), so the wrists hover ~19.5 cm over the table and overlap the a/b-file pieces on screen;
+   straight splayed fingers, no nails, a faceted banded sleeve, a mirrored watch dial; grime baked as 115 hard-threshold
+   blobs in skin.py (hands, materials, judge, director).
+2. **The lighting is inverted.** The lamp is not a visible source (inner glow 4-5 stops under mid-grey), sourceless fills
+   (Hands_Key, Table_Right) make the hands 2.3x the reference's brightness, the opponent's scalp is the brightest point,
+   48% of pixels below luma 8 (reference 34%); ten shadow-casting lights spend 57% of GPU time on RT shadows while the
+   key costs 0.1 ms; volumetric fog costs time and is invisible (director, rendering architect, judge).
+3. **Post-processing carries the image.** Desaturation 0.72, warm grade, grain 0.5, sharpen 1.0 and vignette match the
+   reference's statistics while hiding weak textures; 44% of the reference's fine-detail score is grain-like pixel noise
+   and our score counts our grain (judge, rendering architect, materials).
+4. **What the judge sees is not what the owner sees.** The Auto tier renders at 1552x873 (60.6%) and TSR upscales to
+   1440p; all screenshots were full-resolution scene captures (rendering architect, unique finding).
+5. **Surfaces read as decals and flat tints.** Grime is UV noise that ignores crevices; ~25 untextured instances with one
+   roughness; the patient's sleeves are lime in base colour; black pieces at albedo ~0.003, roughness 0.16 (plastic);
+   bed frames pure-white importer material; straw-like scratch decals (materials, director, judge).
+6. **Composition.** The board's near edge at 0.97 of frame height (reference 0.77), wrists cut off, the opponent small and
+   upright instead of leaning in with clasped hands, frozen in one frame (director, hands).
 
 ## 4. Rendering and asset strategy
 
@@ -85,11 +104,19 @@ No proprietary assets or code are copied; references inform technique only.
 - **GPU scheduling:** the RTX 4070 Ti SUPER is the only render/measure device; builds and captures are serialized by
   `ue5/tools/win/lock.ps1`; no inference runs on it.
 
-## 7. Prioritized milestones
+## 7. Prioritized implementation queue (Step B, 2026-10-13)
 
-To be finalised from Phase A (section 3). Order fixed by the directive: (M1) baseline and diagnosis - done above;
-(M2) hero assets and materials: hands first; (M3) lighting and rendering; (M4) hand-object interaction and opponent idle;
-(M5) environments; (M6) performance and stability; (M7) final audit.
+| # | Task | Owner | State |
+|---|---|---|---|
+| 1 | Hands contact (fix the 18.5 cm body offset, fingertips on the table/frame, never over a piece) + camera framing to the director's numbers | hands/character (camera block granted) | in progress |
+| 2 | Lighting: shadows only on the lamp, the lamp as the visible key with a pool on the board, no sourceless front fill, visible fog, grade that stops crushing shadows, grain/sharpen that no longer fake detail | rendering architect | in progress |
+| 3 | Materials: skin grime along creases/nails, sleeve material trace + MetaHuman fold normals, ebony/boxwood pieces, bed frames and cart steel, detail normals on flat instances | materials | in progress |
+| 4 | Screen percentage per tier from the freed GPU budget; capture/benchmark parity with the game's frame (document the capture's full-resolution path) | lead (C++ ApplyQualityPreset, capture.py) | after 2 |
+| 5 | Board/props/room: scratch decals, tape roll, clipboard sheet, bed springs, piece crowns speckle | board/environment | inspection finishing |
+| 6 | Fingers curl and nails, sleeve geometry, the patient's clasped lean and a breathing idle (keyed, no chess-state access) | hands/character | after 1 |
+| 7 | Hand-driven piece move (design in phaseA-hands-character.md: the board keeps authority; the hand follows, read-only, switchable; identical autotests on/off) | lead C++ + guardian review | design done |
+| 8 | Judge re-score at the benchmark cameras; packaged QA gate (autotests, smoke, perf) | judge, QA | after each milestone |
+| 9 | Environments (the reference's six BOARD ENVIRONMENTS) once the benchmark scene meets the standard | board/environment | post-benchmark |
 
 ## 8. Performance budgets and test requirements
 
