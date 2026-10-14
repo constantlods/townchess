@@ -117,7 +117,17 @@ void ATCGameMode::ApplyQualityPreset()
 	Exec(FString::Printf(TEXT("r.Lumen.Reflections.HardwareRayTracing %d"), bHW ? 1 : 0));
 	Exec(FString::Printf(TEXT("r.RayTracing.Shadows %d"), bHW ? 1 : 0));
 	Exec(TEXT("r.NGX.DLSS.Enable 1"));
-	UE_LOG(LogTownChess, Log, TEXT("quality: %s (level %d), hardware ray tracing %s"), *Q, Level, bHW ? TEXT("on") : TEXT("off"));
+	// Explicit render resolution per tier (renderer audit D1): the engine default left the 1440p player on a 60.6% TSR
+	// frame. With shadows on the three lamp lights only (lighting C2.3) the GPU cost at 1440p is ~3.3 ms fixed + ~14 ms
+	// per full-resolution frame (editor CSV: 8.42 ms at 60.6%, 11.14 ms at 75%, 17.32 ms at 100%), so Epic renders at
+	// 83% (~13 ms, the rendering architect's recommendation).
+	// -tcscreenpct= overrides it for benchmarks.
+	int32 Pct = Level >= 4 ? 100 : Level == 3 ? 83 : Level == 2 ? 67 : Level == 1 ? 58 : 50;
+	FParse::Value(FCommandLine::Get(), TEXT("-tcscreenpct="), Pct);
+	Pct = FMath::Clamp(Pct, 25, 200);
+	Exec(TEXT("r.ScreenPercentage.Default.Desktop.Mode 0"));
+	Exec(FString::Printf(TEXT("r.ScreenPercentage %d"), Pct));
+	UE_LOG(LogTownChess, Log, TEXT("quality: %s (level %d), hardware ray tracing %s, screen percentage %d"), *Q, Level, bHW ? TEXT("on") : TEXT("off"), Pct);
 }
 
 static FName OpponentTagOf(const AActor* A)
