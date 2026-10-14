@@ -39,11 +39,11 @@ Roles are merged into five graphics files because every concurrently running age
 `build_scene.py` is shared by function: keep edits inside your blocks and rebase before pushing. The Windows build PC is
 shared through `ue5/tools/win/lock.ps1` (one builder at a time, <= 45 min per hold).
 
-## Baseline (2026-10-13, commit 7cb3a50, packaged build of 2026-10-06)
+## Baseline (2026-10-13, commit 7cb3a50; screenshots from UnrealEditor -game -RenderOffscreen, fps from the packaged build of 2026-10-06)
 
 `docs/graphics/baseline/`: base_main, base_black, base_hands, base_opponent (+ metrics.json). Measured against the
 reference panel: mean 25.6 (ref 26.6), p95 102.4 (97.1), r/g 1.44 (1.44), g/b 1.64 (1.62), fine detail 11.19 (12.94;
-BETA V2 needs 11.5 - not met at baseline). 2560x1440 Auto (Epic + HW RT): 86.9 fps average, 72.1 fps 1% low (offscreen).
+BETA V2 needs 11.5 - not met at baseline). 2560x1440 Auto (Epic + HW RT): 86.9 fps average, 72.1 fps 1% low (packaged, offscreen: no present cost, no CPU/GPU split yet; the VRAM reading was taken after exit and is not valid). Manifest: metrics.json `_manifest`; script `ue5/tools/win/benchmark.ps1`.
 Visible defects (lead's first look): the player's hand rests on pieces at the board edge (a knight passes into the palm),
 grime reads as leopard spots, flat orange skin, flat-shaded banded sleeve; the patient's sleeves read olive.
 
@@ -52,10 +52,12 @@ grime reads as leopard spots, flat orange skin, flat-shaded banded sleeve; the p
 | Task | Owner | State | Evidence |
 |---|---|---|---|
 | A1 Independent inspection of the same baseline (art direction) | visual director | started 2026-10-13 | |
-| A2 Renderer audit + profiling | rendering architect | started 2026-10-13 | |
+| A2 Renderer audit + profiling (windowed CPU/GPU split, VRAM during play) | rendering architect | started 2026-10-13 | |
 | A3 Hands/character audit | hands/character | started 2026-10-13 | |
 | A4 Materials audit | materials | started 2026-10-13 | |
-| A5 Judge the baseline | visual judge | started 2026-10-13 | |
-| A6 Session compliance audit (both directives + owner messages) | oversight | started 2026-10-13 | |
+| A5 Judge the baseline | visual judge | done: average 5.53, V4/V5 not met, rejected | docs/pipeline/visual.md (6f71140) |
+| A6 Session compliance audit (both directives + owner messages) | session auditor | done: 82 requirements, 24 done / 36 in progress / 21 not started / 1 blocked | docs/SESSION_AUDIT.md |
 | B Consolidate into one implementation queue | lead | after A1-A5 | |
-| Local-model trial (Ollama on the Proxmox host, CPU only) | lead | pending | |
+| Local-model trial (Ollama on the Proxmox host, CPU only) | lead | done: 7 tok/s, small tasks only | plan section 6 |
+| A7 Board/pieces/table/asset-pipeline inspection | board/environment | queued (after the first batch, usage limit) | |
+| Benchmark gaps: second environment, captured piece in frame, hand-driven move | lead | open (second environment does not exist yet; hand move not built) | |

@@ -19,5 +19,19 @@
   "rg": 1.45,
   "gb": 1.64,
   "detail": 10.6
+ },
+ "_manifest": {
+  "commit": "7cb3a50",
+  "date": "2026-10-13",
+  "script": "ue5/tools/win/benchmark.ps1",
+  "screenshots": "UnrealEditor -game -RenderOffscreen (capture.ps1), level /Game/TownChess/L_Table, -Preset epic (capture forces scalability 3 + HW RT), 1920x1080 SceneCapture with the level post settings",
+  "cameras": {
+   "base_main": "seat camera, -TCHud=1 -TCPlay=10, view height 0.6 (default)",
+   "base_black": "seat camera Black (-tcauto=cpu:novice:b), -TCHud=1 -TCPlay=10",
+   "base_hands": "-tcview=0 -TCCamLoc=-56,-46,116 -TCCamTarget=-38,-20,98 -TCFov=36",
+   "base_opponent": "-TCCamLoc=-5,-3.8,112 -TCCamTarget=67,-3.8,104 -TCFov=30"
+  },
+  "perf": "packaged TownChess.exe (2026-10-06, ad640d1), -tcsmoke=400 -RenderOffscreen at 2560x1440 (r.SetRes), Auto preset (Epic + HW RT); frame times after 10 s warm-up; no present/vsync cost; VRAM figure taken after exit (not valid)",
+  "metrics": "luminance/colour/detail on the frame resized to 1045x588 vs the reference crop [0:685,0:1045]; detail counts film grain"
  }
 }
