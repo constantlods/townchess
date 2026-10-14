@@ -1,0 +1,19 @@
+{
+ "base": "f140362 (lighting C2.3). A3 = upstream build, K = upstream + C3 (final), same build-PC session 2026-10-14 17:09-17:35, capture.ps1 -Preset epic, benchmark cameras (benchmark.ps1 parameters)",
+ "metric": "frame resized to 1045x588 (PIL bicubic), Rec.709 luma; detail = mean |Laplacian|; median3 = same after a 3x3 median (pixel grain removed). This script gives 11.14 on the 2026-10-13 base_main (metrics.json 11.19) but 10.0-10.2 where C2 reports ~11.1: compare A/K only",
+ "main": {"A3": {"mean": 29.1, "p95": 99.5, "rg": 1.473, "gb": 1.661, "detail": 10.02, "median3": 6.32},
+          "K": {"mean": 28.2, "p95": 96.5, "rg": 1.493, "gb": 1.695, "detail": 9.47, "median3": 5.92}},
+ "black_seat": {"A3": {"mean": 27.9, "p95": 98.5, "rg": 1.483, "gb": 1.657, "detail": 9.94, "median3": 6.23},
+                "K": {"mean": 26.4, "p95": 90.9, "rg": 1.514, "gb": 1.696, "detail": 9.12, "median3": 5.64}},
+ "V1": "default view met in K (all four inside the bounds, r/g and g/b near their upper limits); Black seat r/g 1.514 is 0.014 over 1.50 (open)",
+ "V2": "not met, and -0.55 vs A3 (median3 -0.40): the loss sits in the background band, where the importer's 255-white bed grids were most of the high-frequency energy; no grain or sharpen added",
+ "rejected_on_the_way": {"bed tint 0.34": "mean -1.4, V2 -1.0 (C2.0 light)", "bed tint 0.6 warm": "C2.3 r/g 1.51 g/b 1.72",
+                         "white tint 0.56/0.45/0.27 rough 0.40": "white pieces read mid-brown under C2.2", "black tint 1.3": "black pieces light grey (diffuse is sampled linear)"},
+ "skin_uv_space": {"what": "dirty BC, hand islands (rows 0-1850, half res), dark blobs < 0.8 x 41-px median, 20-2000 px, inside changed texels",
+                   "before": {"blobs": 257, "area_pct": 2.79}, "after": {"blobs": 56, "area_pct": 0.54},
+                   "first_try_rejected": {"blobs": 688, "area_pct": 5.65, "why": "fine curvature everywhere drew a reptile-scale maze"}},
+ "jacket_sleeves_basecolor": {"before": "(127, 129, 0) phase A", "after": "(90, 82, 72) and (101, 92, 79): blue/green 0.87 (F build)",
+                              "cause": "rough_linen_diff.jpg (mean sRGB 145/171/205) auto-imported as TC_NORMALMAP + linear (BC5 drops blue); setup_texture('color') now forces TC_DEFAULT + sRGB"},
+ "tests": {"cpu": "PASS 78/78", "drag": "PASS 8/8", "state": "final K build, 2026-10-14 ~17:30 PC time"},
+ "gbuffer": "F build (C2.2, before the last bed/piece tint changes): C:/TownChess/shots/F_main_{basecolor,roughness,normal,metallic}.png, F_hands_*, F_hclose*_basecolor, F_pieces_basecolor"
+}
