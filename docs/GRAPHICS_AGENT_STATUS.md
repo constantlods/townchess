@@ -120,8 +120,11 @@ permission rule; until then local work runs only through Houtini/Ollama calls th
 | C4.1 lamp head, books, pill bottle | board/environment | done f086766, lead-reviewed (dome mouth-down, bulb hidden) | C4.1-*.jpg |
 | QA gate on f086766 | lead | all pass (autotests, reconnect 103/103, S2 10/10, npm 479) | docs/evidence/gate-2026-10-14.txt |
 | C5 hands round 2 | hands/character | done a266f7c, lead-reviewed: pose calibrated to the mesh (fingertips 0.5-0.7 cm on frame/table), relaxed curl, smooth sleeve, patient steepled hands + breathing idle, hand decal Rotator fixed; cpu 306/307 (ply budget), drag 8/8 | C5-*.jpg, C5-hands.json |
-| QA gate on C5 | lead | running | |
-| C6 sleeve fabric, rook specks, deep gouges | materials | started | |
+| QA gate on C5 (8d71234) | lead | all pass: cpu 114/114, drag, keys, rematch, promo, reconnect 76/76, S2 10/10, perf 81.4/72.7 | docs/evidence/gate-2026-10-15.txt |
+| C6 sleeve canvas, piece AO cavity, deep gouges | materials | done 06ace58, lead-reviewed; rook specks not fixed (lighting/GI noise in the crown pocket, sent to RA); skin roughness from dirt open | C6-*.jpg, C6-materials.json |
+| Decal materials logged 'Failed to compile ... PCD3D_SM6' | lead | fixed: blend mode set before the decal domain (transient compile on the default opaque blend; final material was fine) | build_scene.py |
+| Visual judge re-score (V3/V4/V5) | visual judge | started | |
+| C7 rook-crown specks (shadow/GI noise) | rendering architect | started | |
 
 Open after C2/C3: V2 detail (C3 metric 9.47 on the new recipe, lower than C2 because the white bed grids were background detail);
 Black seat r/g 1.514 (V1 limit 1.50); pieces have no cavity bake; skin roughness not driven by dirt; lamp source not visible.

@@ -510,8 +510,10 @@ def blood_decal_material(grime_tex):
     if EAL.does_asset_exist(path):
         EAL.delete_asset(path)
     m = AT.create_asset("M_TC_BloodDecal", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
-    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    # blend mode before the domain: a decal domain on the default opaque blend compiles once and logs "Failed to compile
+    # Material for platform PCD3D_SM6" (C6 report), although the final material is fine
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
     E = lambda cls, x, y: MEL.create_material_expression(m, cls, x, y)
     uv = E(unreal.MaterialExpressionTextureCoordinate, -1200, 0)
     t = E(unreal.MaterialExpressionTextureSample, -900, 0)
@@ -646,8 +648,10 @@ def blood_decals():
     if EAL.does_asset_exist(path):
         EAL.delete_asset(path)
     m = AT.create_asset("M_TC_Blood", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
-    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    # blend mode before the domain: a decal domain on the default opaque blend compiles once and logs "Failed to compile
+    # Material for platform PCD3D_SM6" (C6 report), although the final material is fine
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
     E = lambda cls, x, y: MEL.create_material_expression(m, cls, x, y)
     def tex(name, stype, x, y):
         e = E(unreal.MaterialExpressionTextureSampleParameter2D, x, y)
