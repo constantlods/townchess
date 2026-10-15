@@ -78,24 +78,48 @@ def scratch(n, seed):
         w = int(rng.integers(1, 4))
         dp.line(pts, fill=int(rng.uniform(90, 230)), width=w + 2)
         dd.line(pts, fill=int(rng.uniform(120, 255)), width=w)
-    for k in range(6):  # gouges
-        cx, cy = rng.uniform(0.2, 0.8, 2) * S
-        ang = rng.normal(0.0, 0.5)
-        ln = rng.uniform(0.15, 0.35) * S
-        dx, dy = np.cos(ang) * ln / 2, np.sin(ang) * ln / 2
-        dp.line([(cx - dx, cy - dy), (cx + dx, cy + dy)], fill=255, width=14)
-        dd.line([(cx - dx, cy - dy), (cx + dx, cy + dy)], fill=255, width=7)
+    # C6: deep knife gouges like the reference's table edge (were 6 straight 3.5 px lines, ~0.7 mm on a 20 cm decal:
+    # hairlines). Each is a wandering cut 2.5-5 mm wide at its middle, tapering to points, packed with black grime,
+    # with a chipped pale rim and a soft dark halo of grime worked into the grain around it.
+    from PIL import ImageFilter
+    halo = Image.new("L", (S, S), 0)
+    dh = ImageDraw.Draw(halo)
+    for k in range(4):
+        cx, cy = rng.uniform(0.3, 0.7, 2) * S
+        ang = np.pi / 2 + rng.normal(0.0, 0.3)  # along texture y: the long side of the near-edge strips (22 x 7 cm)
+        ln = rng.uniform(0.3, 0.5) * S
+        wmax = rng.uniform(80, 120)  # px at 2x: 40-60 px of 1024 = 3-4 mm across a 7 cm edge strip (8-12 mm on a 22 cm square decal)
+        steps = 48
+        bend = rng.normal(0, 0.04) * S
+        prev = None
+        for i in range(steps + 1):
+            t = i / steps
+            px = cx + (t - 0.5) * ln * np.cos(ang) - np.sin(ang) * bend * np.sin(np.pi * t) + rng.normal(0, 1.2)
+            py = cy + (t - 0.5) * ln * np.sin(ang) + np.cos(ang) * bend * np.sin(np.pi * t) + rng.normal(0, 1.2)
+            w = wmax * np.sin(np.pi * t) ** 0.6 * rng.uniform(0.8, 1.1)
+            if prev is not None and w > 1:
+                seg = [prev, (px, py)]
+                dh.line(seg, fill=255, width=int(w * 3.0))
+                dp.line(seg, fill=255, width=int(w * 1.35 + 6 + rng.uniform(0, 10)))  # chipped pale rim, uneven: reads the groove on the dark wood
+                dd.line(seg, fill=255, width=int(w))
+                dd.ellipse([px - w / 2, py - w / 2, px + w / 2, py + w / 2], fill=255)
+            prev = (px, py)
+    halo = halo.filter(ImageFilter.GaussianBlur(18))
     P = np.asarray(pale.resize((n, n), Image.LANCZOS)).astype(np.float64) / 255
     D = np.asarray(dark.resize((n, n), Image.LANCZOS)).astype(np.float64) / 255
+    H = np.asarray(halo.resize((n, n), Image.LANCZOS)).astype(np.float64) / 255
+    H = np.clip(H - D, 0, 1) * (0.6 + 0.4 * (fbm(n, seed + 7, beta=1.6, fmin=12) * 0.5 + 0.5))
     x, y = grid(n)
     fade = smoothstep(0.5, 0.25, np.hypot(x, y)) * (0.6 + 0.4 * smoothstep(-0.5, 0.5, fbm(n, seed + 1, beta=2.0, fmin=2)))
     rim = np.clip(P - D, 0, 1)
-    alpha = np.clip((rim * 0.95 + D * 0.9) * fade, 0, 1)
+    hal = H * 0.45 * (1 - rim)
+    alpha = np.clip((rim * 0.95 + D * 0.97 + hal) * fade, 0, 1)
     fresh = np.array([0.40, 0.28, 0.16])   # linear: freshly cut wood
-    groove = np.array([0.012, 0.009, 0.006])
-    wgt = D / np.maximum(rim + D, 1e-6)
-    col = fresh[None, None] * (1 - wgt[..., None]) + groove[None, None] * wgt[..., None]
-    rough = 0.75 + 0.15 * D
+    groove = np.array([0.008, 0.006, 0.004])  # packed black grime
+    grime = np.array([0.03, 0.022, 0.014])
+    tot = np.maximum(rim + D + hal, 1e-6)
+    col = (fresh[None, None] * rim[..., None] + groove[None, None] * D[..., None] + grime[None, None] * hal[..., None]) / tot[..., None]
+    rough = 0.75 + 0.15 * np.clip(D + H, 0, 1)
     return col, alpha, rough
 
 

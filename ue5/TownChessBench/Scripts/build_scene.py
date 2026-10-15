@@ -125,11 +125,60 @@ def build_master_material(defaults):
         e.set_editor_property("sampler_type", stype)
         return e
 
+    def mask(src, chans, x, y, pin=""):
+        e = expr(unreal.MaterialExpressionComponentMask, x, y)
+        for c in "rgba":
+            e.set_editor_property(c, c in chans)
+        MEL.connect_material_expressions(src, pin, e, "")
+        return e
+
+    def op(cls, a, b, x, y, pa="", pb=""):
+        e = expr(cls, x, y)
+        for v, pin, port in ((a, pa, "A"), (b, pb, "B")):
+            if isinstance(v, (int, float)):
+                e.set_editor_property("const_" + port.lower(), float(v))
+            else:
+                MEL.connect_material_expressions(v, pin, e, port)
+        return e
+
+    def pixel_footprint(x, y):
+        P = unreal.MaterialExposedViewProperty
+        def vp(*names):
+            for n in names:
+                if hasattr(P, n):
+                    e = expr(unreal.MaterialExpressionViewProperty, x, y)
+                    e.set_editor_property("property", getattr(P, n))
+                    return mask(e, "r", x + 100, y)
+            raise AttributeError(names)
+        try:
+            tanh = vp("MEVP_TAN_HALF_FIELD_OF_VIEW", "TAN_HALF_FIELD_OF_VIEW")
+            vsz = vp("MEVP_VIEW_SIZE", "VIEW_SIZE")
+        except AttributeError as e:
+            log("WARNING master: no view property", e, "- detail fade / spec AA off")
+            c = expr(unreal.MaterialExpressionConstant, x, y)
+            c.set_editor_property("r", 0.0)
+            return c
+        depth = expr(unreal.MaterialExpressionPixelDepth, x, y + 100)
+        a = op(unreal.MaterialExpressionMultiply, depth, tanh, x + 250, y)
+        b = op(unreal.MaterialExpressionMultiply, a, 2.0, x + 350, y)
+        return op(unreal.MaterialExpressionDivide, b, vsz, x + 450, y)
+
     uv = expr(unreal.MaterialExpressionTextureCoordinate, -1400, 0)
     tiling = scalar("Tiling", 1.0, -1400, 120)
     uvm = expr(unreal.MaterialExpressionMultiply, -1200, 0)
     MEL.connect_material_expressions(uv, "", uvm, "A")
     MEL.connect_material_expressions(tiling, "", uvm, "B")
+    # C6: anisotropic tiling, UVScale.rg x Tiling (the player sleeve's cylindrical UVs run 31 cm round x 20 cm along)
+    uvs = expr(unreal.MaterialExpressionVectorParameter, -1400, 200)
+    uvs.set_editor_property("parameter_name", "UVScale")
+    uvs.set_editor_property("default_value", unreal.LinearColor(1, 1, 1, 1))
+    uvsm = mask(uvs, "rg", -1300, 200)
+    uvm0, uvm = uvm, expr(unreal.MaterialExpressionMultiply, -1100, 60)
+    MEL.connect_material_expressions(uvm0, "", uvm, "A")
+    MEL.connect_material_expressions(uvsm, "", uvm, "B")
+    # C6: world size of one rendered pixel at this surface (cm): depth x 2 tan(fov/2) / view width. Analytic, no
+    # DDX/DDY (the pieces are Nanite). Drives the detail fade and the specular anti-aliasing below.
+    pxw = pixel_footprint(-1400, 1500)
 
     bc = tex_param("BaseColor", defaults["white"], unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, -900, -400)
     nm = tex_param("Normal", defaults["normal"], unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, -900, 0)
@@ -161,8 +210,15 @@ def build_master_material(defaults):
     gmul = expr(unreal.MaterialExpressionMultiply, -500, -1000)
     MEL.connect_material_expressions(gsub, "", gmul, "A")
     MEL.connect_material_expressions(scalar("GrimeContrast", 3.0, -650, -1080), "", gmul, "B")
-    gmask = expr(unreal.MaterialExpressionSaturate, -380, -1000)
-    MEL.connect_material_expressions(gmul, "", gmask, "")
+    gmask0 = expr(unreal.MaterialExpressionSaturate, -380, -1000)
+    MEL.connect_material_expressions(gmul, "", gmask0, "")
+    # C6: a per-asset wear mask in the mesh's own UVs (not tiled): R = extra grime (a sleeve's cuff and fold lines),
+    # G = stains (StainColor x base colour). The default is black: no change for any other instance.
+    wm = tex_param("WearMask", defaults["black"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, -1000, -1300)
+    MEL.connect_material_expressions(uv, "", wm, "UVs")
+    wmr = op(unreal.MaterialExpressionMultiply, wm, scalar("WearGrime", 1.0, -1000, -1380), -800, -1300, pa="R")
+    gmask = expr(unreal.MaterialExpressionSaturate, -300, -1100)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionAdd, gmask0, wmr, -450, -1100), "", gmask, "")
     gcol = expr(unreal.MaterialExpressionVectorParameter, -500, -1200)
     gcol.set_editor_property("parameter_name", "GrimeColor")
     gcol.set_editor_property("default_value", unreal.LinearColor(0.32, 0.25, 0.17, 1))
@@ -173,6 +229,14 @@ def build_master_material(defaults):
     MEL.connect_material_expressions(bcm, "", bcf, "A")
     MEL.connect_material_expressions(dirty, "", bcf, "B")
     MEL.connect_material_expressions(gmask, "", bcf, "Alpha")
+    scol = expr(unreal.MaterialExpressionVectorParameter, -500, -1400)
+    scol.set_editor_property("parameter_name", "StainColor")
+    scol.set_editor_property("default_value", unreal.LinearColor(0.45, 0.3, 0.18, 1))
+    stained = op(unreal.MaterialExpressionMultiply, bcf, scol, -150, -1300)
+    bcs = expr(unreal.MaterialExpressionLinearInterpolate, -50, -1200)
+    MEL.connect_material_expressions(bcf, "", bcs, "A")
+    MEL.connect_material_expressions(stained, "", bcs, "B")
+    MEL.connect_material_expressions(wm, "G", bcs, "Alpha")
     # Handling detail (pass C3, materials audit finding 2/3): blood.py's tileable T_HandlingGrime maps at their own
     # tiling, so untextured instances get relief and a varied gloss instead of one flat colour with one roughness.
     # Mask: R smudges, G scratches, B fingerprints, A lacquer chips. Off by default (strengths 0).
@@ -190,9 +254,27 @@ def build_master_material(defaults):
     d1m = expr(unreal.MaterialExpressionOneMinus, -250, -650)
     MEL.connect_material_expressions(ddk, "", d1m, "")
     bcd = expr(unreal.MaterialExpressionMultiply, -120, -550)
-    MEL.connect_material_expressions(bcf, "", bcd, "A")
+    MEL.connect_material_expressions(bcs, "", bcd, "A")
     MEL.connect_material_expressions(d1m, "", bcd, "B")
-    MEL.connect_material_property(bcd, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    # C6 cavity term from ARM.R (AO): pockets darker (CavityDarken), duller (CavityRough) and with less F0
+    # (CavitySpec), so a sub-pixel concave pocket (the rook crowns) reads dark instead of catching bounce/specular
+    cav = expr(unreal.MaterialExpressionOneMinus, -700, 1600)
+    MEL.connect_material_expressions(arm, "R", cav, "")
+    cdk = op(unreal.MaterialExpressionMultiply, cav, scalar("CavityDarken", 0.0, -700, 1700), -550, 1600)
+    cdk1 = expr(unreal.MaterialExpressionOneMinus, -420, 1600)
+    MEL.connect_material_expressions(cdk, "", cdk1, "")
+    bcc = op(unreal.MaterialExpressionMultiply, bcd, cdk1, 0, -500)
+    MEL.connect_material_property(bcc, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    csp = op(unreal.MaterialExpressionMultiply, cav, scalar("CavitySpec", 0.0, -700, 1800), -550, 1800)
+    csp1 = expr(unreal.MaterialExpressionOneMinus, -420, 1800)
+    MEL.connect_material_expressions(csp, "", csp1, "")
+    MEL.connect_material_property(op(unreal.MaterialExpressionMultiply, csp1, 0.5, -300, 1800), "", unreal.MaterialProperty.MP_SPECULAR)
+    # C6 detail fade: full detail while one pixel covers < 1/DetailFadeInv cm, none at twice that (sub-pixel relief
+    # only aliases into sparkle). DetailFadeInv 0 (default) = never fades.
+    dfade = expr(unreal.MaterialExpressionSaturate, -900, 1500)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionSubtract, 2.0,
+                                        op(unreal.MaterialExpressionMultiply, pxw, scalar("DetailFadeInv", 0.0, -1100, 1600), -1000, 1500),
+                                        -950, 1500), "", dfade, "")
 
     # Normal strength: lerp flat → sampled.
     flat = expr(unreal.MaterialExpressionConstant3Vector, -700, 120)
@@ -208,7 +290,7 @@ def build_master_material(defaults):
     MEL.connect_material_expressions(flat, "", dsub, "B")
     dmul = expr(unreal.MaterialExpressionMultiply, -550, 800)
     MEL.connect_material_expressions(dsub, "", dmul, "A")
-    MEL.connect_material_expressions(scalar("DetailNormalStrength", 0.0, -700, 900), "", dmul, "B")
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionMultiply, scalar("DetailNormalStrength", 0.0, -700, 900), dfade, -620, 900), "", dmul, "B")
     nadd = expr(unreal.MaterialExpressionAdd, -320, 100)
     MEL.connect_material_expressions(nl, "", nadd, "A")
     MEL.connect_material_expressions(dmul, "", nadd, "B")
@@ -255,13 +337,23 @@ def build_master_material(defaults):
     MEL.connect_material_expressions(dfp, "", drd, "B")
     drm = expr(unreal.MaterialExpressionMultiply, -400, 1000)
     MEL.connect_material_expressions(drd, "", drm, "A")
-    MEL.connect_material_expressions(scalar("DetailRough", 0.0, -550, 1100), "", drm, "B")
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionMultiply, scalar("DetailRough", 0.0, -550, 1100), dfade, -480, 1100), "", drm, "B")
     radd2 = expr(unreal.MaterialExpressionAdd, -150, 500)
     MEL.connect_material_expressions(radd, "", radd2, "A")
     MEL.connect_material_expressions(drm, "", radd2, "B")
+    crg = op(unreal.MaterialExpressionMultiply, cav, scalar("CavityRough", 0.0, -700, 1900), -550, 1900)
     rsat = expr(unreal.MaterialExpressionSaturate, -100, 400)
-    MEL.connect_material_expressions(radd2, "", rsat, "")
-    MEL.connect_material_property(rsat, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionAdd, radd2, crg, -120, 520), "", rsat, "")
+    # C6 specular anti-aliasing: alpha^2 + SpecAA x footprint^2 (a pixel-sized NDF widening, Kaplanyan-style but from
+    # the analytic footprint instead of normal derivatives). SpecAA 0 (default) = sqrt(r^2) = r.
+    r2 = op(unreal.MaterialExpressionMultiply, rsat, rsat, 0, 400)
+    k2 = op(unreal.MaterialExpressionMultiply, op(unreal.MaterialExpressionMultiply, pxw, pxw, -150, 1500),
+            scalar("SpecAA", 0.0, -150, 1600), 0, 1500)
+    rk = expr(unreal.MaterialExpressionSaturate, 100, 450)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionAdd, r2, k2, 50, 450), "", rk, "")
+    rsq = expr(unreal.MaterialExpressionSquareRoot, 200, 450)
+    MEL.connect_material_expressions(rk, "", rsq, "")
+    MEL.connect_material_property(rsq, "", unreal.MaterialProperty.MP_ROUGHNESS)
     ms = scalar("MetallicScale", 0.0, -700, 560)
     mm = expr(unreal.MaterialExpressionMultiply, -450, 540)
     # metalness: ARM.B, or a Poly Haven model's own metal map when UseMetalTex = 1 (bed frame, wheelchair: pass C3)
@@ -790,12 +882,13 @@ def grime_png(path, size=512):
                 + chunk(b"IDAT", zlib.compress(bytes(raw), 6)) + chunk(b"IEND", b""))
 
 
-def model_material(master, model, prefix, name, **kw):
+def model_material(master, model, prefix, name, arm=None, **kw):
     """Material instance from a Poly Haven model's own maps (diff, nor_gl, rough, optional metal) on the layered
     master, so the hero meshes get correct scanned colour plus our wear layers instead of the FBX importer's guess."""
     d = os.path.join(ASSETS, "models", model, "textures")
     dest = f"{ROOT}/Textures/{model}"
     maps = {}
+    normals = {}
     for f in sorted(os.listdir(d)):
         stem, ext = os.path.splitext(f)
         if not stem.startswith(prefix):
@@ -806,10 +899,25 @@ def model_material(master, model, prefix, name, **kw):
             t = import_texture(os.path.join(d, f), dest, "T_" + stem, "normal")
             t.set_editor_property("flip_green_channel", True)  # OpenGL -> DirectX
             maps["Normal"] = t
+            normals[stem.rsplit("_", 1)[-1]] = t
         elif "_rough_" in stem:
-            maps["RoughTex"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "gray")
+            t = import_texture(os.path.join(d, f), dest, "T_" + stem, "gray")
+            # C6 specular AA in the mips (Toksvig): the roughness mips widen where the normal map's mips average
+            # diverging normals, so distant scan relief turns matte instead of sparkling (rook crowns at the game FOV)
+            nrm = normals.get(stem.rsplit("_", 1)[-1])
+            if nrm:
+                try:
+                    t.set_editor_property("composite_texture", nrm)
+                    t.set_editor_property("composite_texture_mode", unreal.CompositeTextureMode.CTM_NORMAL_ROUGHNESS_TO_RED)
+                    t.set_editor_property("composite_power", 1.0)
+                    EAL.save_loaded_asset(t)
+                except Exception as e:
+                    log("WARNING composite roughness", stem, e)
+            maps["RoughTex"] = t
         elif "_metal_" in stem:
             maps["MetalTex"] = import_texture(os.path.join(d, f), dest, "T_" + stem, "gray")
+    if arm and os.path.exists(arm):  # our baked AO (ue5/tools/textures/piece_ao.py): R = AO for the cavity term
+        maps["ARM"] = import_texture(arm, f"{ROOT}/Textures/Pieces", os.path.splitext(os.path.basename(arm))[0], "linear")
     sc = dict(kw.pop("scalars", {}) or {})
     if "RoughTex" in maps:
         sc["UseRoughTex"] = 1.0
@@ -1821,6 +1929,11 @@ def player_skins(mhn):
         return out
     dest = f"{ROOT}/Characters/PlayerSkin"
     mel = unreal.MaterialEditingLibrary
+    try:  # C6: which inputs the cinematic body material exposes (skin roughness from the dirt mask needs one)
+        log("skin parent params: tex", [str(n) for n in mel.get_texture_parameter_names(parent)],
+            "scalar", [str(n) for n in mel.get_scalar_parameter_names(parent)])
+    except Exception as e:
+        log("skin parent params unavailable", e)
     reimport = os.environ.get("TC_SKIN_REIMPORT", "0") == "1"
     for f in sorted(os.listdir(SKIN_DIR)):
         if not (f.startswith("T_PlayerSkin_") and f.endswith("_BC.png")):
@@ -1919,6 +2032,8 @@ def build():
         "normal": import_texture(os.path.join(tmp, "T_TC_FlatNormal.png"), f"{ROOT}/Textures", "T_TC_FlatNormal", "normal"),
         "arm": import_texture(os.path.join(tmp, "T_TC_DefaultARM.png"), f"{ROOT}/Textures", "T_TC_DefaultARM", "linear"),
     }
+    png(os.path.join(tmp, "T_TC_Black.png"), 4, 4, (0, 0, 0, 255))
+    defaults["black"] = import_texture(os.path.join(tmp, "T_TC_Black.png"), f"{ROOT}/Textures", "T_TC_BlackMask", "linear")
     # metallic = ARM.B x MetallicScale, and the default ARM has B = 0: every untextured "metal=1" instance rendered as a
     # dielectric (pass 60: the board's brass corners read as paper). Metal parts without maps take this ARM instead.
     png(os.path.join(tmp, "T_TC_MetalARM.png"), 4, 4, (255, 160, 255, 255))
@@ -1993,14 +2108,21 @@ def build():
     # a yellower 0.7/0.6/0.42 pushed the C2.3 frame to r/g 1.50-1.51, g/b 1.70;
     # 0.56/0.45/0.27 and 0.64/0.55/0.38 at roughness 0.40 read tan next to the black pieces under the C2.2 light),
     # satin varnish roughness ~0.33 (0.29 x 1.15; was ~0.21, the frame's hottest speculars)
+    # C6 (rook-crown specks, V5): baked AO as the ARM (cavity term: crenel walls and piece crevices darker, duller) and
+    # Toksvig roughness mips (model_material). The crown-floor specks are lighting, not material: the base-colour buffer
+    # is clean there and the final image shows stochastic soft-shadow/GI stipple (C6-rooks.jpg); the master's detail fade
+    # (DetailFadeInv 30) and pixel-footprint spec AA (SpecAA 20) changed nothing visible on them and cost static V2 detail
+    # (9.19 -> 9.13), so they stay available in M_TC_PBR but are off here.
+    piece_aa = {"CavityDarken": 0.9, "CavityRough": 0.5, "CavitySpec": 0.9}
+    pdir = os.path.join(TEXTURES_DIR, "pieces")
     mi_pw = model_material(master, "chess_set", "chess_set_pieces_white", "MI_PiecesWhite", grime_color=(0.42, 0.3, 0.17), tint=(0.68, 0.61, 0.5), rough=1.15,
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.58, "GrimeContrast": 2.2, "MicroRough": 0.22, "GrimeStreaks": 0.3,
+                           arm=os.path.join(pdir, "T_PiecesWhite_ARM.png"), scalars={**piece_aa, "GrimeTiling": 3.0, "GrimeThreshold": 0.58, "GrimeContrast": 2.2, "MicroRough": 0.22, "GrimeStreaks": 0.3,
                                     "GrimeRoughness": 0.6, "DetailTiling": 3.0, "DetailNormalStrength": 0.35, "DetailRough": 0.2, "DetailDarken": 0.1})
     # Black = ebony / dark stained wood: albedo ~0.03 linear, dark brown (0.18/0.155/0.135 x 0.18; was a neutral 0.11 ->
     # ~0.02), roughness ~0.42 (0.29 x 1.45; was ~0.16, the mirror-streak "black plastic") varied by the micro and
     # handling layers; the grime layer lightens (worn varnish, paler wood showing at rims)
     mi_pb = model_material(master, "chess_set", "chess_set_pieces_black", "MI_PiecesBlack", grime_color=(1.6, 1.35, 1.15), rough=1.45, tint=(0.18, 0.155, 0.135),
-                           scalars={"GrimeTiling": 3.0, "GrimeThreshold": 0.62, "GrimeContrast": 2.0, "MicroRough": 0.25, "GrimeStreaks": 0.2,
+                           arm=os.path.join(pdir, "T_PiecesBlack_ARM.png"), scalars={**piece_aa, "GrimeTiling": 3.0, "GrimeThreshold": 0.62, "GrimeContrast": 2.0, "MicroRough": 0.25, "GrimeStreaks": 0.2,
                                     "GrimeRoughness": 0.62, "DetailTiling": 3.0, "DetailNormalStrength": 0.35, "DetailRough": 0.22, "DetailDarken": 0.0})
     mi_cb = model_material(master, "chess_set", "chess_set_board", "MI_ChessBoard", grime_color=(0.36, 0.25, 0.16), tint=(0.8, 0.63, 0.44),
                            scalars={"GrimeTiling": 1.7, "GrimeThreshold": 0.3, "GrimeContrast": 2.5, "MicroRough": 0.2})
@@ -2585,8 +2707,22 @@ def build():
         hands = SEATED.get("player_hands")
         if pb and hands and "player:lowerarm_l" in SEATED:
             psmc = pb.skeletal_mesh_component
-            mi_ps = make_mi(master, "MI_PlayerSleeve", {"BaseColor": None}, tint=(0.11, 0.12, 0.13), rough=0.9, grime_color=(0.3, 0.26, 0.2),
-                            scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.1})
+            # C6: woven canvas (rough_linen, a blue scan: tint 1.06/0.71/0.51 on its linear mean 0.28/0.42/0.61 gives a pale
+            # grey canvas ~0.30/0.30/0.31, the reference's "Institutional Sleeves"; was a flat 0.11/0.12/0.13 grey-green. A
+            # beige 1.27/0.76/0.41 put the Black seat at g/b 1.702 from the two bottom corners: V1 <= 1.70), square weave
+            # on the C5 cylindrical UVs (31.4 cm round x 20 cm along: UVScale V 0.64), ~12 threads/cm; cuff/fold grime and
+            # stains from textures/sleeve.py through the UV-space WearMask
+            wear = os.path.join(TEXTURES_DIR, "sleeve", "T_PlayerSleeve_Wear.png")
+            mi_ps = surface_material(master, "rough_linen", name="MI_PlayerSleeve", tiling=0.8, tint=(1.06, 0.71, 0.51), rough=1.0,
+                                     grime_color=(0.32, 0.27, 0.21),
+                                     scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.5, "GrimeContrast": 1.8, "GrimeStreaks": 0.35,
+                                              "GrimeRoughness": 0.95, "NormalStrength": 1.5, "MicroRough": 0.1})
+            MEL.set_material_instance_vector_parameter_value(mi_ps, "UVScale", unreal.LinearColor(1.0, 20.0 / 31.4, 1.0, 1.0))
+            MEL.set_material_instance_vector_parameter_value(mi_ps, "StainColor", unreal.LinearColor(0.5, 0.3, 0.24, 1.0))
+            if os.path.exists(wear):
+                MEL.set_material_instance_texture_parameter_value(mi_ps, "WearMask", import_texture(wear, f"{ROOT}/Textures/Sleeve", "T_PlayerSleeve_Wear", "linear"))
+            MEL.update_material_instance(mi_ps)
+            EAL.save_loaded_asset(mi_ps)
             sleeve_sm = prop_with("player_sleeve", {"PlayerSleeve": mi_ps})
             watch_sm = prop_with("wristwatch", {"Strap": make_mi(master, "MI_WatchStrap", {"BaseColor": None}, tint=(0.07, 0.045, 0.03), rough=0.7),
                                                 "Steel": make_mi(master, "MI_WatchSteel", {"BaseColor": None, "ARM": METAL_ARM}, metal=1.0, rough=0.35, tint=(0.55, 0.55, 0.53)),
