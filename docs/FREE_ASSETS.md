@@ -29,7 +29,7 @@ All Poly Haven downloads are scripted (`ue5/tools/fetch_polyhaven.py`, hero reso
 
 | Asset | Generator | Output |
 |---|---|---|
-| Cage mask, Annotator plate/coif/sleeves, ledger, pencil, tin mug, dome lamp, med cart, clipboard, wooden chessboard, book pile, loose record sheets, pill bottle with tablets | `ue5/tools/blender/props.py` (Blender, scripted) | `ue5/assets/props/*.obj` |
+| Cage mask, Annotator plate/coif/sleeves, ledger, pencil, tin mug, dome lamp (+ shade head, C4), med cart, clipboard (+ forms pad, C4), surgical tape roll (C4, replaces Poly Haven `medical_tape` in the level), wooden chessboard, book pile, loose record sheets, pill bottle with tablets | `ue5/tools/blender/props.py` (Blender, scripted) | `ue5/assets/props/*.obj` |
 | Blood decals (spatter, pool, smear, drips: colour/coverage, relief, gloss) and handling-grime masks (since pass C3 the master material's DetailNormal/DetailMask: relief and gloss variation on every untextured instance and the pieces) | `ue5/tools/textures/blood.py` (numpy/scipy/pillow, `tools/.venv`) | `ue5/assets/textures/blood`, `.../grime` |
 | Inlaid board surface (maple/walnut composite, joints, scratches, wear) | `ue5/tools/textures/board.py` | `ue5/assets/textures/board` |
 | Grime mask (blotches, streaks, smudges) | `build_scene.py` `grime_png` | built into the level |

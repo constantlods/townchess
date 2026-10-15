@@ -33,12 +33,12 @@ texture/mesh or not in the level; **UNUSED** = fetched, never placed. "Imported"
 |---|---|---|---|---|
 | Table mesh | Poly Haven `wooden_table_02` | CC0 | 2K FBX imported (4K on disk, same first-`.fbx` rule) | DEGRADED: its own scanned maps are replaced by `wood_table_worn` tiled 3.5x with tint 0.7/0.6/0.5 |
 | Table top surface | Poly Haven `wood_table_worn` | CC0 | 4K | DEGRADED: reads "flat brown" (judge Table 4/10, the lowest row) |
-| Knife scars / scuffs | own `textures/stains.py` "Scratch" decal | own | 1024 | BROKEN as relief: colour-only straight hairlines; `T_Stain_*_Normal.png` are perfectly flat (pixel std 0.0 in all three channels, measured) |
+| Knife scars / scuffs | own `textures/stains.py` "Scratch" decal | own | 1024 | C4: projection fixed (Phase A finding 1). Still colour-only hairlines; `T_Stain_*_Normal.png` are perfectly flat (pixel std 0.0 in all three channels, measured) |
 | Mug rings, handled grime | own `stains.py` "Ring", "Dirt" | own | 1024 | OK at gameplay distance (normal flat, roughness varies) |
 | Blood decals (spatter, pool, smear, drips) | own `textures/blood.py` | own | 2048 with real normal/roughness | OK; judge wants more on pieces and the table edge |
-| Dome lamp | own `props.py desk_lamp()` + emissive bulb/inner face | own | no texture (enamel MI from `rusty_metal_02`) | DEGRADED: reads dead (judge finding 3); the shade's open side faces away from the seat |
+| Dome lamp | own `props.py desk_lamp()` + `desk_lamp_head()` (C4: shade opens round Lamp_Key) | own | no texture (enamel MI from `rusty_metal_02`) | C4: bulb and inside visible from the seat; inside still flat (Phase A finding 4) |
 | Brass bowl, tin mug, book stack, pill bottle, loose record sheets, clipboard, med cart | own `props.py` (+ `forms.py` sheet) | own | smart-project UVs, untextured MIs except sheets | OK (bowl, mug, books, pills); clipboard DEGRADED (placement, pale slab) |
-| Medical tape | Poly Haven `medical_tape` | CC0 | 2K | BROKEN: no texture imported (`Models/medical_tape` holds only the mesh and the FBX material); white blob in `base_main` 1490-1560 x 670-730 |
+| Medical tape | Poly Haven `medical_tape` | CC0 | 2K | UNUSED since C4 (imported without maps, a white puck); replaced by own `props.py tape_roll()` |
 | Cigarette pack | Poly Haven `cigarette_pack` | CC0 | 2K | BROKEN: imports as a skeletal mesh (`_PhysicsAsset`, `_Skeleton`), so `clutter()` finds no static mesh and nothing is placed |
 | Alarm clock | Poly Haven `alarm_clock_01` | CC0 | 2K | BROKEN: same skeletal import; `build_scene.py` skips it ("imports without a static mesh") |
 | Captured pieces | `ATCBoard::GraveyardSlot` (C++, lead) | - | - | DEGRADED: upright rows 10 cm beside the board, a lone pawn stands by the lamp base in `base_main` (545, 625); the reference shows none on the main view |
@@ -174,8 +174,63 @@ gap), then Prison Cell (reuses beds and bars), then the rest.
   holds the `_2k` maps; `Textures/chess_set` holds both `_2k` and `_8k`.
 - `ue5/assets/textures/stains/T_Stain_{Dirt,Ring,Scratch}_Normal.png`: per-channel pixel std 0.0 (measured with
   numpy); blood normals std 4-18.
-_Incomplete: the board/environment specialist was stopped by the usage limit (2026-10-13) before writing the close-up evidence; its captures are on the build PC (C:\TownChess\shots). To be redone in its next run._
+- Close-ups (C4 run, 2026-10-14, build PC, capture.ps1 -Preset epic, 1920x1080; "before" = upstream 35e9730's level,
+  "after" = C4): `docs/graphics/iterations/C4-lamp.jpg`, `C4-tape.jpg`, `C4-clipboard.jpg`, `C4-beds.jpg`,
+  `C4-table-edge.jpg`, `C4-rooks.jpg`, `C4-rook-diagnosis.jpg`, main/Black seat `C4-main-before-after.jpg`,
+  `C4-black-before-after.jpg`, numbers in `C4-board-env.json` (camera of every close-up listed there).
+- The interrupted 2026-10-13 run's close-ups are still on the build PC (`C:\TownChess\shots\be_{clipboard,rooks,
+  rooks_bc,springs,tape}.png`); the C4 "before" set re-takes the same subjects on the current lighting and replaces them.
+- Scene geometry read from the level build log (`build-level.log`, 2026-10-14): table bounds +-56.7 x +-35.3 before its
+  90 deg yaw, so the top spans **x +-35.3, y +-56.7** at z 79.95; med cart mesh bounds x -34..31.5, y -84.7..-44.3
+  (its OBJ pivot is off the cart's centre, see finding 3); dome lamp -8.5..35 x -12.25..9.75 (a 1.25 cm pivot offset).
 
 ## Phase A findings
 
-_Incomplete for the same reason. The lead's interim view (from sections 1-4, the judge and the director): scratch decals read as straw lines, the tape roll is a white blob, the clipboard sheet a pale slab, bed springs glow, rook crowns speckle; see docs/pipeline/visual.md._
+Measured or seen in the close-ups above; each names its cause in code and what C4 did about it.
+
+1. **Every table/board decal projected sideways (the "pine needle" scars).** `build_scene.py` spawned the wear decals
+   with `unreal.Rotator(-90, yaw, 0)`; UE Python's order is (roll, pitch, yaw), so each had roll -90 and its intended
+   yaw as a *pitch*. At pitch ~0 (the scars at yaw 0/15/-10/170) the decal box is a vertical slab and the texture is
+   smeared along world X into parallel hairlines; at other "yaws" the splats were stretched at an angle. Also
+   `decal_size` is a half extent, so every decal was twice the size the list meant, and two scars sat beyond the
+   table's near edge (x -44/-46 vs -35.3). C4: `Rotator(0, -90, yaw)`, sizes halved, each decal's depth kept to its own
+   surface (board decals top+1.1..2.9, table decals top-1.3..+1.5, clear of the pieces, the frame's vertical sides and
+   the resting hands), plus five scratch strips on the near edge (`C4-table-edge.jpg`). The hand decals in the
+   hands/character block (`build_scene.py` ~2127) use the same `Rotator(-90, yaw, 0)` and should be checked by their
+   owner. Remaining: the `stains.py` Scratch texture itself is 260 one-to-three-pixel hairlines; projected correctly
+   it reads as fine scratches, not the reference's few deep gouges (a texture change for materials).
+2. **Props off the table.** The table top is x +-35.3, y +-56.7, but props were placed for a deeper table: the game
+   record clipboard at (12, 74, 86.2) and a record sheet at (22, 66) floated beyond the right edge with the floor
+   visible under them (`C4-clipboard.jpg`, before), the sheets at (40, -46) and (-36, -46) hung past the far and near
+   edges, and the alarm clock (-8, 46) / medical tape (10, 44) slots were inside. C4: clipboard flat on the table at
+   (8, 44); the three loose sheets dropped (two were out of frame, and on the table in the lamp's pool they pushed the
+   default view's mean over V1's 30). Pills at (36, -24) still overhang the far edge by ~2 cm (open).
+3. **OBJ pivots.** `props.py` joins parts into `parts[0]`, whose location stays the pivot: the cart's mesh is off its
+   centre by ~65 cm (its tray is at world x ~60-100, not at CART (16, 80)), which is why the clipboard "on the cart"
+   hung in mid-air; the lamp was off by 1.25 cm. New props bake each part's transform before the join
+   (`_lamp_join`); the cart is left as is. The book stack (54, 50) sits at the cart's near corner at table height, so the
+   tray (z 83.6) runs 3.6 cm into the bottom book; in the close-up (`C4a_books`, build PC) it reads as resting on the
+   cart, but the stack should be lifted onto the tray (open).
+4. **The lamp was not a visible source.** The dome opened 18 deg away from the board (its open side faced away from
+   the seat), and at the fixed exposure (EV 8.45, scene white ~240 nits) the bulb's emissive 60 rendered mid-grey and
+   the inner face's 2.5 black. C4: the shade is its own mesh (`dome_lamp_head.obj`) opening round the Lamp_Key
+   position (lights not moved), bulb 2000 (clips warm-white), inner face 14 with a fresnel fall-off; the head neither
+   casts shadows nor reaches Lumen/ray tracing, so lighting stays the rendering architect's (board region luma 63.5 ->
+   64.2 with the head in place, i.e. no spill). Remaining: the inside still reads as a flat dark disc; brighter
+   values cost V1 (inner 200: main mean 37.2, p95 133; inner 30: 31.5).
+5. **Tape roll.** Poly Haven `medical_tape` imported without its maps and `clutter()` scaled it to 7 cm: a 7 cm white
+   marble puck with a 1 cm hole (`C4-tape.jpg`). Replaced by our own roll (5.6 cm across, 2.5 cm wide, 3.4 cm core,
+   stepped wound layers, peeled tail). `medical_tape` is now unused.
+6. **Bed springs.** The bed scan's pale paint is sRGB ~164/157/145; the C3 tint x 2.4/2.7/3.2 made it a ~0.9 albedo
+   blue-white grid lit from behind by Window_Cold (7500 K, 2500 lm). C4: 1.5/1.7/1.85 (`C4-beds.jpg`).
+7. **Rook crowns.** At the seat with 9x the sampling (FOV 7) the h1 rook's crown is clean in both final and base
+   colour (`C4-rook-diagnosis.jpg`); at the game's FOV 62 the inside of the crown, a 3-4 px concave pocket shaded only
+   by indirect light, shows grey/white specks. Not an asset defect: screen-probe GI / TSR noise at Epic's 83 % screen
+   percentage on a sub-pixel cavity (plus the scan's grey veins and the handling detail layer). Request to the
+   rendering architect (Lumen screen-probe / TSR settings) and materials (detail normal on the pieces at distance).
+8. **Clipboard sheet.** The game's record plane (ATCClipboard, C++) is a flat 0.8 cream; C4 prints it on the forms
+   stock (`paper_material` multiplies the record by `T_PaperForm_BaseColor` at a fixed mip 5: stains, no text) and adds
+   a three-sheet pad of patient forms under it in `clipboard.obj`.
+9. **Missing source maps** (section 1, re-checked): `old_bed_frame` has its maps now (C3 builds `MI_OldBedFrame` from
+   them); `metal_office_desk` still renders untextured grey (the large slab behind the clipboard in `C4-clipboard.jpg`,
+   before) and `alarm_clock_01` / `cigarette_pack` still import skeletal and are skipped.

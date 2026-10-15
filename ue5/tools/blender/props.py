@@ -217,59 +217,115 @@ def desk_lamp():
     sp.bezier_points[0].co = (0, 0, 0.385)
     sp.bezier_points[0].handle_right = (0, 0, 0.45)
     sp.bezier_points[0].handle_left = (0, 0, 0.33)
-    sp.bezier_points[1].co = (0.2, 0, 0.43)
-    sp.bezier_points[1].handle_left = (0.08, 0, 0.47)
-    sp.bezier_points[1].handle_right = (0.26, 0, 0.41)
+    # C4: the arm ends in the knuckle at the back of the re-aimed dome (desk_lamp_head), arriving along its axis
+    end = LAMP_APEX - LAMP_AXIS * 0.016
+    sp.bezier_points[1].co = end
+    sp.bezier_points[1].handle_left = end - LAMP_AXIS * 0.08 + Vector((0, 0, 0.02))
+    sp.bezier_points[1].handle_right = end + LAMP_AXIS * 0.02
     arm.data.bevel_depth = 0.008
     arm.data.bevel_resolution = 4
     bpy.ops.object.convert(target="MESH")
     parts.append(bpy.context.active_object)
-    # dome shade: a hemisphere shell opening downwards, tilted towards the table
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=24, radius=0.11, location=(0.24, 0, 0.42))
-    shade = bpy.context.active_object
-    bm = bmesh.new()
-    bm.from_mesh(shade.data)
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.01], context="VERTS")
-    bm.to_mesh(shade.data)
-    bm.free()
-    so = shade.modifiers.new("solid", "SOLIDIFY")
-    so.thickness = 0.002
-    apply_mods(shade)
-    shade.rotation_euler = (0, math.radians(18), 0)
-    parts.append(shade)
     for o in parts:
         material(o, "M_LampMetal")
-    # glowing inner face of the shade (pass 61: the lamp lit its own shade from outside): a slightly smaller dome,
-    # normals turned inwards, so from below the shade reads lit from within
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=24, radius=0.107, location=(0.24, 0, 0.42))
-    inner = bpy.context.active_object
-    bm = bmesh.new()
-    bm.from_mesh(inner.data)
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.008], context="VERTS")
-    bmesh.ops.reverse_faces(bm, faces=bm.faces)
-    bm.to_mesh(inner.data)
-    bm.free()
-    inner.rotation_euler = (0, math.radians(18), 0)
-    material(inner, "M_LampInner")
-    parts.append(inner)
-    # the bulb sits up inside the dome (at z 0.385 it hung below the rim as a flat white disc: judge run 4)
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=0.028, location=(0.25, 0, 0.445))
-    bulb = bpy.context.active_object
-    material(bulb, "M_LampBulb")
-    parts.append(bulb)
+    _lamp_join(parts, "SM_DomeLamp")
+    export("dome_lamp.obj")
+
+
+# Pass C4 (board/environment): the shade is its own mesh (dome_lamp_head.obj, same pivot as dome_lamp.obj), opening
+# towards the board and the seat round the key light, so the key has a visible source. LAMP_KEY is where build_scene.py
+# puts the Lamp_Key spot (24 cm along the arm, 35.5 cm over the table; the lights are the rendering architect's and do
+# not move); LAMP_AXIS is the opening direction in Blender space for the lamp's placement (base (24, -56), yaw 101):
+# the key's aim (board centre) blended 0.3 with the direction to the seat camera -> 12 deg off the key's axis and
+# 44 deg off the camera's line, so the glowing inside and the bulb face the player (the old dome opened 18 deg away
+# from the board: "the lamp is dead as a light source", judge baseline finding 3).
+LAMP_KEY = Vector((0.24, 0.0, 0.355))
+LAMP_AXIS = Vector((0.653, -0.455, -0.606)).normalized()
+LAMP_R = 0.11
+LAMP_RIM = LAMP_KEY + LAMP_AXIS * 0.015          # centre of the dome's opening: the light sits 1.5 cm inside it
+LAMP_APEX = LAMP_RIM - LAMP_AXIS * LAMP_R          # back of the dome, where the arm joins
+
+
+def _lamp_join(parts, name):
+    for o in parts:  # bake every part's transform first: a joined object keeps parts[0]'s location as its pivot,
+        bpy.ops.object.select_all(action="DESELECT")  # which shifted dome_lamp.obj 1.25 cm in UE y (bounds -12.25..9.75)
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    bpy.ops.object.select_all(action="DESELECT")
     for o in parts:
         o.select_set(True)
     bpy.context.view_layer.objects.active = parts[0]
     bpy.ops.object.join()
-    lamp = bpy.context.active_object
-    lamp.name = "SM_DomeLamp"
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    ob = bpy.context.active_object
+    ob.name = name
+    ob.rotation_mode = "XYZ"  # export() pre-rotates through rotation_euler; a quaternion-mode part ignored it
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
     bpy.ops.object.mode_set(mode="OBJECT")
     bpy.ops.object.shade_smooth()
-    export("dome_lamp.obj")
+    return ob
+
+
+def _dome(radius, cut, inward):
+    """Hemisphere shell (apex +Z, opening -Z, cut `cut` m below the equator) turned so it opens along LAMP_AXIS."""
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=64, ring_count=32, radius=radius, location=(0, 0, 0))
+    d = bpy.context.active_object
+    bm = bmesh.new()
+    bm.from_mesh(d.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -cut], context="VERTS")
+    if inward:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces)
+    bm.to_mesh(d.data)
+    bm.free()
+    d.rotation_mode = "QUATERNION"
+    d.rotation_quaternion = Vector((0, 0, -1)).rotation_difference(LAMP_AXIS)
+    d.location = LAMP_RIM
+    return d
+
+
+def desk_lamp_head():
+    """Shade, glowing inner face, rolled rim, bulb and socket of the dome lamp (see LAMP_AXIS)."""
+    reset()
+    parts = []
+    shade = _dome(LAMP_R, 0.01, False)
+    so = shade.modifiers.new("solid", "SOLIDIFY")
+    so.thickness = 0.002
+    so.offset = 1.0  # outwards: the inner face below stays visible
+    apply_mods(shade)
+    material(shade, "M_LampMetal")
+    parts.append(shade)
+    # rolled rim: a bead round the opening catches the light as the lit edge of the reference's shade
+    rim_r = math.sqrt(LAMP_R ** 2 - 0.01 ** 2)
+    bpy.ops.mesh.primitive_torus_add(major_radius=rim_r + 0.001, minor_radius=0.0032, major_segments=64, minor_segments=10)
+    rim = bpy.context.active_object
+    rim.rotation_mode = "QUATERNION"
+    rim.rotation_quaternion = Vector((0, 0, -1)).rotation_difference(LAMP_AXIS)
+    rim.location = LAMP_RIM + LAMP_AXIS * 0.01
+    material(rim, "M_LampMetal")
+    parts.append(rim)
+    inner = _dome(LAMP_R - 0.0015, 0.0085, True)
+    material(inner, "M_LampInner")
+    parts.append(inner)
+    # socket from the back of the dome to the bulb, and a knuckle where the arm meets the dome
+    sock_a, sock_b = LAMP_APEX + LAMP_AXIS * 0.004, LAMP_KEY - LAMP_AXIS * 0.026
+    mid, ln = (sock_a + sock_b) / 2, (sock_b - sock_a).length
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.013, depth=ln, location=mid)
+    s = bpy.context.active_object
+    s.rotation_mode = "QUATERNION"
+    s.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(LAMP_AXIS)
+    material(s, "M_LampMetal")
+    parts.append(s)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=0.014, location=LAMP_APEX - LAMP_AXIS * 0.008)
+    material(bpy.context.active_object, "M_LampMetal")
+    parts.append(bpy.context.active_object)
+    # bulb: centred 8 mm behind the key light (the spot sits inside the glass), its front just past the rim plane
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=0.026, location=LAMP_KEY - LAMP_AXIS * 0.008)
+    material(bpy.context.active_object, "M_LampBulb")
+    parts.append(bpy.context.active_object)
+    _lamp_join(parts, "SM_DomeLampHead")
+    export("dome_lamp_head.obj")
 
 
 # ---------------------------------------------------------------- The Annotator (docs/CHARACTERS.md 2.2, 2.3)
@@ -578,7 +634,106 @@ def clipboard():
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
     bpy.ops.object.mode_set(mode="OBJECT")
+    # C4 (judge baseline V5 #6, "pale slab"): a stack of three thin patient-record sheets (forms.py texture, A4, 0.15 mm)
+    # under the clip, each a little skewed so the edges step, the top one with a lifted bottom corner. They lie between
+    # the board's face (z 2 mm) and the game's record plane (ATCClipboard Paper, 4.5 mm up, 20 x 26.7 cm), so the
+    # record reads as the top sheet of a used pad. Planar grid UVs: one sheet = the whole form, heading at the clip.
+    sheets = []
+    for k, (dx, dy, rot, z) in enumerate(((0.0015, -0.0105, 0.012, 0.0023), (-0.002, -0.0095, -0.017, 0.0029), (0.0005, -0.0085, 0.006, 0.0035))):
+        bpy.ops.mesh.primitive_grid_add(x_subdivisions=12, y_subdivisions=16, size=1, location=(dx, dy, z))
+        g = bpy.context.active_object
+        g.scale = (0.21, 0.297, 1)
+        g.rotation_euler.z = rot
+        bpy.ops.object.transform_apply(location=False, scale=True, rotation=True)
+        for v in g.data.vertices:
+            # the clipped top stays flat; the free bottom edge waves by a fraction of a millimetre, one corner lifts
+            t = max(0.0, (0.1 - v.co.y) / 0.25)
+            v.co.z += 0.00025 * t * math.sin(v.co.x * 40 + k) + (0.0006 * max(0.0, 0.05 - math.hypot(v.co.x - 0.105, v.co.y + 0.148)) / 0.05 if k == 2 else 0.0)
+        sol = g.modifiers.new("solid", "SOLIDIFY")
+        sol.thickness = 0.00015
+        apply_mods(g)
+        material(g, "M_PaperForm")
+        sheets.append(g)
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in [cb] + sheets:
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    for o in sheets:
+        o.select_set(True)
+    cb.select_set(True)
+    bpy.context.view_layer.objects.active = cb
+    bpy.ops.object.join()  # the board keeps its smart-projected UVs, the sheets their grid UVs (same UV layer name)
     export("clipboard.obj")
+
+
+def tape_roll():
+    """C4 (judge baseline V5 #7: the Poly Haven medical_tape imported untextured and, scaled to 7 cm, read as a white
+    puck): a roll of surgical tape standing on its edge, 2.5 cm wide, 5.6 cm across, a 3.4 cm cardboard core showing
+    through the hole, wound layers stepped on the side faces, and a peeled tail stuck flat to the table. Axis along X,
+    origin under the roll on the table (z = 0)."""
+    reset()
+    parts = []
+    r_core_in, r_core, r_out, w, n = 0.0168, 0.0185, 0.028, 0.025, 72
+    def circle(bm, x, r, segs):
+        return [bm.verts.new((x, r * math.cos(2 * math.pi * i / segs), r_out + r * math.sin(2 * math.pi * i / segs))) for i in range(segs)]
+
+    def bridge(bm, a, b, mat):
+        for i in range(len(a)):
+            j = (i + 1) % len(a)
+            f = bm.faces.new((a[i], a[j], b[j], b[i]))
+            f.material_index = mat
+
+    def tube(bm, r0, r1, x0, x1, segs, steps=0, mat_out=0, mat_side=0):
+        """closed tube between radii r0 < r1 from x0 to x1; `steps` concentric wound-layer steps on each side face"""
+        rs = [r0 + (r1 - r0) * k / (steps + 1) for k in range(steps + 2)]
+        ends = []
+        for x, sgn in ((x1, 1), (x0, -1)):
+            rings = [circle(bm, x + sgn * (0.00022 if 0 < k < len(rs) - 1 and k % 2 else 0.0), r, segs) for k, r in enumerate(rs)]
+            for k in range(len(rings) - 1):
+                bridge(bm, rings[k], rings[k + 1], mat_side) if sgn > 0 else bridge(bm, rings[k + 1], rings[k], mat_side)
+            ends.append(rings)
+        bridge(bm, ends[1][-1], ends[0][-1], mat_out)   # outer surface
+        bridge(bm, ends[0][0], ends[1][0], mat_out)     # inner surface
+        bm.normal_update()
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+
+    bm = bmesh.new()
+    tube(bm, r_core, r_out, -w / 2, w / 2, n, steps=6, mat_out=0, mat_side=1)
+    tape = obj_from_bm("Tape", bm)
+    for nm in ("M_Tape", "M_TapeSide"):
+        tape.data.materials.append(bpy.data.materials.get(nm) or bpy.data.materials.new(nm))
+    parts.append(tape)
+    bm = bmesh.new()
+    tube(bm, r_core_in, r_core, -w / 2 - 0.0006, w / 2 + 0.0006, n)
+    core = obj_from_bm("Core", bm)
+    material(core, "M_TapeCore")
+    parts.append(core)
+    # peeled tail: leaves the roll at its foot and lies on the table towards -Y for 4.5 cm, the end lifting a little
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=2, y_subdivisions=12, size=1, location=(0, -0.0225, 0.00025))
+    tail = bpy.context.active_object
+    tail.scale = (w * 0.98, 0.045, 1)
+    bpy.ops.object.transform_apply(scale=True)
+    for v in tail.data.vertices:
+        v.co.z += 0.004 * max(0.0, (-v.co.y - 0.032) / 0.013) ** 2
+    sol = tail.modifiers.new("solid", "SOLIDIFY")
+    sol.thickness = 0.0003
+    apply_mods(tail)
+    material(tail, "M_Tape")
+    parts.append(tail)
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    ob = bpy.context.active_object
+    ob.name = "SM_TapeRoll"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.shade_smooth()
+    export("tape_roll.obj")
 
 
 def med_cart():
@@ -982,12 +1137,12 @@ def export(name):
 
 WHICH = sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else []
 BUILDERS = {
-    "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp,
+    "cage_mask": cage_mask, "tin_mug": tin_mug, "desk_lamp": desk_lamp, "desk_lamp_head": desk_lamp_head,
     "annotator_mask": annotator_mask, "annotator_coif": annotator_coif, "ledger": ledger, "pencil": pencil,
     "oversleeve": lambda: sleeve("SM_Oversleeve", 0.25, 0.056, 0.047, "M_Duck", "oversleeve.obj"),  # fits over a MetaHuman forearm
     "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl, "restraint_straps": restraint_straps,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.068, 0.06, "M_CoatWool", "coat_sleeve.obj"),  # fits over the upper arm
-    "book_stack": book_stack, "loose_papers": loose_papers, "pill_bottle": pill_bottle, "wristwatch": wristwatch,
+    "book_stack": book_stack, "loose_papers": loose_papers, "pill_bottle": pill_bottle, "wristwatch": wristwatch, "tape_roll": tape_roll,
     "player_sleeve": lambda: sleeve("SM_PlayerSleeve", 0.20, 0.05, 0.044, "M_PlayerSleeve", "player_sleeve.obj"),  # over the player's forearm
 }
 for k, f in BUILDERS.items():

@@ -377,9 +377,13 @@ def import_font(ttf, name, legacy_size=32):
     return font
 
 
-def paper_material():
+def paper_material(form_tex=None):
     """Paper for the clipboard sheet: the game draws into the 'Sheet' render target; a little emission keeps pencil
-    legible when the sheet is raised out of the lamp's cone (a reading light does the rest)."""
+    legible when the sheet is raised out of the lamp's cone (a reading light does the rest).
+    C4 (board/environment, clipboard block): with form_tex (forms.py T_PaperForm_BaseColor) the record is printed on the
+    same aged stock as the patient forms under it: the form sampled at a fixed coarse mip (32 x 45 px: its stains and
+    yellowing, none of its text) multiplies the sheet, which also takes the flat 0.8 cream down to ~0.5, so the sheet on
+    the table no longer reads as the frame's palest slab."""
     path = f"{ROOT}/Materials/M_TC_Paper"
     if EAL.does_asset_exist(path):
         EAL.delete_asset(path)
@@ -387,7 +391,15 @@ def paper_material():
     t = MEL.create_material_expression(m, unreal.MaterialExpressionTextureSampleParameter2D, -600, 0)
     t.set_editor_property("parameter_name", "Sheet")
     t.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
-    MEL.connect_material_property(t, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    base = t
+    if form_tex:
+        f = MEL.create_material_expression(m, unreal.MaterialExpressionTextureSample, -600, -250)
+        f.set_editor_property("texture", form_tex)
+        if setp(f, "mip_value_mode", unreal.TextureMipValueMode.TMVM_MIP_LEVEL) and setp(f, "const_mip_value", 5):
+            base = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -380, -100)
+            MEL.connect_material_expressions(t, "RGB", base, "A")
+            MEL.connect_material_expressions(f, "RGB", base, "B")
+    MEL.connect_material_property(base, "RGB" if base is t else "", unreal.MaterialProperty.MP_BASE_COLOR)
     k = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -300, 200)
     MEL.connect_material_expressions(t, "RGB", k, "A")
     k.set_editor_property("const_b", 0.12)
@@ -1695,20 +1707,52 @@ def build():
     lamp = import_prop("dome_lamp")
     mi_brass = surface_material(master, "rusty_metal_02", name="MI_Brass", tiling=1.5, metal=1.0, tint=(0.8, 0.6, 0.32), rough=0.7,
                                 scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0, "MicroRough": 0.15})
-    bulb_mat = emissive_material("M_TC_Bulb", (1.0, 0.62, 0.3), 60.0)
+    # C4: at the fixed exposure (EV 8.45) an unlit emissive of ~240 renders as scene white, so the old bulb (60) read
+    # mid-grey and the inner face (2.5) black ("the lamp is dead as a light source", judge baseline finding 3). The bulb
+    # now clips to a warm white and the inside of the shade glows; both are on the head mesh, which neither casts
+    # shadows nor feeds Lumen/ray tracing (below), so the rendering architect's lights stay what lights the scene.
+    bulb_mat = emissive_material("M_TC_Bulb", (1.0, 0.86, 0.62), float(os.environ.get("TC_BULB", 2000.0)))
     # pass 61: dark green enamel worn to rust (the blotchy orange brass shade read cheap: judge run 4) and a warm
     # glowing inner face; the bulb now sits up inside the dome
     mi_enamel = surface_material(master, "rusty_metal_02", name="MI_LampEnamel", tiling=1.5, metal=0.4, tint=(0.17, 0.19, 0.14), rough=0.65,
                                  grime_color=(1.8, 1.2, 0.7), scalars={"GrimeTiling": 2.5, "GrimeThreshold": 0.62, "GrimeContrast": 2.5, "MicroRough": 0.15})
-    inner_mat = emissive_material("M_TC_LampInner", (1.0, 0.72, 0.42), 2.5)
-    for sm in lamp:
+    # inside of the shade: brightest where it faces the eye (round the bulb), falling off towards the rim, (1 - fresnel)^2
+    # (a flat 30 read as a grey disc, 200 as a cream one: C4a/C4b lamp close-ups; V1 mean budget ~+1)
+    inner_mat = emissive_material("M_TC_LampInner", (1.0, 0.62, 0.32), float(os.environ.get("TC_LAMP_INNER", 14.0)))
+    try:
+        fr = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionFresnel, -700, 200)
+        fr.set_editor_property("exponent", 1.5)
+        fr.set_editor_property("base_reflect_fraction", 0.0)
+        om = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionOneMinus, -560, 200)
+        MEL.connect_material_expressions(fr, "", om, "")
+        sq = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionMultiply, -420, 200)
+        MEL.connect_material_expressions(om, "", sq, "A")
+        MEL.connect_material_expressions(om, "", sq, "B")
+        k = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionConstant3Vector, -560, 0)
+        k.set_editor_property("constant", unreal.LinearColor(*(c * float(os.environ.get("TC_LAMP_INNER", 14.0)) for c in (1.0, 0.62, 0.32)), 1))
+        mul = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionMultiply, -300, 100)
+        MEL.connect_material_expressions(k, "", mul, "A")
+        MEL.connect_material_expressions(sq, "", mul, "B")
+        MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        MEL.recompile_material(inner_mat)
+        EAL.save_loaded_asset(inner_mat)
+    except Exception as e:
+        log("WARNING lamp inner falloff skipped", e)
+    lamp_shade = import_prop("dome_lamp_head")  # C4: shade, inner face, bulb (props.py desk_lamp_head, same pivot)
+    for sm in lamp + lamp_shade:
         for i, sl in enumerate(sm.static_materials):
             n = str(sl.material_slot_name).lower()
             sm.set_material(i, bulb_mat if "bulb" in n else inner_mat if "inner" in n else mi_enamel)
         EAL.save_loaded_asset(sm)
     LAMP_BASE, LAMP_YAW = (24.0, -56.0), 101.0
-    lamp_actors, llo, lhi = place_model(lamp, (LAMP_BASE[0], LAMP_BASE[1], 0), yaw=LAMP_YAW, label="Lamp", sit_on=top)
+    lamp_actors, llo, lhi = place_model(lamp + lamp_shade, (LAMP_BASE[0], LAMP_BASE[1], 0), yaw=LAMP_YAW, label="Lamp", sit_on=top)
     tag(lamp_actors)
+    # the shade now closes round Lamp_Key and Lamp_Opponent (both shadowed): without these flags it would cut the
+    # opponent's light (89 deg off the shade's axis) and the emissive would add unplanned bounce light
+    for a in lamp_actors[len(lamp):]:
+        smc = a.static_mesh_component
+        for prop, val in (("cast_shadow", False), ("affect_dynamic_indirect_lighting", False), ("visible_in_ray_tracing", False)):
+            setp(smc, prop, val)
     yr = math.radians(LAMP_YAW)
     lamp_bulb = (LAMP_BASE[0] + 24 * math.cos(yr), LAMP_BASE[1] + 24 * math.sin(yr), top + 38.5)
     log("lamp bounds", llo, lhi, "bulb", lamp_bulb)
@@ -1726,6 +1770,12 @@ def build():
     mi_rubber = make_mi(master, "MI_Rubber", {"BaseColor": None}, tint=(0.03, 0.03, 0.03), rough=0.8)
     mi_hardboard = make_mi(master, "MI_Hardboard", {"BaseColor": None}, tint=(0.3, 0.2, 0.12), rough=0.75,
                            scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.45, "GrimeContrast": 2.0, "MicroRough": 0.2})
+    # patient-record paper (forms.py): the loose sheets on the table and, since C4, the pad under the clipboard's record
+    form = os.path.join(TEXTURES_DIR, "forms", "T_PaperForm_BaseColor.jpg")
+    form_tex = import_texture(form, f"{ROOT}/Textures/Forms", "T_PaperForm_BaseColor", "color") if os.path.exists(form) else None
+    mi_form = make_mi(master, "MI_PaperForm", {"BaseColor": form_tex},
+                      tint=(0.85, 0.82, 0.76), rough=0.92, grime_color=(0.35, 0.27, 0.18),
+                      scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
     cart = import_prop("med_cart")
     for sm in cart:
         for i, sl in enumerate(sm.static_materials):
@@ -1737,12 +1787,18 @@ def build():
     if GAMEPLAY and board_mesh:
         for sm in board_mesh:
             for i, sl in enumerate(sm.static_materials):
-                sm.set_material(i, mi_cart if "steel" in str(sl.material_slot_name).lower() else mi_hardboard)
+                slot = str(sl.material_slot_name).lower()
+                sm.set_material(i, mi_cart if "steel" in slot else mi_form if "paper" in slot else mi_hardboard)
             EAL.save_loaded_asset(sm)
-        clip = EAS.spawn_actor_from_class(unreal.TCClipboard, unreal.Vector(CART[0] - 4, CART[1] - 6, 86.2), unreal.Rotator(0, 0, -100))
+        # C4: the clipboard hung in the air: (12, 74, 86.2) is 6 cm above table height beyond the table's side edge
+        # (y 56.7) and nowhere near the cart, whose OBJ pivot puts its tray at x ~60-100 (C4-clipboard.jpg: the floor
+        # shows under it; the "pale tilted slab" of judge baseline V5 #6). Now flat on the table right of the board
+        # (underside -0.2 cm -> 0.05 cm over the top), long side towards the opponent, clear of the right hand
+        # (x <= -24), the mug (30, 38) and the tape roll (28, 50); Tab still lifts it from here.
+        clip = EAS.spawn_actor_from_class(unreal.TCClipboard, unreal.Vector(8.0, 44.0, top + 0.25), unreal.Rotator(0, 0, -92))
         clip.set_actor_label("GameRecordClipboard")
         clip.get_editor_property("board").set_static_mesh(board_mesh[0])
-        setp(clip, "paper_material", paper_material())
+        setp(clip, "paper_material", paper_material(form_tex))
         for prop, ttf, nm in (("hand_face", "PatrickHand-Regular.ttf", "F_TC_Hand"), ("form_face", "CourierPrime-Bold.ttf", "F_TC_Form")):
             face = next((o for o in import_file(os.path.join(FONTS, ttf), f"{ROOT}/Fonts", nm + "_Face") if isinstance(o, unreal.FontFace)), None)
             if face:
@@ -1771,24 +1827,47 @@ def build():
         tag(clip)
     # ---- Wear and clutter on the table: dried blood, papers, a book stack (the reference's table is a lived-in mess)
     blood = blood_decals()
-    placements = [  # variant, x, y, size (cm), yaw: board squares, the near frame, the table
-        ("Spatter", -4, -10, 14, 75),  # (the decal at (6, 8) clipped to a straight-edged stain on f/g: removed) ("Spatter", 16, 14, 9, 200), ("Smear", -18, -2, 16, 0),
-        ("Pool", -30, 34, 18, 140), ("Spatter", 30, -30, 12, 300), ("Smear", -28, -40, 22, 160), ("Spatter", 20, 40, 10, 40),
+    # C4: every decal here was spawned with unreal.Rotator(-90, yaw, 0), which is (roll, pitch, yaw) in UE Python: roll
+    # -90 and the intended yaw as a PITCH, so each decal projected along a tilted or horizontal axis. At pitch ~0 (the
+    # knife scars at yaw 0/15/-10/170) a decal box is a 6 cm-thick vertical slab and its texture is smeared along world X
+    # into rows of straight parallel hairlines: the judge's "pine needles" (baseline finding 4). Now pitch -90 (straight
+    # down) with the yaw as yaw. decal_size is a half extent, so the sizes below (full widths, as the list always meant)
+    # are halved, and each decal's depth is kept to its own surface: "board" decals (on the squares/frame, z +1.71/+1.92)
+    # span top+1.1..2.9 and never reach the table; "table" decals span top-1.3..+1.5 and never reach the board's top or
+    # the pieces. Table decals keep their boxes off the board frame's vertical sides (|x|,|y| 27.65) and out of the
+    # resting hands (x -40..-24, |y| 13-38); table extent x +-35.3, y +-56.7 (bounds log), so the old ones at x 38-44
+    # had nothing to land on but the opponent's arms or the player's. Moved entries say where they were.
+    placements = [  # variant, x, y, full width along the decal's Y, full width along its Z (None: square), yaw, level
+        ("Spatter", -4, -10, 14, None, 75, "board"),
+        ("Pool", -15, 42, 12, None, 140, "table"),        # was (-30, 34, 18): over the right hand
+        ("Spatter", 31.8, -34, 6, None, 300, "table"),     # was (30, -30, 12): across the far frame's side
+        ("Smear", -10, -44, 16, None, 160, "table"),       # was (-28, -40, 22): under the left hand
+        ("Spatter", 20, 40, 10, None, 40, "table"),
         # pass 49: the reference has blood across the board and grime everywhere (fine detail 12.9 against our 10.5)
-        ("Spatter", 9, 13, 7, 30), ("Spatter", -15, 17, 6, 200), ("Spatter", 15, -16, 8, 120), ("Smear", -27, 8, 10, 90),
-        ("Dirt", 42, -8, 34, 20), ("Dirt", 38, 30, 30, 140), ("Dirt", -6, -50, 30, 260), ("Dirt", -4, 52, 28, 80),
-        ("Ring", 22, 30, 10, 0), ("Ring", 44, -40, 9, 110),
+        ("Spatter", 9, 13, 7, None, 30, "board"), ("Spatter", -15, 17, 6, None, 200, "board"), ("Spatter", 15, -16, 8, None, 120, "board"),
+        ("Smear", -27, 8, 10, None, 90, "board"),
+        ("Dirt", 31.5, -8, 34, 7, 0, "table"),            # was (42, -8, 34): mostly beyond the far edge; now the far strip
+        # (Dirt (38, 30, 30) dropped: no free table there now between the clipboard, the mug and the tape roll)
+        ("Dirt", 2, -46, 22, None, 260, "table"), ("Dirt", -16, 49, 14, None, 80, "table"),  # were (-6, -50, 30), (-4, 52, 28)
+        ("Ring", 31, 31, 9, None, 0, "table"), ("Ring", 28, -44, 8, None, 110, "table"),      # were (22, 30, 10), (44, -40, 9)
         # pass 62: knife scars and scuffs on the table round the board (judge run 4: wide flat brown areas; V2 detail)
-        ("Scratch", -40, -8, 36, 0), ("Scratch", -38, 30, 30, 15), ("Scratch", -36, -40, 30, -10), ("Scratch", 4, -46, 34, 80),
-        ("Scratch", 6, 46, 32, 100), ("Scratch", 38, 16, 28, 170), ("Scratch", -22, 52, 30, 60), ("Scratch", 30, -40, 26, 140),
+        ("Scratch", -20, -48, 24, None, -10, "table"), ("Scratch", 4, -44, 30, None, 80, "table"),
+        ("Scratch", 31.5, 14, 24, 7, 0, "table"),  # ((6, 46, 32) lies under the clipboard now: it drew "pencil" lines on its sheet)
+        ("Scratch", -16, 48, 24, None, 60, "table"), ("Scratch", 24, -44, 22, None, 140, "table"),
         # pass 64: blood on the near frame and the table edge in front of it (judge run 4: nothing on the table edge)
-        ("Spatter", -29, -12, 9, 250), ("Smear", -34, 10, 13, 15), ("Scratch", -44, 58, 30, 35), ("Scratch", -46, -58, 30, 160)]
-    for k, (v, x, y, sz, yaw) in enumerate(placements):
+        ("Spatter", -26.5, -8, 7, None, 250, "board"), ("Smear", -32.5, 3, 9, None, 15, "table"),
+        # C4: the reference's worn near table edge: Scratch strips on the 7.6 cm of table between the board's near frame
+        # (x -27.65) and the table's edge (x -35.3), scars running along the edge, clear of the resting hands.
+        ("Scratch", -31.5, 0, 22, 7.2, 0, "table"), ("Scratch", -31.3, -4, 14, 6.4, 186, "table"),
+        ("Scratch", -31.7, 5, 15, 6.8, 174, "table"), ("Scratch", -31.5, -47, 15, 7.2, 180, "table"),
+        ("Scratch", -31.5, 47, 15, 7.2, 4, "table")]
+    for k, (v, x, y, wy, wz, yaw, level) in enumerate(placements):
         if v not in blood:
             continue
-        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, top + 3), unreal.Rotator(-90, yaw, 0))
+        zc, depth = (top + 2.0, 0.9) if level == "board" else (top + 0.1, 1.4)
+        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, zc), unreal.Rotator(0, -90, yaw))
         dec.decal.set_decal_material(blood[v])
-        setp(dec.decal, "decal_size", unreal.Vector(3, sz, sz))  # shallow: stays on the board/table surface
+        setp(dec.decal, "decal_size", unreal.Vector(depth, wy / 2, (wz or wy) / 2))
         setp(dec.decal, "sort_order", k)
         dec.set_folder_path("Wear")
     if "Drips" in blood and os.environ.get("TC_EDGE_DRIPS") == "1":  # off: it projected onto the player's forearm
@@ -1809,17 +1888,17 @@ def build():
         return meshes[0] if meshes else None
 
     # ---- Our own clutter (pass 51, props.py + forms.py): patient-record sheets, a book pile, a pill bottle
-    form = os.path.join(TEXTURES_DIR, "forms", "T_PaperForm_BaseColor.jpg")
-    mi_form = make_mi(master, "MI_PaperForm", {"BaseColor": import_texture(form, f"{ROOT}/Textures/Forms", "T_PaperForm_BaseColor", "color")
-                                               if os.path.exists(form) else None},
-                      tint=(0.85, 0.82, 0.76), rough=0.92, grime_color=(0.35, 0.27, 0.18),
-                      scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.55, "GrimeContrast": 2.0})
     papers = import_prop("loose_papers")
     for sm in papers:
         sm.set_material(0, mi_form)
         EAL.save_loaded_asset(sm)
     # pass 58 added two on the right; the nearer one (-14, 74) cut the frame's right border as a jagged white edge (judge run 4)
-    for loc, yaw in (((-36, -46), 14), ((40, -46), -28), ((22, 66), -150)):
+    # C4: all three hung off the table (x +-35.3, y +-56.7): (22, 66) floated beyond the right edge (C4-clipboard.jpg),
+    # (40, -46) 10 cm past the far edge, (-36, -46) past the near edge. On the top they land in the lamp's pool: at
+    # (-23, -44) / (21, -38) / (24, -45) they lifted the default view's mean by up to 2.2 and put it over V1's 30
+    # (C4-board-env.json, C4a-C4c), so none is placed; the forms stock now shows on the clipboard's pad instead.
+    PAPERS = []  # [((x, y), yaw), ...] on the top, each sheet ~13 cm from its centre to its farthest corner
+    for loc, yaw in PAPERS:
         tag(place_model(papers, (loc[0], loc[1], 0), yaw=yaw, label="Papers", sit_on=top + 0.05)[0])
     cover = lambda n, c: make_mi(master, n, {"BaseColor": None}, tint=c, rough=0.82, grime_color=(0.12, 0.09, 0.06),
                                  scalars={"GrimeTiling": 4.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.2, "MicroRough": 0.2})
@@ -1863,7 +1942,20 @@ def build():
         size = max(hi[i] - lo[i] for i in range(3)) or 1.0
         place_model(meshes, (loc[0], loc[1], 0), yaw=yaw, scale=min(1.0, max_dim / size), label="Clutter_" + name, sit_on=top)
     # (the book set rendered as a thin floating strip and the magnifier stood upright with a bright lens: removed, pass 48)
-    clutter("medical_tape", (10, 44), 20, 7.0)
+    # C4: our own tape roll (props.py tape_roll) instead of Poly Haven medical_tape, which imported without its maps and,
+    # scaled to 7 cm, read as a white puck (judge baseline V5 #7). Standing on its edge beyond the clipboard's far
+    # corner, its axis ~40 deg off the line from the seat so the hole and the core read, the peeled tail stuck to the
+    # table towards the player.
+    tape = prop_with("tape_roll", {
+        # (first try: grime threshold 0.35-0.42 streaked the roll brown like wood grain, C4a_tape)
+        "TapeSide": make_mi(master, "MI_TapeSide", {"BaseColor": None}, tint=(0.46, 0.44, 0.39), rough=0.85, grime_color=(0.32, 0.27, 0.2),
+                            scalars={"GrimeTiling": 9.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0, "GrimeStreaks": 0.0, "MicroRough": 0.2}),
+        "TapeCore": make_mi(master, "MI_TapeCore", {"BaseColor": None}, tint=(0.26, 0.18, 0.1), rough=0.9, grime_color=(0.15, 0.1, 0.06),
+                            scalars={"GrimeTiling": 8.0, "GrimeThreshold": 0.5, "GrimeContrast": 2.0}),
+        "Tape": make_mi(master, "MI_TapeRoll", {"BaseColor": None}, tint=(0.6, 0.58, 0.52), rough=0.8, grime_color=(0.42, 0.37, 0.29),
+                        scalars={"GrimeTiling": 6.0, "GrimeThreshold": 0.62, "GrimeContrast": 2.0, "GrimeStreaks": 0.0, "MicroRough": 0.2, **FLAT_DETAIL})})
+    if tape:
+        place_model([tape], (28, 50, 0), yaw=60, label="TapeRoll", sit_on=top)
     clutter("cigarette_pack", (-24, -36), 35, 9.0)            # by the bowl, near the player's left hand
     beds = import_model("old_bed_frame")
     if beds:
@@ -1872,7 +1964,11 @@ def build():
         # main cool/neutral area, and with the scan at a warm tint the C2.3 main view went to r/g 1.51, g/b 1.72 (V1
         # out; at x1.0-1.4 still 1.50/1.71). Tinted to a pale grey-green institutional paint over the rust instead
         # (scan x 2.4/2.7/3.2: painted areas ~0.45 linear, the rusty patches stay dark)
-        assign(beds, model_material(master, "old_bed_frame", "old_bed_frame", "MI_OldBedFrame", tint=(2.4, 2.7, 3.2), grime_color=(0.45, 0.4, 0.36),
+        # C4 (judge V5 #9, "glowing" springs): the scan's pale paint is sRGB ~164/157/145, so x 2.4/2.7/3.2 made it a
+        # ~0.9 albedo blue-white that the 7500 K Window_Cold rect right behind bed A turned into a lit wire grid; a duller
+        # grey-green paint instead (TC_BED_TINT to tune)
+        bed_tint = tuple(float(v) for v in os.environ.get("TC_BED_TINT", "1.5,1.7,1.85").split(","))
+        assign(beds, model_material(master, "old_bed_frame", "old_bed_frame", "MI_OldBedFrame", tint=bed_tint, grime_color=(0.45, 0.4, 0.36),
                                     scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "GrimeStreaks": 0.5, "MicroRough": 0.15}))
         place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)
         place_model(beds, (cx + L / 2 - 55, 125, 0), yaw=90, label="BedB", sit_on=0.0)

@@ -1,0 +1,39 @@
+{
+ "what": "C4 board/props/room (board/environment specialist): judge baseline V5 #6 clipboard slab, #7 tape blob, #8 rook speckle, #9 glowing bed springs, finding 3 dead lamp, finding 4 needle scratches; ASSET_PIPELINE.md evidence + Phase A findings",
+ "base": "35e9730 (upstream; level built from it = B). Build PC 2026-10-14 21:24-22:15 PC time, capture.ps1 -Preset epic 1920x1080 -WarmSec 22; main = -Auto cpu:novice:w:5+0 -Extra '-TCHud=1 -TCPlay=10', black = cpu:novice:b:untimed same extra (benchmark.ps1 cameras)",
+ "metric": "C3 recipe (C3-materials.json): frame resized to 1045x588 (PIL bicubic), Rec.709 luma; detail = mean |Laplacian| (4-neighbour); median3 = same after a 3x3 median; this script gives 9.49 on C3's K_main (C3 json: 9.47)",
+ "V1_bounds": "mean 24-30, p95 <= 105, r/g 1.38-1.50, g/b 1.55-1.70",
+ "main": {
+  "B_before": {"mean": 28.3, "p95": 96.6, "rg": 1.493, "gb": 1.695, "detail": 9.49, "median3": 5.88, "below8": 33.2},
+  "C4a": {"mean": 37.2, "p95": 133.0, "rg": 1.392, "gb": 1.594, "detail": 9.94, "median3": 6.34, "below8": 32.4},
+  "C4b": {"mean": 31.5, "p95": 96.7, "rg": 1.448, "gb": 1.678, "detail": 9.72, "median3": 6.10, "below8": 32.7},
+  "C4c": {"mean": 31.1, "p95": 96.2, "rg": 1.461, "gb": 1.695, "detail": 9.75, "median3": 6.12, "below8": 32.5},
+  "C4d_final": {"mean": 29.6, "p95": 95.3, "rg": 1.472, "gb": 1.699, "detail": 9.56, "median3": 5.99, "below8": 33.0}
+ },
+ "black_seat": {
+  "B_before": {"mean": 26.6, "p95": 91.8, "rg": 1.510, "gb": 1.694, "detail": 9.18, "median3": 5.62, "below8": 33.6},
+  "C4a": {"mean": 35.6, "p95": 133.8, "rg": 1.396, "gb": 1.588, "detail": 9.58, "median3": 6.04, "below8": 32.8},
+  "C4b": {"mean": 29.7, "p95": 92.0, "rg": 1.460, "gb": 1.677, "detail": 9.41, "median3": 5.84, "below8": 33.0},
+  "C4c": {"mean": 29.2, "p95": 91.7, "rg": 1.471, "gb": 1.691, "detail": 9.43, "median3": 5.87, "below8": 32.5},
+  "C4d_final": {"mean": 27.6, "p95": 89.2, "rg": 1.485, "gb": 1.698, "detail": 9.31, "median3": 5.78, "below8": 33.3}
+ },
+ "V1": "final: main and Black seat inside all four bounds; Black seat r/g 1.510 -> 1.485 (was over 1.50). Margins are thin: main mean 29.6 (limit 30), g/b 1.699 / 1.698 (limit 1.70)",
+ "V2": "not lowered: main detail 9.49 -> 9.56 (median3 5.88 -> 5.99), Black 9.18 -> 9.31 (5.62 -> 5.78); no grain or sharpen change",
+ "iterations": {
+  "C4a": "all prop/decal changes, lamp inner emissive 200, bulb 2000, three loose sheets moved onto the table: lamp zone luma 28.4 -> 130.2 (mean +5.0 of the +8.9), sheets +2.2, clipboard +1.6",
+  "C4b": "inner 30, two sheets dropped to one, clipboard record printed on the forms stock (mip 5), tape grime cleaned up",
+  "C4c": "inner (1, 0.62, 0.32) x 36 with (1 - fresnel)^2 (no visible fall-off)",
+  "C4d_final": "inner 14, last loose sheet dropped (mean 31.1 -> 29.6)"
+ },
+ "region_check": "board region (700-1250 x 620-880) luma 63.5 before vs 64.2 in C4a: the lamp head (cast_shadow / affect_dynamic_indirect_lighting / visible_in_ray_tracing off) adds no light to the scene; all mean change is the visible shade, sheets and clipboard",
+ "closeups": {
+  "cameras": {"lamp": "-TCCamLoc=-35,-12,113 -TCCamTarget=19.4,-32.4,113 -TCFov=40", "tape_before": "-12,30,96 -> 10,44,82 fov 30", "tape_after": "-2,36,96 -> 28,50,82 fov 30",
+              "clip_before": "-25,40,118 -> 15,70,84 fov 50", "clip_after": "-30,28,112 -> 8,44,80 fov 45", "beds": "130,-50,115 -> 265,-120,50 fov 55",
+              "edge": "-75,0,105 -> -31,0,80 fov 60", "rook": "-38,-31,95 -> -20.3,-20.3,86.5 fov 22", "rookseat": "-90,0,114 -> -20.3,20.3,86 fov 7 (seat position, 9x sampling)"},
+  "which_build": "lamp, main, black: C4d (final). tape and clipboard: C4b; beds, table edge, rook diagnosis: C4a. Nothing in those props/materials changed after the build shown (C4c/C4d changed only the lamp inner emissive and dropped loose sheets)",
+  "files": ["C4-main-before-after.jpg", "C4-black-before-after.jpg", "C4-lamp.jpg", "C4-tape.jpg", "C4-clipboard.jpg", "C4-beds.jpg", "C4-table-edge.jpg", "C4-rooks.jpg", "C4-rook-diagnosis.jpg"]
+ },
+ "rooks": "not fixed: at the seat with FOV 7 the h1 crown is clean in final and base colour; at FOV 62 its 3-4 px concave inside shows grey/white specks: screen-space GI/TSR noise at Epic 83% screen percentage on a sub-pixel cavity, not geometry or a prop. Request to rendering architect / materials",
+ "tests": {"cpu": "PASS 220/220 (full game to checkmate)", "drag": "PASS 8/8", "build": "final C4d level, 2026-10-14 22:08-22:11 PC time"},
+ "pc": "PC checkout restored to upstream (git checkout, new prop files removed) and L_Table rebuilt from upstream before releasing the lock"
+}
