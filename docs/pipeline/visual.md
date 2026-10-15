@@ -1,5 +1,7 @@
 # Visual judge report (stage 2)
 
+Latest: **run 6 (2026-10-15, base `da356aa`), at the end of this file**: average 6.00; V3, V4 and V5 not met.
+
 Date: 2026-10-13. Run "baseline 2026-10-13" (independent judge, role 15), base `a82c55d`. Reference:
 `docs/reference/concept-reference.jpg`, main panel (top-left, 0..1045 x 0..685) plus the HAND CUSTOMIZATION panel.
 Judged: `docs/graphics/baseline/base_main.jpg`, `base_black.jpg`, `base_hands.jpg`, `base_opponent.jpg` (all 1920x1080)
@@ -113,3 +115,137 @@ No default world-grid materials were seen.
 - **Caged patient**: the silhouette is right (hunched, caged, folded arms). The face is the best asset, but it is
   clean. The reference reads as a filthy, wet patient in a stained jacket; ours reads as a clean orderly.
 - **The Annotator**: not in this baseline set, so not judged.
+
+---
+
+# Run 6 (2026-10-15): judge re-score after C2.3-C6
+
+Base `da356aa` (upstream; includes C2.3 lighting, C3 materials, C4/C4.1 board/props/room, C5 hands round 2, C6
+materials). Build PC: lock `judge` 07:46-08:07 PC time; `git pull` to da356aa, L_Table rebuilt with `setup_content.ps1`
+(BUILD OK, 169 actors); no C++ change since the PC's last build. Captures: `capture.ps1 -Preset epic 1920x1080
+-WarmSec 22`, benchmark cameras (benchmark.ps1: main, black, hands, opponent) plus close-ups. Evidence (downscaled):
+`docs/graphics/judge/run6-*.jpg`; `run6-crops.jpg` = main-view crops at 2-6x (row 1: HUD portrait + lamp, right
+white rook crown, left white knight; row 2: watch dial rotated 180 deg, table near edge, table left of the board).
+Coordinates below are in the 1920x1080 originals (close-ups: their own 1920x1080 frame). Specialists' reports were
+not used for scoring; only the images.
+
+V1 check on the main/Black captures (1045 px, Rec.709): main mean 29.4, p95 96, r/g 1.484, g/b 1.696; Black 27.8 /
+92 / 1.497 / 1.696. Inside the V1 bounds in both seats; g/b sits 0.004 under its limit.
+
+## Findings first (evidence)
+
+1. **The hands are no longer broken** (`run6-hands`, `run6-hand-seat-left/right`, `run6-nails`). Fingertips rest on
+   the board frame and table, no finger enters a piece, and the stretched, doubled fingers are gone. The skin is the
+   weak part: one waxy orange-brown tone, sausage-smooth fingertips, no wet sheen or roughness change, no scars.
+2. **The opponent's pose now matches the reference** (`run6-main` x 840-1000, y 240-480): steepled hands raised to the
+   caged face. The cage is dark, pitted, hammered iron with a brow band and nose strap (`run6-opponent`). The gown is
+   still a clean, smooth beige cloth, and the face and hands are clean and dry. The bald scalp is still the hottest
+   orange highlight above the board (x 830-950, y 60-130).
+3. **The lamp is in frame but is not a light source** (`run6-lamp`, main x 340-615, y 0-195). The dome reads as worn
+   metal. Its mouth is a flat pale grey band with no glow, and there is no bulb and no hot core. The board pool and the
+   long piece shadows now read as lamp light, which is the biggest lighting gain since the baseline.
+4. **Shadow noise shows on large surfaces.** There is a dithered, salt-and-pepper pattern in the shadowed gown (main
+   x 1050-1150, y 380-560; Black seat the same) and dark grain inside the right white rook's crown (main x 1385-1420,
+   y 710-725). The white firefly specks of the baseline are gone.
+5. **The table still looks procedural.** The C6 "deep gouges" render as pale dashed lines inside a halo of hairline
+   scratches (`run6-table-edge` x 600-1900, y 300-560). At seat distance they read as chalk "W" strokes (main x 270-350,
+   y 630-700). The near-edge face has decal streaks stretched into a fur-like texture (`run6-table-edge` y 550-1000).
+   A hard-edged rectangular red decal sits on that edge (`run6-table-edge` x 1370-1560, y 480-690; main x 995-1050,
+   y 1025-1070).
+6. **The props are real objects now** (`run6-clipboard`, `run6-tape`, `run6-beds`). The clipboard holds a stained,
+   handwritten record, the tape is a roll with a core, and the bed springs are dark wire. One new defect: the record's
+   header is printed twice over itself ("WARD - BATIENTRECORD", `run6-clipboard` x 1080-1560, y 650-830).
+
+## Scores (0-10 vs the reference)
+
+| Element | Baseline 10-13 | Run 6 | Change | Evidence |
+|---|---|---|---|---|
+| Opponent: face | 6 | 6 | same | `run6-opponent`: strong MetaHuman skin and eyes. Clean and dry, and the scalp is the hot highlight (main x 830-950, y 60-130) |
+| Opponent: body/pose | 6 | 7 | better | Steepled hands at the mask, as in the reference (main x 840-1000, y 240-480). Upright, does not lean in on the elbows |
+| Opponent: clothing | 5 | 5 | same | Clean, smooth beige gown with no stains. Dither noise in its shadows (main x 1050-1150, y 380-560) |
+| Mask | 6 | 7 | better | Dark hammered iron, pits, brow band and nose strap (`run6-opponent`, `run6-cage-side`). A thin wire basket, not a heavy riveted helmet. No rust |
+| Player hands | 5 | 6 | better | No deformation or clipping. Veins and crease dirt read. Uniform waxy skin; nails weak from the seat (V4) |
+| Pieces | 6 | 6 | same | Fireflies gone, AO in the cavities (`run6-rook`). Matte beige "plastic", faceted silhouettes up close (`run6-nails` knight x 830-890), no chips or blood. Black pieces look like bronze in `run6-opponent-hands` |
+| Board | 6 | 6 | same | Mottled squares, blood, brass pins. A regular grid of pin-prick dots on the squares (`run6-rook`, `run6-rook-seat` x 0-600, y 0-400) |
+| Blood / wear | 5 | 5 | same | Splats on squares, a flat red smear on the table (main x 1700-1900, y 780-860), a rectangular decal on the edge. None on pieces or hands |
+| Table | 4 | 5 | better | Fewer needle lines in the main view. Dashed "gouges", chalk strokes, fur-like edge (finding 5). No peeling varnish or pale worn patches |
+| Props / clutter | 5 | 6 | better | Real clipboard record, tape roll, lamp dome, mug, pill bottle, books on the cart. Double-printed header. The record is upside down from the seat |
+| Environment | 5 | 6 | better | Dark bed wires, brick and plaster wall, cell bars, tiled floor, wheelchair. A stretched, streaky lit panel behind the lamp (main x 370-460, y 180-560; `run6-beds` x 740-1200). No WARD B sign, no window or cold accent |
+| Lighting | 5 | 6 | better | Board pool and long lamp shadows; the room is legible. The lamp mouth is a flat grey band, the scalp out-shines it, no cold back light, shadow noise |
+| Camera / composition | 7 | 7 | same | Both hands at the lower corners on the frame, board centred, opponent top centre, lamp top left: close to the reference. The wrists are cut by the bottom edge |
+| UI / HUD | 6 | 6 | same | Same cards and plain timers, no row icons. The player portrait is a dim, cluttered hand crop (`run6-crops` row 1) |
+| Black-seat view | 6 | 6 | same | Correct flip and HUD swap, and a captured piece stands beside the board (x 450-510, y 490-610). Same defects and noise as the main view |
+| **Average** | **5.53** | **6.00** (15 rows) | +0.47 | 3 rows below 6 (clothing, blood/wear, table) |
+
+**V3 (every row >= 6, average >= 7): not met.** The average is 6.00, and 3 rows are at 5.
+
+**V4 (hands >= 7: veins, dirt, nails): 6/10, not met.**
+- Veins: they read. The back of the hand shows raised veins and tendons (`run6-hand-seat-left` x 400-1000, y 300-500),
+  slightly lumpy and worm-like.
+- Dirt: it reads in the knuckle creases and as specks (`run6-hand-seat-right` x 640-760, y 300-400), and as smears on
+  the fingers (`run6-nails` x 820-1050, y 0-450). It is sparse; the reference's hands are filthy and wet.
+- Nails: visible in close-ups (`run6-nails` x 1200-1360, y 560-700; `run6-hand-seat-right` little finger x 575-660,
+  y 770-870). From the seat they are faint on the little finger and absent on the index and middle fingertips, which
+  render as smooth rounded caps.
+- Still missing: skin tone and roughness variation (waxy, uniform orange), a wet sheen, and scars.
+
+**V5 (no placeholder, broken or clipping asset): not met.** 13 defects, listed below.
+
+Baseline defects:
+
+| # | Baseline defect | Run 6 |
+|---|---|---|
+| 1 | Stretched, overlapping fingers | fixed (`run6-hands`, `run6-hand-seat-left/right`) |
+| 2 | Hand through a pawn and a knight | fixed: fingertips on the frame (`run6-hands`, `run6-nails`) |
+| 3 | Mirrored dial, flat strap | dial: **retracted, not a defect**. Rotated 180 deg, the dial reads normally, with 3 toward the hand (`run6-watch-dial`, `run6-crops`). The baseline misread the viewing angle; the dial asset did not change. Strap: fixed, now curved and scuffed with a keeper (`run6-watch-strap`). See new #13 |
+| 4 | Banded, untextured sleeve | fixed: canvas weave, no stair-steps (`run6-sleeve-watch`). See new #12 |
+| 5 | Opponent's fingers over the black back rank | fixed: the hands are raised to the mask |
+| 6 | Clipboard slab | fixed: a textured record. See new #7 |
+| 7 | Tape roll blob | fixed: a roll with a core (`run6-tape`). It is plain |
+| 8 | Rook-crown specks | partly fixed: the white fireflies are gone; dark grain remains in one crown (new #2) |
+| 9 | Glowing bed springs | fixed: dark wire (`run6-beds`) |
+| 10 | Smeared HUD player portrait | still present, weaker: it reads as a hand only at 2x zoom (`run6-crops`, main x 35-100, y 28-90) |
+
+New list. Main view and Black seat:
+1. Dithered shadow noise on the opponent's gown, in both seats (main x 1050-1150, y 380-560).
+2. Dark grain in the right white rook's crown (main x 1385-1420, y 710-725).
+3. A hard-edged rectangular red decal on the table's near edge (main x 995-1050, y 1025-1070; `run6-table-edge`
+   x 1370-1560, y 480-690).
+4. Decal streaks stretched over the near-edge face of the table, so it reads as fur (`run6-table-edge` y 550-1000).
+5. A stretched, streaky texture on the lit wall panel behind the lamp (main x 370-460, y 180-560; `run6-lamp`
+   x 910-1150, y 560-1080; `run6-beds` x 740-1200, y 0-830).
+6. The lamp mouth is a flat pale grey band that reads as unlit plastic (`run6-lamp` x 610-1390, y 450-700).
+7. The clipboard header is printed twice over itself (`run6-clipboard` x 1080-1560, y 650-830).
+8. A faint pale rectangle on the left white knight's neck (main x 630-640, y 766-780; `run6-crops`). Low confidence.
+
+Close-ups:
+
+9. A regular pin-prick dot grid on the board squares (`run6-rook`, `run6-rook-seat`).
+10. The table gouges are dashed pale lines with a halo of hairline scratches (`run6-table-edge` x 600-1900,
+    y 300-560).
+11. Faceted, low-poly silhouettes: the knight (`run6-nails` x 830-890) and the watch bezel (`run6-watch-dial`).
+12. The sleeve's grime band has a hard straight vertical edge (`run6-sleeve-watch` x 1580-1650), and the weave
+    stretches along the cuff roll (`run6-watch-strap` x 700-1000, y 300-850).
+13. From the side, the strap end is a flat blocky tab (`run6-sleeve-watch` x 120-350, y 620-1000).
+
+Checked and not found: no world-grid materials, no floating props. There is no hand-piece or hand-hand clipping in
+the idle pose. The opponent's fingertips touch the front of the cage; no penetration is visible in `run6-main`,
+`run6-opponent` or `run6-cage-side`.
+
+## Top 5 remaining gaps to the reference (ranked by payoff)
+
+1. **The lamp is not the visible key, and the shadows are noisy.** The mouth is a flat grey band, there is no hot core
+   or glow, the scalp out-shines the lamp, and there is no cold back accent. Dither and grain in the shadows (V5 #1,
+   #2, #6). Owner: rendering architect (C7), with board/environment for the lamp-mouth material.
+2. **The hand skin does not match the reference.** It is a waxy, uniform albedo with no roughness or wetness driven by
+   the dirt. Nails do not read from the seat, the fingertips are smooth caps, and there are no scars (V4). Owner:
+   hands/character, with materials for skin roughness from dirt (open since C6).
+3. **The opponent is clean.** A smooth beige gown with no stains, and clean, dry skin; the reference shows a filthy,
+   stained canvas jacket and a wet face. The scalp is a hot orange highlight. Owner: materials (gown and skin grime),
+   with hands/character for the jacket asset.
+4. **Large wood surfaces look procedural.** Dashed gouges, chalk strokes, a fur-like near edge, a rectangular decal,
+   a pin-prick dot grid on the squares, and no peeling varnish or worn patches (V5 #3, #4, #9, #10). Owner: materials,
+   with board/environment for decal placement and projection.
+5. **The room has no story props, and its surfaces are stretched.** No WARD B sign in frame, no window or cold
+   source. A streaky wall panel behind the lamp, and a double-printed clipboard header (V5 #5, #7). Owner:
+   board/environment.
