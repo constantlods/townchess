@@ -117,7 +117,11 @@ permission rule; until then local work runs only through Houtini/Ollama calls th
 | D1 screen percentage per tier | lead | coded (Cinematic 100, Epic 83, High 67, Medium 58, Low 50; `-tcscreenpct=`); packaged benchmark pending | TCGame.cpp ApplyQualityPreset |
 | C4 board/props/room V5 defects | board/environment | done b2f8380 except rook specks (Lumen/TSR noise, needs RA) and lamp head (faces the camera; C4.1 running); V1 in bounds both seats (main 29.6/95.3/1.472/1.699, Black 27.6/89.2/1.485/1.698), detail 9.56; cpu 220/220, drag 8/8 | C4-*.jpg, C4-board-env.json |
 | D1 verified | lead | Epic 83%: packaged offscreen 82.3 / 71.7 fps | PERFORMANCE_BENCHMARKS.md |
-| Hands round 2 (fingertips into the frame, hand decal Rotator bug found in C4, nails, sleeves) | hands/character | queued after C4.1 | |
+| C4.1 lamp head, books, pill bottle | board/environment | done f086766, lead-reviewed (dome mouth-down, bulb hidden) | C4.1-*.jpg |
+| QA gate on f086766 | lead | all pass (autotests, reconnect 103/103, S2 10/10, npm 479) | docs/evidence/gate-2026-10-14.txt |
+| C5 hands round 2 | hands/character | done a266f7c, lead-reviewed: pose calibrated to the mesh (fingertips 0.5-0.7 cm on frame/table), relaxed curl, smooth sleeve, patient steepled hands + breathing idle, hand decal Rotator fixed; cpu 306/307 (ply budget), drag 8/8 | C5-*.jpg, C5-hands.json |
+| QA gate on C5 | lead | running | |
+| C6 sleeve fabric, rook specks, deep gouges | materials | started | |
 
 Open after C2/C3: V2 detail (C3 metric 9.47 on the new recipe, lower than C2 because the white bed grids were background detail);
 Black seat r/g 1.514 (V1 limit 1.50); pieces have no cavity bake; skin roughness not driven by dirt; lamp source not visible.
