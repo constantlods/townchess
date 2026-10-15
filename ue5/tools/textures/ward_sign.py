@@ -1,6 +1,6 @@
 """The reference's painted "WARD B" wall sign (our own work; the font is the repo's OFL Courier Prime Bold).
 
-Hand-painted stencil lettering on plaster: "WARD" over a large "B" and a double-headed arrow, dark grey paint that has
+Hand-painted stencil lettering on plaster: "WARD" over a large "B" and a double-headed arrow, off-white institutional paint that has
 worn and flaked off (fractal erosion, more at the edges of the strokes), brush streaks along the strokes and a few
 runs below the letters. A decal texture (board/environment C8b): RGBA, rgb = paint colour, a = paint coverage.
 Output: <out>/signs/T_WardSign_BaseColor.png (1024 x 1024, sRGB, straight alpha).
@@ -72,9 +72,9 @@ def main():
     keep = smoothstep(-1.1, -0.45, coarse) * smoothstep(-2.4, -1.6, fine - edge * 1.2)
     alpha = np.clip(paint * keep, 0, 1) * 0.92
 
-    # paint colour: dark grey-brown, brush streaks along the horizontal strokes, lighter where thin
+    # paint colour: dirty off-white (it reads on the dark tile wainscot), brush streaks along the horizontal strokes, greyer where thin
     streak = fbm(N, a.seed + 3, beta=1.6, fmin=8, aniso=6.0)
-    base = np.array([46, 44, 41], np.float32)[None, None] * (1.0 + 0.12 * streak[..., None]) + (1.0 - alpha[..., None]) * 18.0
+    base = np.array([172, 170, 160], np.float32)[None, None] * (1.0 + 0.12 * streak[..., None]) - (1.0 - alpha[..., None]) * 30.0
     rgba = np.dstack([base.clip(0, 255), (alpha * 255).clip(0, 255)]).astype(np.uint8)
     out = os.path.join(a.out, "signs")
     os.makedirs(out, exist_ok=True)

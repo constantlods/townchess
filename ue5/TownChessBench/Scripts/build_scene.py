@@ -2356,7 +2356,7 @@ def build():
         stock_tex = None
         if os.path.exists(form):  # C8b: the forms stock without its text, for the record sheet (paper_material)
             stock_tex = import_texture(form, f"{ROOT}/Textures/Forms", "T_PaperStock_BaseColor", "color")
-            setp(stock_tex, "max_texture_size", 64)
+            setp(stock_tex, "max_texture_size", 32)  # 64 px still left the text lines as grey bands
             setp(stock_tex, "mip_gen_settings", unreal.TextureMipGenSettings.TMGS_BLUR5)
             EAL.save_loaded_asset(stock_tex)
         setp(clip, "paper_material", paper_material(stock_tex))
@@ -2574,7 +2574,7 @@ def build():
     # Courier Prime OFL) painted onto the back wall's tiles and plaster, lit by BackWall_Wash and Corridor_Glow.
     sign_png = os.path.join(TEXTURES_DIR, "signs", "T_WardSign_BaseColor.png")
     if os.path.exists(sign_png):
-        sy, sz, ssize, syaw = (float(v) for v in os.environ.get("TC_SIGN", "62,120,52,0").split(","))
+        sy, sz, ssize, syaw = (float(v) for v in os.environ.get("TC_SIGN", "62,120,56,-90").split(","))
         stex = import_texture(sign_png, f"{ROOT}/Textures/Signs", "T_WardSign_BaseColor", "color")
         path = f"{ROOT}/Materials/M_TC_WardSign"
         if EAL.does_asset_exist(path):
@@ -2591,7 +2591,7 @@ def build():
         MEL.connect_material_property(sr, "", unreal.MaterialProperty.MP_ROUGHNESS)
         MEL.recompile_material(sm_)
         EAL.save_loaded_asset(sm_)
-        sign = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(cx + L / 2 - 2, sy, sz), unreal.Rotator(0, 0, syaw))
+        sign = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(cx + L / 2 - 2, sy, sz), unreal.Rotator(syaw, 0, 0))  # roll -90: the text runs along +Y
         sign.decal.set_decal_material(sm_)
         setp(sign.decal, "decal_size", unreal.Vector(4.0, ssize / 2, ssize / 2))  # x: 4 cm either side of the wall's face
         sign.set_actor_label("WardSign")
@@ -2601,7 +2601,10 @@ def build():
     chair = import_model("painted_wooden_chair_01")
     tag(place_model(chair, (92, 0, 0), yaw=180, label="OpponentChair", sit_on=0.0)[0])
     cabinet = import_model("drawer_cabinet")
-    place_model(cabinet, (cx + L / 2 - 40, -140, 0), yaw=180, label="Cabinet", sit_on=0.0)
+    # C8b (judge run 6 V5 #5, "a stretched, streaky lit panel behind the lamp"): at yaw 180 the cabinet's drawer front
+    # faced the wall and the seat saw its back, one flat board whose UVs stretch the scan's grain over ~1 m, lit by
+    # Window_Cold 30 cm away (C8b-panel.jpg). Turned round, the drawer front faces the room.
+    place_model(cabinet, (cx + L / 2 - 40, -140, 0), yaw=float(os.environ.get("TC_CABINET_YAW", 0.0)), label="Cabinet", sit_on=0.0)
     wheel = import_model("wheelchair_01")
     if wheel:  # same importer-material problem as the beds (white frame in the base-colour buffer)
         assign(wheel, model_material(master, "wheelchair_01", "wheelchair_01", "MI_Wheelchair", tint=(0.7, 0.68, 0.64), grime_color=(0.38, 0.3, 0.22),
