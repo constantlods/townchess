@@ -40,6 +40,10 @@ CAM_TARGET = arg("TCCamTarget", "")  # aim the close-up at this point (x,y,z) in
 RESIGN = arg("TCResign", "") == "1"  # resign once the game runs: the end card (CHECKMATE/RESIGNED + Rematch) for the shot
 SKIN = arg("TCSkin", "")  # -TCSkin=<id>: put MI_PlayerSkin_<id> on the player's body for the shot
 HUD = arg("TCHud", "") == "1"  # draw the game HUD over the shot (what the player sees, not just the scene)
+# -TCGamePath=1: render the capture like the player's frame: the main view's resolution, the quality tier's screen
+# percentage (Epic 83%) and TSR. Without it a capture renders at full resolution and reads sharper than the game
+# (rendering architect C7: detail 9.28 full resolution against 8.98 on the game path, same view)
+GAME_PATH = arg("TCGamePath", "") == "1"
 CMDS = [c.replace("_", " ") for c in arg("TCCmds", "").split(";") if c]  # console commands, "_" for spaces (e.g. r.Fog_0)
 state = {"f": 0, "t0": time.time(), "phase": "warm", "tcap": 0.0}
 
@@ -88,6 +92,11 @@ def begin():
     cc.set_editor_property("texture_target", rt)
     cc.set_editor_property("capture_every_frame", True)
     cc.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, SOURCES.get(SOURCE, SOURCES["final"])))
+    if GAME_PATH:
+        cc.set_editor_property("main_view_resolution", True)
+        cc.set_editor_property("main_view_family", True)
+        cc.set_editor_property("ignore_screen_percentage", False)
+        log("capture on the game path: main view resolution, screen percentage and TSR")
     if SOURCE in BUFFER_VIS:  # e.g. -TCSource=roughness (materials audit request): grey = the G-buffer value
         mat = unreal.load_asset(BUFFER_VIS[SOURCE])
         state["vis_mat"] = mat  # applied after the level's post settings are copied (below), which would replace it
