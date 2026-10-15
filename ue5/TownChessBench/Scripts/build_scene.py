@@ -2574,7 +2574,7 @@ def build():
     # Courier Prime OFL) painted onto the back wall's tiles and plaster, lit by BackWall_Wash and Corridor_Glow.
     sign_png = os.path.join(TEXTURES_DIR, "signs", "T_WardSign_BaseColor.png")
     if os.path.exists(sign_png):
-        sy, sz, ssize, syaw = (float(v) for v in os.environ.get("TC_SIGN", "62,120,56,-90").split(","))
+        sy, sz, ssize, syaw = (float(v) for v in os.environ.get("TC_SIGN", "62,110,56,90").split(","))
         stex = import_texture(sign_png, f"{ROOT}/Textures/Signs", "T_WardSign_BaseColor", "color")
         path = f"{ROOT}/Materials/M_TC_WardSign"
         if EAL.does_asset_exist(path):
@@ -2591,7 +2591,7 @@ def build():
         MEL.connect_material_property(sr, "", unreal.MaterialProperty.MP_ROUGHNESS)
         MEL.recompile_material(sm_)
         EAL.save_loaded_asset(sm_)
-        sign = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(cx + L / 2 - 2, sy, sz), unreal.Rotator(syaw, 0, 0))  # roll -90: the text runs along +Y
+        sign = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(cx + L / 2 - 2, sy, sz), unreal.Rotator(syaw, 0, 0))  # roll 90: upright, the text runs along +Y
         sign.decal.set_decal_material(sm_)
         setp(sign.decal, "decal_size", unreal.Vector(4.0, ssize / 2, ssize / 2))  # x: 4 cm either side of the wall's face
         sign.set_actor_label("WardSign")
