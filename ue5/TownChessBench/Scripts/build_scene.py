@@ -1008,7 +1008,9 @@ POSES = {
              "upperarm_l": (52, 0), "upperarm_r": (52, 0), "lowerarm_l": (50, 0), "lowerarm_r": (50, 0)},
     # the reference's opponent: leaning in on the table, forearms up, hands clasped in front of the face
     # the player's own body (first person, head hidden): leaning in, hands resting on the board's near corners
-    "player": {"spine_01": (8, 0), "spine_03": (float(os.environ.get("TC_PLAYER_LEAN", 16)), 0),  # 12 -> 16 (pass 63): reach further "neck_01": (6, 0), "head": (10, 0),
+    # C5: spine_01 also turns the chest square to the table (Z, negative = the right shoulder forward): the idle's twist
+    # left the right shoulder 10 cm further back than the left and the right wrist out of reach (9 cm off its target)
+    "player": {"spine_01": (8, float(os.environ.get("TC_PLAYER_TWIST", -10))), "spine_03": (float(os.environ.get("TC_PLAYER_LEAN", 16)), 0),  # 12 -> 16 (pass 63): reach further "neck_01": (6, 0), "head": (10, 0),
                "hand_l": (0, 0, float(os.environ.get("TC_HAND_ROLL", -95))), "hand_r": (0, 0, -float(os.environ.get("TC_HAND_ROLL", -95)))},
     "clasp": {"spine_01": (-4, 0), "spine_03": (-7, 0), "neck_01": (2, 0), "head": (4, 0),  # slight lean in, head level
               "upperarm_l": (58, -26), "upperarm_r": (58, 26), "lowerarm_l": (98, -44), "lowerarm_r": (98, 44),
@@ -1048,14 +1050,26 @@ SEAT = {}  # filled by build(): "top" (table top z), "eye" (default-view eye, wo
 # Measured (capture -TCProbe=Player, docs/graphics/iterations/phaseA-hands-character.md): the runtime body stands 18.5 cm
 # higher than this solver's model (head 132.5 vs 114.0) while x/y agree within 2.6 cm; the body actor is lowered by it.
 # 18.5 lowered the hands ~3.1 cm into the table (lead probe 2026-10-14: fingertip joints 77.2-78.7 vs top 79.95): 15.3
+# C5: build_seated_pose now evaluates its sequence on the mesh and solves with the evaluated proportions and pelvis, so
+# the model's head is the game's head and no fix is needed (0); 15.3 stays the fallback when that evaluation fails.
 PLAYER_Z_FIX = float(os.environ.get("TC_PLAYER_ZFIX", 15.3))
+# How far the default-view eye sits in front of the (hidden) head bone. 9 (C1) put the chest ~59 cm behind the table's
+# near edge: the arms could not reach the board's corners (C5 model: right wrist 9 cm short). The head and neck are hidden
+# in the game (ATCGameMode::BeginPlay), so the body may sit closer to the table than a real eye would allow; the chest
+# and shoulders stay below the bottom of the default view (checked in the C5 main captures).
+PLAYER_EYE_AHEAD = float(os.environ.get("TC_PLAYER_EYE_AHEAD", 3.0))
 # Rest pose in table space (cm; x towards the board, |y| outwards, z over the table top). Wrists on the table in front of
-# the board's near corners, fingers forward and slightly inward so index/middle pads lie on the side frame beside the
-# a1/h1 corner and ring/pinky on the table: no finger over a square (squares |x|,|y| <= 23.2, frame to 27.65, top 1.92).
-# Wrists 5.5 cm nearer the board than the first try (-40.5, 27.5): there the hands rested at the table's near edge,
-# almost out of the default view (lead verification 2026-10-14, hv_main).
-PLAYER_REST = {k: float(v) for k, v in zip(("wrist_x", "wrist_y", "wrist_z", "yaw", "mcp_z", "elbow_z", "elbow_y"),
-                                            os.environ.get("TC_PLAYER_REST", "-35.0,25.0,3.2,4,2.0,14,22").split(","))}
+# the board's near corners, fingers forward and inward by `yaw` so the curled index/middle/ring pads rest on the near
+# frame beside the a1/h1 corner and the pinky on the frame or the table: no finger over a square (squares |x|,|y| <=
+# 23.2, frame to 27.65, top 1.92). `roll` raises the thumb side (a relaxed hand rests a little on its outer edge).
+# C1 asked for (-35, 25) with yaw 4 and knuckles 2 cm over the surface: out of the solver's reach with its short arms
+# (wrist 12-21 cm off) and the fingers hyperextended to reach down; at runtime (longer arms) the fingertips landed on the
+# frame's outer edge and dipped into it. C5 (calibrated model): wrists symmetric at the corners, fingers turned in.
+PLAYER_REST = dict(zip(("wrist_x", "wrist_y", "wrist_z", "yaw", "mcp_z", "elbow_z", "elbow_y", "roll"),
+                       (-42.0, 27.0, 3.4, 22.0, 4.4, 14.0, 22.0, 10.0)))
+PLAYER_REST.update({k: float(v) for k, v in zip(("wrist_x", "wrist_y", "wrist_z", "yaw", "mcp_z", "elbow_z", "elbow_y", "roll"),
+                                                 os.environ.get("TC_PLAYER_REST", "").split(",")) if v.strip()})
+PLAYER_SPREAD = float(os.environ.get("TC_PLAYER_SPREAD", 0.35))  # share of each finger's splay closed towards the middle finger
 BOARD_HALF, BOARD_PLAY_HALF, BOARD_FRAME_Z, BOARD_SURF_Z = 27.65, 23.2, 1.92, 1.71  # props.py chess_board()
 
 
@@ -1068,34 +1082,119 @@ def board_surface(x, y):
     return 0.0, "table"
 
 
-def _finger_rest(p1, p2, p3, N, to_world, top, dip=6.0):
-    """Curl one finger (joints p1..p3 = _01.._03, component space) about its own hinge axis so the _03 joint sits 0.9 cm
-    over the surface under it and the pad (estimated tip) 0.55 cm over it, with no joint below the surface.
-    Returns (axis, a, b, c): component-space rotations in degrees for _01, _02 (relative) and _03."""
+def _surface_under(w, r=0.0):
+    """board_surface() of the highest surface within r cm (horizontally) of world point w: a finger near the frame's
+    outer edge must clear the frame, not the table beside it (C1: index/middle dipped up to 2 cm into the frame)."""
+    best = board_surface(w[0], w[1])
+    if r > 0:
+        d = 0.7 * r
+        for dx, dy in ((r, 0), (-r, 0), (0, r), (0, -r), (d, d), (-d, d), (d, -d), (-d, -d)):
+            s = board_surface(w[0] + dx, w[1] + dy)
+            if s[0] > best[0]:
+                best = s
+    return best
+
+
+# Relaxed resting hand (reference main view: fingers gently curled, pads on the frame, nails facing the seat). Preferred
+# ABSOLUTE flexion in degrees at the knuckle (MCP: proximal phalanx against the hand's wrist-knuckle line) and at the
+# middle joint (PIP: middle against proximal phalanx), rising from index to pinky; the end joint follows at DIP_RATIO x
+# the added PIP flexion (the coupled tendon of a relaxed finger). C5: the C1 solver searched -30..60 relative to the
+# reference pose and every finger ended at -30 (hyperextended, the judge's "stretched fingers"). The MetaHuman reference
+# pose already flexes the fingers (~22 deg MCP, ~12 deg PIP), so the curl is now judged in absolute angles.
+FINGER_CURL = {"thumb": (0, 8), "index": (12, 38), "middle": (14, 42), "ring": (16, 44), "pinky": (18, 46)}
+DIP_RATIO = 0.7
+FINGER_R, TIP_R = 0.8, 0.65  # centre line to skin: finger body / pad (cm)
+FINGER_PREF = float(os.environ.get("TC_FINGER_PREF", 0.004))  # weight of the relaxed curl against the contact (per deg^2)
+
+
+def _signed_angle(u, v, axis):
+    """Angle in degrees from u to v about axis (right hand)."""
+    return math.degrees(math.atan2(sum(a * b for a, b in zip(_vcross(u, v), axis)), sum(a * b for a, b in zip(u, v))))
+
+
+def _finger_rest(p1, p2, p3, N, to_world, top, finger, F=None, q3=None):
+    """Curl one finger (joints p1..p3 = _01.._03, component space) about its own hinge axis: the pad of the distal
+    segment rests on the surface under it (centre line TIP_R over the highest surface within 0.7 cm), every other
+    sampled point of the centre line stays FINGER_R over the highest surface within 0.9 cm (no joint or segment inside
+    the frame's edge), nothing over the playing squares, and the absolute flexion stays near FINGER_CURL (measured
+    against the hand line F; the thumb's preference is relative). The distal segment runs along the _03 bone's own axis
+    (q3), as _finger_tip() and the probe log assume. Returns (axis, mcp, pip, dip): component-space rotations in degrees
+    added at _01, _02 and _03."""
     L = _vnorm(_vcross(_vnorm(_vsub(p3, p1)), N))
     seg1, seg2 = _vsub(p2, p1), _vsub(p3, p2)
-    l3 = 0.75 * _vlen(seg2)
-    def surf(c):  # clearance of a component-space point over what lies under it (world z: P.z + c.z)
+    l3 = 0.8 * _vlen(seg2)
+    d30 = _vnorm(seg2)
+    if q3 is not None:
+        ax = _qrot(q3, (1.0, 0.0, 0.0))
+        d30 = ax if sum(x * y for x, y in zip(ax, seg2)) > 0 else (-ax[0], -ax[1], -ax[2])
+    want_a, want_b = FINGER_CURL[finger]
+    if F is not None and finger != "thumb":  # the reference pose's own flexion, so the preference is absolute
+        Fp = _vnorm(_vsub(F, tuple(c * sum(a * b for a, b in zip(F, L)) for c in L)))
+        want_a -= _signed_angle(Fp, _vnorm(seg1), L)
+        want_b -= _signed_angle(_vnorm(seg1), _vnorm(seg2), L)
+    def clear(c, r):
         w = to_world(c)
-        return w[2] - top - board_surface(w[0], w[1])[0]
+        return w[2] - top - _surface_under(w, r)[0]
     best = None
-    for a in range(-30, 61, 2):
-        qa = _axis(L, a)
-        q2 = _qrot(qa, seg1)
-        j2 = _vadd(p1, q2)
-        for b in range(-10, 61, 3):
-            qab = _axis(L, a + b)
-            j3 = _vadd(j2, _qrot(qab, seg2))
-            d3 = _vnorm(_qrot(_axis(L, a + b + dip), seg2))
-            tip = _vadd(j3, d3, l3)
-            cost = (surf(j3) - 0.9) ** 2 + (surf(tip) - 0.55) ** 2 + 0.0004 * (a * a + b * b)
-            if any(board_surface(*to_world(c)[:2])[1] == "squares" for c in (j3, tip)):
-                cost += 50.0  # never rest a finger on the playing squares
-            if surf(j2) < 0.8:
-                cost += 10.0 * (0.8 - surf(j2)) ** 2 + 5.0
+    for a in range(-36, 41, 2):
+        j2 = _vadd(p1, _qrot(_axis(L, a), seg1))
+        for b in range(-12, 70, 3):
+            c = round(DIP_RATIO * max(b, 0))
+            j3 = _vadd(j2, _qrot(_axis(L, a + b), seg2))
+            d3 = _qrot(_axis(L, a + b + c), d30)
+            body = [_vadd(p1, _vsub(j2, p1), 0.5), j2, _vadd(j2, _vsub(j3, j2), 0.5), j3]
+            dist = [_vadd(j3, d3, l3 * t) for t in (0.4, 0.75, 1.0)]
+            cmin = min(clear(p, 0.9) for p in body)
+            dmin = min(clear(p, 0.7) for p in dist)
+            cost = 4.0 * (dmin - TIP_R) ** 2 + FINGER_PREF * ((a - want_a) ** 2 + (b - want_b) ** 2)
+            if cmin < FINGER_R:
+                cost += 20.0 * (FINGER_R - cmin) ** 2 + 2.0
+            if dmin < TIP_R - 0.15:
+                cost += 40.0 * (TIP_R - 0.15 - dmin) ** 2 + 4.0
+            if any(board_surface(*to_world(p)[:2])[1] == "squares" for p in (j3, dist[1], dist[-1])):
+                cost += 50.0  # never rest a finger on the playing squares (the pieces stand there)
             if best is None or cost < best[0]:
-                best = (cost, a, b)
-    return L, best[1], best[2], dip
+                best = (cost, a, b, c)
+    return L, best[1], best[2], best[3]
+
+
+def _steeple_finger(p1, p2, p3, Np, mid_x, side_sign, finger):
+    """The patient's steepled hands: curl one finger about its hinge (positive = towards the palm, which faces the other
+    hand) so that its pad meets the mirrored finger at the midplane x = mid_x, while every other part of the finger
+    stays on its own side (no finger through the other hand). side_sign: +1 if this hand lies at x > mid_x."""
+    L = _vnorm(_vcross(_vnorm(_vsub(p3, p1)), Np))
+    seg1, seg2 = _vsub(p2, p1), _vsub(p3, p2)
+    l3 = 0.8 * _vlen(seg2)
+    want_a, want_b = (6, 10) if finger != "thumb" else (0, 6)
+    def gap(c):  # centre line distance from the midplane, on this hand's side
+        return side_sign * (c[0] - mid_x)
+    best = None
+    for a in range(-24, 41, 2):
+        j2 = _vadd(p1, _qrot(_axis(L, a), seg1))
+        for b in range(-6, 46, 3):
+            c = round(DIP_RATIO * b)
+            j3 = _vadd(j2, _qrot(_axis(L, a + b), seg2))
+            d3 = _vnorm(_qrot(_axis(L, a + b + c), seg2))
+            tip = _vadd(j3, d3, l3)
+            body = [j2, _vadd(j2, _vsub(j3, j2), 0.5), j3, _vadd(j3, d3, 0.5 * l3)]
+            cost = 4.0 * (gap(tip) - TIP_R) ** 2 + 0.002 * ((a - want_a) ** 2 + (b - want_b) ** 2)
+            bmin = min(gap(p) for p in body)
+            if bmin < FINGER_R:
+                cost += 20.0 * (FINGER_R - bmin) ** 2 + 2.0
+            if best is None or cost < best[0]:
+                best = (cost, a, b, c)
+    return L, best[1], best[2], best[3]
+
+
+def _finger_tip(new_w, b2, b3):
+    """Estimated fingertip (component space): the distal segment continues the _03 bone's axis by 0.8 x the middle
+    segment's length (the probe logs only the _03 joint)."""
+    j2, (j3, q3) = new_w[b2][0], new_w[b3]
+    ax = _qrot(q3, (1.0, 0.0, 0.0))
+    seg = _vsub(j3, j2)
+    if sum(a * b for a, b in zip(ax, seg)) < 0:  # the bone's +X points back up the finger on this side
+        ax = (-ax[0], -ax[1], -ax[2])
+    return _vadd(j3, ax, 0.8 * _vlen(seg))
 
 
 def _nlerp(a, b, t):
@@ -1107,12 +1206,51 @@ def _nlerp(a, b, t):
     return tuple(v / n for v in q)
 
 
-def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, pose_name="rest"):
-    """Authors a single-frame seated pose for the UE5 mannequin.
+def _angle_deg(qa, qb):
+    d = abs(sum(qa[i] * qb[i] for i in range(4)))
+    return math.degrees(2 * math.acos(min(1.0, d)))
 
-    Starts from MM_Idle frame 0, infers the bone hierarchy from local vs component transforms, applies
-    component-space rotations (mannequin faces +Y, up is +Z), re-derives local transforms and keys them into a new
-    AnimSequence. Deltas are about the component X axis: +90 swings a hanging limb forward."""
+
+# The patient's breathing idle (C5): a looping sequence instead of one keyed frame. Chest and upper back rise and fall
+# (spine_03/spine_05 about the body's left-right axis), the head keeps its gaze (counter-rotation) and drifts slowly. The
+# arms are children of the chest, so the steepled hands move with it rigidly (< 0.5 cm) and never part. Only the
+# opponents breathe: the player's resting hands must not slide on the table under the fixed seat camera.
+IDLE_POSES = ("clasp",)
+IDLE_SECONDS, IDLE_FPS = float(os.environ.get("TC_IDLE_SECONDS", 5.0)), 30
+IDLE_AMP = float(os.environ.get("TC_IDLE_AMP", 1.0))  # 0 = the old statue
+
+
+def _idle_deltas(deltas, f, frames, order, parent):
+    """Breathing offsets for frame f of a loop of `frames` frames (frame 0 = the rest pose exactly). Each breathing bone
+    turns its whole subtree rigidly: a solved delta below it is conjugated by the accumulated turn (a plain pre-rotation
+    would re-aim the arms in component space and the steepled fingertips would press 0.4 cm into each other)."""
+    if frames <= 1 or IDLE_AMP <= 0:
+        return deltas
+    ph = 2 * math.pi * f / frames
+    breath = math.sin(ph) * IDLE_AMP  # +1 = full inhale
+    X, Z = (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)
+    turn = IDLE_AMP * (0.9 * math.sin(ph + 1.3) + 0.4 * math.sin(2 * ph + 0.4))
+    nod = IDLE_AMP * 0.5 * math.sin(ph + 2.1)
+    own = {"spine_03": _axis(X, -0.7 * breath),  # negative X: the chest lifts and opens (positive leans the body in)
+           "spine_05": _axis(X, -0.5 * breath),
+           "head": _qmul(_axis(Z, turn), _axis(X, 1.2 * breath + nod))}  # the gaze stays on the board while the chest moves
+    ident = (0.0, 0.0, 0.0, 1.0)
+    out, acc = dict(deltas), {}
+    for b in order:
+        cp = acc.get(parent.get(b), ident)
+        if b in out and cp != ident:
+            out[b] = _qmul(_qmul(cp, out[b]), _qinv(cp))
+        if b in own:
+            out[b] = _qmul(own[b], out.get(b, ident))
+            acc[b] = _qmul(own[b], cp)
+        elif cp != ident:
+            acc[b] = cp
+    return out
+
+
+def _pose_inputs(skel_mesh, base_anim, own_proportions, pose_name):
+    """Bone names, parents, local and component transforms of the base animation's first frame (MM_Idle), with the
+    target mesh's bone lengths when own_proportions."""
     opts = unreal.AnimPoseEvaluationOptions()
     pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(base_anim, 0.0, opts)
     names = [str(n) for n in unreal.AnimPoseExtensions.get_bone_names(pose)]
@@ -1137,19 +1275,19 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
 
     if own_proportions:
         # Poses come from the mannequin's idle (same joint orientations as the MetaHuman body skeleton); bone lengths
-        # come from the target mesh's reference pose so its proportions are kept.
+        # come from the skeleton's reference pose here, and from the mesh as evaluated (build_seated_pose's loop) after.
         ref = unreal.AnimPoseExtensions.get_reference_pose(skel_mesh.get_editor_property("skeleton"))
         ref_names = {str(n) for n in unreal.AnimPoseExtensions.get_bone_names(ref)}
         for b in names:
             if b in ref_names:
                 loc[b] = (_xf(unreal.AnimPoseExtensions.get_bone_pose(ref, b, unreal.AnimPoseSpaces.LOCAL))[0], loc[b][1])
         names = [b for b in names if b in ref_names]
-        if pose_name == "player":
-            # The idle's hanging hands curl every finger; resting on the table that read as a fist (LIM-011). Blend the
-            # finger joints toward the reference pose (straight fingers) and keep a little of the idle's curl.
-            relax = float(os.environ.get("TC_FINGER_RELAX", 0.8))  # 0.6 -> 0.8 (pass 63): the curled tips hid every nail
+        if pose_name in ("player", "clasp"):
+            # The idle's hanging hands curl every finger. Start the fingers from the reference pose (straight) and author
+            # the curl explicitly (_finger_rest / _steeple_finger). C1 kept 20% of the idle's curl (TC_FINGER_RELAX 0.8).
+            relax = float(os.environ.get("TC_FINGER_RELAX", 1.0))
             for b in names:
-                if b.startswith(("thumb_", "index_", "middle_", "ring_", "pinky_")) and not b.endswith("metacarpal_l") and not b.endswith("metacarpal_r"):
+                if b.startswith(("thumb_", "index_", "middle_", "ring_", "pinky_")) and not b.endswith(("metacarpal_l", "metacarpal_r")):
                     rq = _xf(unreal.AnimPoseExtensions.get_bone_pose(ref, b, unreal.AnimPoseSpaces.LOCAL))[1]
                     loc[b] = (loc[b][0], _nlerp(loc[b][1], rq, relax))
 
@@ -1164,7 +1302,31 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         order.append(b)
     for b in names:
         visit(b)
+    # key_t: the translations written into the sequence (the skeleton's reference). The game scales each keyed
+    # translation to the mesh's proportions (C5 dump: evaluated = keyed x 1.03-1.32 per bone, same direction), so the
+    # keys must stay at the reference while the model (loc) takes the evaluated lengths.
+    return {"names": names, "parent": parent, "loc": loc, "wld": wld, "order": order, "pelvis_bias": (0.0, 0.0, 0.0),
+            "key_t": {b: loc[b][0] for b in names}}
 
+
+ARM_TARGETS = {
+    # C5: the reference's patient holds his clasped hands up in front of his face. Wrists 19 cm under and 20 cm in front of
+    # the head bone (the cage mask reaches ~16.5 cm in front of it at mouth height), elbows low (forearms steep), hands
+    # steepled at the midline (fingertips meeting, no finger through the other hand). Was (3, 18, -21) / -31 / 19:
+    # forearms as a flat bar at chest height, one hand laid over the other forearm (judge V5 #5: finger overlap).
+    "clasp": {"hand": tuple(float(v) for v in os.environ.get("TC_CLASP_HAND", "5,20,-19").split(",")),
+              "elbow_z": float(os.environ.get("TC_CLASP_ELBOW_Z", -32)), "elbow_x": 15.0},
+    # pass 60: (22, 46, -32) left the left wrist below the frame and the right hand a sliver at the corner
+    "player": {"hand": tuple(float(v) for v in os.environ.get("TC_PLAYER_HAND", "19,58,-32").split(",")),
+               "elbow_z": -36.0, "elbow_x": 22.0}}  # pass 63: elbows may lift off the table (out of view) for reach
+CLASP_HANDS = {k: float(v) for k, v in zip(("tent", "fwd"), os.environ.get("TC_CLASP_STEEPLE", "8,18").split(","))}
+CAGE_ELLIPSOID = ((0.0, 5.85, -0.3), (10.6, 11.0, 13.9))  # cage_mask bounds (+-10.3, -9.3..12, -12.9..14.3) on TC_MASK_OFFSET 0,4.5,-1
+
+
+def solve_seated_pose(D, pose_name):
+    """Pure solver (no unreal calls; ue5/tools reproduces it offline from a TC_POSE_DUMP): component-space pose of every
+    bone. Returns new_w, new_l (bone -> (t, q)), the final deltas and the solve() closure (breathing frames)."""
+    names, parent, loc, order = D["names"], D["parent"], D["loc"], D["order"]
     X, Z = (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)
     deltas = {"thigh_l": _axis(X, 90), "thigh_r": _axis(X, 90), "calf_l": _axis(X, -90), "calf_r": _axis(X, -90)}
     Y = (0.0, 1.0, 0.0)
@@ -1172,6 +1334,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
         ax, az, ay = (tuple(rot) + (0.0,))[:3]
         deltas[bone] = _qmul(_axis(Y, ay), _qmul(_axis(Z, az), _axis(X, ax)))  # ay: roll about the forward axis
     pelvis_drop = float(os.environ.get("TC_PELVIS_DROP", 47.0)) + (6.0 if pose_name == "clasp" else 0.0)  # he sits low, bowed in
+    bias = D.get("pelvis_bias", (0.0, 0.0, 0.0))
 
     def solve(deltas):
         new_w, new_l = {}, dict(loc)
@@ -1185,26 +1348,24 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
                 r = _qrot(qp, t_l)
                 t_w, q_w = (tp[0] + r[0], tp[1] + r[1], tp[2] + r[2]), _qmul(qp, q_l)
             if b == "pelvis":
-                t_w = (t_w[0], t_w[1], t_w[2] - pelvis_drop)
+                # the keyed pelvis is dropped by pelvis_drop; the model adds the measured difference between the keyed
+                # and the evaluated pelvis (the skeleton's translation retargeting does not honour the whole drop)
+                t_w = (t_w[0] + bias[0], t_w[1] + bias[1], t_w[2] - pelvis_drop + bias[2])
             if b in deltas:
                 q_w = _qmul(deltas[b], q_w)
             if (b in deltas or b == "pelvis") and p is not None:
                 tp, qp = new_w[p]
                 iq = _qinv(qp)
-                d = (t_w[0] - tp[0], t_w[1] - tp[1], t_w[2] - tp[2])
+                tk = (t_w[0] - bias[0], t_w[1] - bias[1], t_w[2] - bias[2]) if b == "pelvis" else t_w
+                d = (tk[0] - tp[0], tk[1] - tp[1], tk[2] - tp[2])
                 new_l[b] = (_qrot(iq, d), _qmul(iq, q_w))
             new_w[b] = (t_w, q_w)
         return new_w, new_l
 
     new_w, new_l = solve(deltas)
-    ARM_TARGETS = {"clasp": {"hand": (3.0, 18.0, -21.0), "elbow_z": -31.0, "elbow_x": 19.0},  # hands under the chin, cage visible
-                   # pass 60: (22, 46, -32) left the left wrist below the frame and the right hand a sliver at the corner
-                   "player": {"hand": tuple(float(v) for v in os.environ.get("TC_PLAYER_HAND", "19,58,-32").split(",")),
-                              "elbow_z": -36.0, "elbow_x": 22.0}}  # pass 63: elbows may lift off the table (out of view) for reach  # in reach (60 cm forward gave IK error 174/561)  # head sits ~34 cm over the table
     if pose_name in ARM_TARGETS and all(b in new_w for b in ("upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r")):
         # Search the arm rotations instead of guessing them: elbows on the table, hands meeting in front of the chin.
         head = new_w["head"][0]
-        table_z = float(os.environ.get("TC_TABLE_Z", 80.0))
         def chain(side, ux, uz, lx, lz):
             dl = dict(deltas)
             dl[f"upperarm_{side}"] = _qmul(_axis(Z, uz), _axis(X, ux))
@@ -1228,7 +1389,7 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             # model maps component c -> world (P.x + c.y, P.y - c.x, P.z + c.z) with P below (yaw -90).
             top = SEAT["top"]
             ex, _, ez = SEAT["eye"]
-            P = (ex - (head[1] + 9.0), head[0], ez - (head[2] + 8.0))
+            P = (ex - (head[1] + PLAYER_EYE_AHEAD), head[0], ez - (head[2] + 8.0))
             to_world = lambda c: (P[0] + c[1], P[1] - c[0], P[2] + c[2])
             to_comp_dir = lambda d: (-d[1], d[0], d[2])
             rest = PLAYER_REST
@@ -1239,6 +1400,8 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
             target = (head[0] + sign * tg["hand"][0], head[1] + tg["hand"][1], head[2] + tg["hand"][2])
             elbow_z = head[2] + tg["elbow_z"]  # elbows on the table: the table top is ~31 cm under the seated head
             elbow_x, w_hand, w_ez, w_ex = tg["elbow_x"], 1.0, 0.5, 0.3
+            if pose_name == "clasp":
+                w_hand = 4.0  # the steeple needs both wrists where asked (C4 log: right hand 6 cm off, error 35)
             if player:
                 # component x = P.y - world y: this side's wrist at world y = -sign * |y|
                 target = (head[0] + sign * rest["wrist_y"], rest["wrist_x"] - P[0], top + rest["wrist_z"] - P[2])
@@ -1264,26 +1427,28 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
                             err = score(ux, uz, lx, lz)
                             if score_best is None or err < score_best:
                                 score_best, best[side] = err, (ux, uz, lx, lz)
-            if player:  # refine around the coarse optimum (the 8-10 deg grid left the wrist 2-3 cm off its target)
-                for step in (3, 1):
-                    b0 = best[side]
-                    for dux in range(-3, 4):
-                        for duz in range(-3, 4):
-                            for dlx in range(-3, 4):
-                                for dlz in range(-3, 4):
-                                    cand = (b0[0] + dux * step, b0[1] + duz * step, b0[2] + dlx * step, b0[3] + dlz * step)
-                                    err = score(*cand)
-                                    if err < score_best:
-                                        score_best, best[side] = err, cand
-            log(pose_name, side, "best", best[side], "error", round(score_best, 1), "target", [round(v, 1) for v in target])
+            for step in (3, 1):  # refine around the coarse optimum (the 8-10 deg grid left the wrist 2-3 cm off its target)
+                b0 = best[side]
+                for dux in range(-3, 4):
+                    for duz in range(-3, 4):
+                        for dlx in range(-3, 4):
+                            for dlz in range(-3, 4):
+                                cand = (b0[0] + dux * step, b0[1] + duz * step, b0[2] + dlx * step, b0[3] + dlz * step)
+                                err = score(*cand)
+                                if err < score_best:
+                                    score_best, best[side] = err, cand
+            hand_at = chain(side, *best[side])[f"hand_{side}"][0]
+            log(pose_name, side, "best", best[side], "error", round(score_best, 1), "target", [round(v, 1) for v in target],
+                "wrist off by", round(_vlen(_vsub(hand_at, target)), 1))
         for side in ("l", "r"):
             ux, uz, lx, lz = best[side]
             deltas[f"upperarm_{side}"] = _qmul(_axis(Z, uz), _axis(X, ux))
             deltas[f"lowerarm_{side}"] = _qmul(_axis(Z, lz), _axis(X, lx))
         new_w, new_l = solve(deltas)
         if player:
-            # Lay each hand flat: fingers forward (slightly inward), index towards the board's centre line, the knuckles
-            # rest["mcp_z"] over whatever lies under them (wrist extension instead of the forearm's downward line).
+            # Lay each hand on the table: fingers forward and inward by rest["yaw"], the knuckles rest["mcp_z"] over
+            # whatever lies under them (wrist extension instead of the forearm's downward line), the thumb side raised
+            # by rest["roll"] (a relaxed hand rests on its outer edge a little, it is not pressed flat).
             for it in range(2):
                 for side in ("l", "r"):
                     sgn = 1.0 if new_w[f"upperarm_{side}"][0][0] > head[0] else -1.0  # +1: this hand at world -y
@@ -1298,16 +1463,42 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
                     # medial (towards the board centre line) is world +y for the hand at -y
                     fx, fy = math.cos(yaw), sgn * math.sin(yaw)
                     mw = (hw[0] + fx * hl, hw[1] + fy * hl)
-                    drop = hw[2] - (top + board_surface(*mw)[0] + rest["mcp_z"])
+                    drop = hw[2] - (top + _surface_under(mw, 1.5)[0] + rest["mcp_z"])
                     pitch = math.asin(max(-0.7, min(0.7, drop / hl)))
-                    D = to_comp_dir((fx * math.cos(pitch), fy * math.cos(pitch), -math.sin(pitch)))
-                    T = to_comp_dir((-math.sin(yaw), sgn * math.cos(yaw), 0.0))
+                    Dw = (fx * math.cos(pitch), fy * math.cos(pitch), -math.sin(pitch))
+                    Tw = (-math.sin(yaw), sgn * math.cos(yaw), 0.0)
+                    Uw = _vnorm(_vcross(Tw, Dw))  # up, square to the fingers
+                    Uw = Uw if Uw[2] > 0 else (-Uw[0], -Uw[1], -Uw[2])
+                    roll = math.radians(rest["roll"])
+                    Tw = _vadd(tuple(c * math.cos(roll) for c in Tw), Uw, math.sin(roll))
+                    Dc, Tc = to_comp_dir(Dw), to_comp_dir(Tw)
                     F = _vnorm(_vsub(m1, h))
                     S = _vsub(new_w[f"index_01_{side}"][0], new_w[f"pinky_01_{side}"][0])
-                    R = _qmul(_quat_from_axes(D, T), _qinv(_quat_from_axes(F, S)))
+                    R = _qmul(_quat_from_axes(Dc, Tc), _qinv(_quat_from_axes(F, S)))
                     deltas[hb] = _qmul(R, deltas.get(hb, (0.0, 0.0, 0.0, 1.0)))
                 new_w, new_l = solve(deltas)
-            # fingers and thumb: pads on the frame/table, joints never below the surface
+            for side in ("l", "r"):
+                hb = f"hand_{side}"
+                if f"middle_01_{side}" not in new_w:
+                    continue
+                F = _vnorm(_vsub(new_w[f"middle_01_{side}"][0], new_w[hb][0]))
+                S = _vsub(new_w[f"index_01_{side}"][0], new_w[f"pinky_01_{side}"][0])
+                N = _vnorm(_vcross(F, S))
+                N = N if N[2] < 0 else (-N[0], -N[1], -N[2])  # out of the palm: down
+                # close the reference pose's splay: index, ring and pinky turn towards the middle finger about the palm
+                # normal by PLAYER_SPREAD of their angle to it (straight splayed fingers read as a paddle, Phase A)
+                if f"middle_02_{side}" not in new_w:
+                    continue
+                md = _vnorm(_vsub(new_w[f"middle_02_{side}"][0], new_w[f"middle_01_{side}"][0]))
+                for f in ("index", "ring", "pinky"):
+                    b1, b2 = f"{f}_01_{side}", f"{f}_02_{side}"
+                    if b1 not in new_w or b2 not in new_w:
+                        continue
+                    fd = _vnorm(_vsub(new_w[b2][0], new_w[b1][0]))
+                    ang = math.degrees(math.atan2(sum(a * b for a, b in zip(_vcross(fd, md), N)), sum(a * b for a, b in zip(fd, md))))
+                    deltas[b1] = _qmul(_axis(N, PLAYER_SPREAD * ang), deltas.get(b1, (0.0, 0.0, 0.0, 1.0)))
+            new_w, new_l = solve(deltas)
+            # fingers and thumb: relaxed curl, pads on the frame/table, nothing below a surface
             for side in ("l", "r"):
                 hb = f"hand_{side}"
                 if f"middle_01_{side}" not in new_w:
@@ -1320,52 +1511,232 @@ def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, p
                     bs = [f"{f}_0{k}_{side}" for k in (1, 2, 3)]
                     if not all(b in new_w for b in bs):
                         continue
-                    L, a, b, c = _finger_rest(*(new_w[b][0] for b in bs), N, to_world, top)
+                    L, a, b, c = _finger_rest(*(new_w[b][0] for b in bs), N, to_world, top, f, F, new_w[bs[2]][1])
                     for bone, ang in zip(bs, (a, b, c)):
                         deltas[bone] = _qmul(_axis(L, ang), deltas.get(bone, (0.0, 0.0, 0.0, 1.0)))
                     log("player finger", side, f, "curl", a, b, c)
             new_w, new_l = solve(deltas)
-            # predicted contact in world space (compare with capture -TCProbe=Player)
+            # predicted contact in world space (compare with capture -TCProbe=Player): joints and the estimated tip
             for side in ("l", "r"):
                 for b in (f"hand_{side}", f"index_03_{side}", f"middle_03_{side}", f"ring_03_{side}", f"pinky_03_{side}", f"thumb_03_{side}"):
                     if b in new_w:
                         w = to_world(new_w[b][0])
                         z0, what = board_surface(w[0], w[1])
-                        log("player rest", b, "world", [round(v, 1) for v in w], "over", what, "by", round(w[2] - top - z0, 1))
-        SEATED[f"{pose_name}_hands"] ={s_: (new_w[f"hand_{s_}"][0], new_w[f"lowerarm_{s_}"][0]) for s_ in ("l", "r")}
+                        msg = ["player rest", b, "world", [round(v, 1) for v in w], "over", what, "by", round(w[2] - top - z0, 1)]
+                        if b.endswith(("_03_l", "_03_r")) and parent.get(b) in new_w:
+                            tip = to_world(_finger_tip(new_w, parent[b], b))
+                            zt, wt = board_surface(tip[0], tip[1])
+                            msg += ["tip", [round(v, 1) for v in tip], "over", wt, "by", round(tip[2] - top - zt, 1)]
+                        log(*msg)
+        if pose_name == "clasp" and all(f"middle_01_{s}" in new_w for s in ("l", "r")):
+            # Steepled hands in front of the face (reference: hands clasped before the mouth). Each hand: fingers up,
+            # tilted forward by fwd (away from the cage) and towards the midline by tent; palm facing the other hand.
+            mid_x = 0.5 * (new_w["hand_l"][0][0] + new_w["hand_r"][0][0])
+            tent, fwd = math.radians(CLASP_HANDS["tent"]), math.radians(CLASP_HANDS["fwd"])
+            for it in range(2):
+                for side in ("l", "r"):
+                    hb = f"hand_{side}"
+                    h = new_w[hb][0]
+                    ss = 1.0 if h[0] > mid_x else -1.0
+                    F = _vnorm(_vsub(new_w[f"middle_01_{side}"][0], h))
+                    S = _vsub(new_w[f"index_01_{side}"][0], new_w[f"pinky_01_{side}"][0])
+                    N = _vnorm(_vcross(F, S))
+                    # the palm side: the thumb's base lies in front of the knuckle line, on the palm side
+                    pal = 1.0 if sum(a * b for a, b in zip(_vsub(new_w[f"thumb_02_{side}"][0], new_w[f"index_01_{side}"][0]), N)) > 0 else -1.0
+                    Dt = _vnorm((-ss * math.sin(tent), math.sin(fwd) * math.cos(tent), math.cos(fwd) * math.cos(tent)))
+                    # S target: thumbs towards the face (-y) if that turns the palm to the other hand, else away
+                    Tt = (0.0, -1.0, 0.0)
+                    Ncand = _vcross(Dt, Tt)
+                    if pal * Ncand[0] * -ss < 0:
+                        Tt = (0.0, 1.0, 0.0)
+                    R = _qmul(_quat_from_axes(Dt, Tt), _qinv(_quat_from_axes(F, S)))
+                    deltas[hb] = _qmul(R, deltas.get(hb, (0.0, 0.0, 0.0, 1.0)))
+                    if it == 1:
+                        log("clasp hand", side, "thumbs", "to the face" if Tt[1] < 0 else "away from the face")
+                new_w, new_l = solve(deltas)
+            for side in ("l", "r"):
+                h = new_w[f"hand_{side}"][0]
+                ss = 1.0 if h[0] > mid_x else -1.0
+                F = _vnorm(_vsub(new_w[f"middle_01_{side}"][0], h))
+                S = _vsub(new_w[f"index_01_{side}"][0], new_w[f"pinky_01_{side}"][0])
+                N = _vnorm(_vcross(F, S))
+                Np = N if N[0] * -ss > 0 else (-N[0], -N[1], -N[2])  # towards the other hand
+                for f in ("thumb", "index", "middle", "ring", "pinky"):
+                    bs = [f"{f}_0{k}_{side}" for k in (1, 2, 3)]
+                    if not all(b in new_w for b in bs):
+                        continue
+                    L, a, b, c = _steeple_finger(*(new_w[b][0] for b in bs), Np, mid_x, ss, f)
+                    for bone, ang in zip(bs, (a, b, c)):
+                        deltas[bone] = _qmul(_axis(L, ang), deltas.get(bone, (0.0, 0.0, 0.0, 1.0)))
+                    log("clasp finger", side, f, "curl", a, b, c)
+            new_w, new_l = solve(deltas)
+            # checks: every finger joint on its own side of the midline, and clear of the cage mask
+            gaps = []
+            for side in ("l", "r"):
+                ss = 1.0 if new_w[f"hand_{side}"][0][0] > mid_x else -1.0
+                gaps += [ss * (new_w[b][0][0] - mid_x) for b in new_w if b.endswith(f"_{side}") and b.startswith(
+                    ("thumb_", "index_", "middle_", "ring_", "pinky_"))]
+            th, qh = new_w["head"]
+            (cx, cy, cz), (rx, ry, rz) = CAGE_ELLIPSOID
+            def cage_clear(p):
+                # head bone frame at the seated pose (the cage is attached with head_relative: it follows the head bone)
+                q0 = SEATED_IDLE_HEAD.get("q0") or qh
+                tilt = _qmul(qh, _qinv(q0))
+                v = _qrot(_qinv(tilt), _vsub(p, th))
+                d = math.sqrt(((v[0] - cx) / rx) ** 2 + ((v[1] - cy) / ry) ** 2 + ((v[2] - cz) / rz) ** 2)
+                return (d - 1.0) * min(rx, ry, rz)
+            cage = min(cage_clear(new_w[b][0]) for b in new_w if b.startswith(("hand_", "thumb_", "index_", "middle_", "ring_", "pinky_"))
+                       and b.endswith(("_l", "_r")))
+            log("clasp check: min finger-joint distance from the midline", round(min(gaps), 2), "cm; min hand clearance from the cage",
+                round(cage, 1), "cm (approx.)")
+        SEATED[f"{pose_name}_hands"] = {s_: (new_w[f"hand_{s_}"][0], new_w[f"lowerarm_{s_}"][0]) for s_ in ("l", "r")}
         for s_ in ("l", "r"):  # arm bone transforms, for props aimed along the arm (player hand options, sleeves)
             SEATED[f"{pose_name}:lowerarm_{s_}"] = new_w[f"lowerarm_{s_}"]
             SEATED[f"{pose_name}:upperarm_{s_}"] = new_w[f"upperarm_{s_}"]
         log(pose_name, "hands", [round(v, 1) for v in new_w["hand_l"][0]], [round(v, 1) for v in new_w["hand_r"][0]],
             "elbows", [round(v, 1) for v in new_w["lowerarm_l"][0]], [round(v, 1) for v in new_w["lowerarm_r"][0]])
+    return {"new_w": new_w, "new_l": new_l, "deltas": deltas, "solve": solve, "order": order, "parent": parent}
 
-    # head in the seated pose (component space) and its idle orientation, for props attached to the head bone
-    SEATED["head"] = (new_w["head"][0], new_w["head"][1], wld["head"][1])
-    for b_ in ("spine_03", "spine_05", "pelvis"):
-        if b_ in new_w:
-            SEATED[b_] = (new_w[b_][0], new_w[b_][1], wld[b_][1])
 
+SEATED_IDLE_HEAD = {}  # the idle's head orientation (q0) while solving; the cage check needs the same tilt as head_relative
+
+
+_TRACKED = set()
+
+
+def _new_sequence(skel_mesh, dest, name):
     path = f"{dest}/{name}"
+    _TRACKED.discard(path)
     if EAL.does_asset_exist(path):
         EAL.delete_asset(path)
     f = unreal.AnimSequenceFactory()
     f.set_editor_property("target_skeleton", skel_mesh.get_editor_property("skeleton"))
     f.set_editor_property("preview_skeletal_mesh", skel_mesh)
-    seq = AT.create_asset(name, dest, unreal.AnimSequence, f)
+    return AT.create_asset(name, dest, unreal.AnimSequence, f)
+
+
+def _key_sequence(seq, D, S, frames):
+    """Key the solved pose; with frames > 1 a seamless breathing loop (the last key repeats the first). Rotations come
+    from the solver; translations are the skeleton's reference (D["key_t"]), except the dropped pelvis."""
+    names, key_t = D["names"], D["key_t"]
+    keys = []
+    for f in range(frames):
+        if f == 0:
+            keys.append(S["new_l"])
+        else:
+            keys.append(S["solve"](_idle_deltas(S["deltas"], f, frames, S["order"], S["parent"]))[1])
+    keys.append(keys[0])
     ctrl = seq.controller
     ctrl.open_bracket(unreal.Text("TC seated pose"), False)
-    ctrl.set_frame_rate(unreal.FrameRate(30, 1), False)
-    ctrl.set_number_of_frames(unreal.FrameNumber(1), False)
+    ctrl.set_frame_rate(unreal.FrameRate(IDLE_FPS, 1), False)
+    ctrl.set_number_of_frames(unreal.FrameNumber(frames), False)
+    sv = unreal.Vector(1, 1, 1)
+    key = seq.get_path_name().split(".")[0]
+    first = key not in _TRACKED  # the closed loop keys the same sequence again: add each track once
+    _TRACKED.add(key)
     for b in names:
-        t, q = new_l[b]
-        tv = unreal.Vector(*t)
-        qv = unreal.Quat(*q)
-        sv = unreal.Vector(1, 1, 1)
-        ctrl.add_bone_curve(b, False) if not hasattr(ctrl, "add_bone_track") else ctrl.add_bone_track(b, False)
-        ctrl.set_bone_track_keys(b, [tv, tv], [qv, qv], [sv, sv], False)
+        if first:
+            ctrl.add_bone_curve(b, False) if not hasattr(ctrl, "add_bone_track") else ctrl.add_bone_track(b, False)
+        tk = [unreal.Vector(*(k[b][0] if b == "pelvis" else key_t[b])) for k in keys]
+        ctrl.set_bone_track_keys(b, tk, [unreal.Quat(*k[b][1]) for k in keys], [sv] * len(keys), False)
     ctrl.close_bracket(False)
+
+
+def _evaluate_on_mesh(seq, skel_mesh, names):
+    """The authored sequence evaluated on the target mesh as the game plays it (the skeleton's translation retargeting
+    applied): bone -> ((local t, q), (component t, q)). None if this engine's Python cannot do it."""
+    try:
+        opts = unreal.AnimPoseEvaluationOptions()
+        opts.set_editor_property("optional_skeletal_mesh", skel_mesh)
+        try:
+            opts.set_editor_property("should_retarget", True)
+        except Exception:
+            pass
+        pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(seq, 0.0, opts)
+        have = {str(n) for n in unreal.AnimPoseExtensions.get_bone_names(pose)}
+        return {b: (_xf(unreal.AnimPoseExtensions.get_bone_pose(pose, b, unreal.AnimPoseSpaces.LOCAL)),
+                    _xf(unreal.AnimPoseExtensions.get_bone_pose(pose, b, unreal.AnimPoseSpaces.WORLD))) for b in names if b in have}
+    except Exception:
+        log("WARNING pose evaluation on the mesh failed\n" + traceback.format_exc())
+        return None
+
+
+POSE_CHECK_BONES = ("pelvis", "head", "lowerarm_l", "lowerarm_r", "hand_l", "hand_r", "index_03_l", "middle_03_l", "pinky_03_l",
+                    "thumb_03_l", "index_03_r", "middle_03_r", "pinky_03_r", "thumb_03_r")
+
+
+def build_seated_pose(skel_mesh, base_anim, dest, name, own_proportions=False, pose_name="rest"):
+    """Authors a seated pose for the UE5 mannequin / MetaHuman body (one frame, or a breathing loop for IDLE_POSES).
+
+    Starts from MM_Idle frame 0, infers the bone hierarchy from local vs component transforms, applies
+    component-space rotations (mannequin faces +Y, up is +Z), re-derives local transforms and keys them into a new
+    AnimSequence. Deltas are about the component X axis: +90 swings a hanging limb forward.
+
+    C5 closed loop (own_proportions): the solver's bone lengths came from the skeleton's reference pose, but the game
+    plays the sequence on the mesh with the skeleton's translation retargeting: every keyed translation is scaled to the
+    mesh (C1 probe: forearm 25.9 cm at runtime against 23.0 in the solver, fingertips 6-9 cm further forward than
+    predicted, the body 15-18 cm higher). Pass 0 keys the reference translations and evaluates the sequence on the mesh
+    (the editor evaluation matched the game's probe within 0.1 cm on every probed bone, C5 s1); the solver then takes the
+    evaluated lengths and pelvis offset as its model (the keys stay at the reference) and solves again; the residual
+    between model and evaluation is logged."""
+    D = _pose_inputs(skel_mesh, base_anim, own_proportions, pose_name)
+    SEATED_IDLE_HEAD["q0"] = D["wld"]["head"][1] if "head" in D["wld"] else None
+    seq = _new_sequence(skel_mesh, dest, name)
+    frames = max(1, int(round(IDLE_SECONDS * IDLE_FPS))) if pose_name in IDLE_POSES and IDLE_AMP > 0 else 1
+    loop = own_proportions and os.environ.get("TC_POSE_LOOP", "1") == "1"
+    passes = int(os.environ.get("TC_POSE_PASSES", 3)) if loop else 1
+    ev, res = None, {}
+    for it in range(passes):
+        S = solve_seated_pose(D, pose_name)
+        _key_sequence(seq, D, S, 1)
+        if not loop:
+            break
+        ev = _evaluate_on_mesh(seq, skel_mesh, D["names"])
+        if not ev:
+            break
+        res = {b: _vlen(_vsub(S["new_w"][b][0], ev[b][1][0])) for b in POSE_CHECK_BONES if b in ev and b in S["new_w"]}
+        rot = max((_angle_deg(S["new_l"][b][1], ev[b][0][1]) for b in D["names"] if b in ev), default=0.0)
+        log("pose loop", name, "pass", it, "model vs evaluated (cm):", {k: round(v, 2) for k, v in res.items()},
+            "max local rotation diff", round(rot, 2), "deg")
+        if (max(res.values()) if res else 0.0) < 0.3 or it == passes - 1:
+            break
+        # the model takes the evaluated bone lengths (all but the pelvis) and the pelvis offset; the keys do not change,
+        # so the evaluated lengths do not either and the next pass only has to follow the pelvis
+        for b in D["names"]:
+            if b in ev and b != "pelvis" and D["parent"].get(b):
+                D["loc"][b] = (ev[b][0][0], D["loc"][b][1])
+        if "pelvis" in ev:
+            pb = D["pelvis_bias"]
+            dp = _vsub(ev["pelvis"][1][0], S["new_w"]["pelvis"][0])
+            D["pelvis_bias"] = (pb[0] + dp[0], pb[1] + dp[1], pb[2] + dp[2])
+            log("pose loop", name, "pelvis bias", [round(v, 2) for v in D["pelvis_bias"]])
+    if frames > 1:
+        _key_sequence(seq, D, S, frames)
+    if res and max(res.values()) >= 0.5:
+        log("WARNING pose loop", name, "did not converge: worst", round(max(res.values()), 2), "cm")
+    SEATED[f"{pose_name}:calibrated"] = bool(ev) and bool(res) and max(res.values()) < 0.5
+    new_w = S["new_w"]
+    dump = os.environ.get("TC_POSE_DUMP")
+    if dump:
+        try:
+            import json
+            os.makedirs(dump, exist_ok=True)
+            with open(os.path.join(dump, f"{name}.json"), "w") as fh:
+                json.dump({"pose": pose_name, "names": D["names"], "parent": D["parent"], "order": D["order"],
+                           "loc": D["loc"], "wld": D["wld"], "pelvis_bias": D["pelvis_bias"], "seat": SEAT,
+                           "model": {b: new_w[b] for b in new_w},
+                           "evaluated": {b: ev[b][1] for b in ev} if ev else None}, fh)
+            log("pose dump", os.path.join(dump, f"{name}.json"))
+        except Exception:
+            log("WARNING pose dump failed\n" + traceback.format_exc())
+
+    # head in the seated pose (component space) and its idle orientation, for props attached to the head bone
+    SEATED["head"] = (new_w["head"][0], new_w["head"][1], D["wld"]["head"][1])
+    for b_ in ("spine_03", "spine_05", "pelvis"):
+        if b_ in new_w:
+            SEATED[b_] = (new_w[b_][0], new_w[b_][1], D["wld"][b_][1])
     EAL.save_loaded_asset(seq)
-    log("seated pose", path, len(names), "bones; pelvis", new_w.get("pelvis", ((0, 0, 0),))[0],
+    log("seated pose", f"{dest}/{name}", len(D["names"]), "bones,", frames, "frames; pelvis", new_w.get("pelvis", ((0, 0, 0),))[0],
         "head", new_w.get("head", ((0, 0, 0),))[0], "hand_l", new_w.get("hand_l", ((0, 0, 0),))[0])
     return seq
 
@@ -2166,10 +2537,11 @@ def build():
         probe = unreal.load_asset(f"{MH_ROOT}/{mhn}/Body/SKM_{mhn}_BodyMesh")
         build_seated_pose(probe, idle, f"{ROOT}/Anims", "A_TC_Probe_player", own_proportions=True, pose_name="player")
         hx, hy, hz = SEATED["head"][0]
-        # component +Y (forward) -> world +X with yaw -90; eyes 9 cm before and 8 cm over the head bone; lowered by the
+        # component +Y (forward) -> world +X with yaw -90; eyes PLAYER_EYE_AHEAD cm before and 8 cm over the head bone; lowered by the
         # measured runtime offset (PLAYER_Z_FIX) so the solver's table-space hand targets hold in the game
         ex, _, ez = SEAT["eye"]
-        ploc = (ex - (hy + 9.0), hx, ez - (hz + 8.0) - PLAYER_Z_FIX)
+        zfix = PLAYER_Z_FIX if (SEATED.get("player:calibrated") is not True or "TC_PLAYER_ZFIX" in os.environ) else 0.0
+        ploc = (ex - (hy + PLAYER_EYE_AHEAD), hx, ez - (hz + 8.0) - zfix)
         pb, _ = spawn_opponent("player", mhn, outfit_mi=mi_gown_early, pose="player", loc=ploc, yaw=-90.0, with_face=False,
                                group_tag="TC_PlayerBody")
         if pb:
@@ -2184,18 +2556,26 @@ def build():
             hd = hand_decal_materials() if os.environ.get("TC_HAND_DECALS", "0") == "1" else None
             hands = SEATED.get("player_hands")
             if hd and hands:
+                # C5: these were spawned with unreal.Rotator(-90, yaw, 0) = (roll, pitch, yaw) in UE Python, i.e. roll -90
+                # and the yaw as a pitch: they projected sideways (the C4 finding for the table decals). Now pitch -90
+                # (straight down) with the forearm's yaw; decal_size is a half extent (depth, across, along the hand). The
+                # box was also centred 8 cm over the wrist bone, above the hand, so it reached no skin; it now spans the
+                # back of the hand (~2.5 cm over the wrist bone at the knuckles' side). And spawn_opponent sets
+                # receives_decals False on every body (table blood must not land on the arms), so with decals on the
+                # player's body has to receive them.
+                setp(pb.skeletal_mesh_component, "receives_decals", True)
                 for side, (hand, elbow) in hands.items():
-                    # component -> world for yaw -90: (x, y) -> (y, -x); the back of the hand is ~6 cm past the wrist
+                    # component -> world for yaw -90: (x, y) -> (y, -x); the back of the hand is ~5 cm past the wrist
                     w = (ploc[0] + hand[1], ploc[1] - hand[0], ploc[2] + hand[2])
                     e = (ploc[0] + elbow[1], ploc[1] - elbow[0], ploc[2] + elbow[2])
                     fx, fy = w[0] - e[0], w[1] - e[1]
                     L = max(math.hypot(fx, fy), 1e-3)
-                    c = (w[0] + fx / L * 6.0, w[1] + fy / L * 6.0, w[2] + 8.0)
+                    c = (w[0] + fx / L * 5.0, w[1] + fy / L * 5.0, w[2] + 2.5)
                     yaw = math.degrees(math.atan2(fy, fx))
                     for mat in ("M_TC_HandDirt", "M_TC_HandVeins"):
-                        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(*c), unreal.Rotator(-90, yaw, 0))
+                        dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(*c), unreal.Rotator(0, -90, yaw))
                         dec.decal.set_decal_material(hd[mat])
-                        setp(dec.decal, "decal_size", unreal.Vector(3, 5, 4))  # shallow: only the top of the hand, not the sides of the forearm
+                        setp(dec.decal, "decal_size", unreal.Vector(2.0, 4.0, 4.5))  # shallow: the back of the hand, not the palm or the table
                         dec.set_actor_label(f"HandDetail_{side}_{mat[5:]}")
                         dec.set_folder_path("Player")
                 log("hand detail decals on", sorted(hands))
@@ -2221,8 +2601,9 @@ def build():
                     loc, rot = aimed_on_bone(f"player:lowerarm_{side}", elbow, d)
                     attach_static(f"PlayerSleeve_{side}", sleeve_sm, psmc, f"lowerarm_{side}", loc, rot, "TC_PlayerOpt_sleeves")
                 if watch_sm and side == "l":
-                    # 2.5 cm up the forearm from the wrist joint (the probe put the first try 7 cm up), past the sleeve's end
-                    wrist = tuple(hand[i] - d[i] / n * 2.5 for i in range(3))
+                    # 4 cm up the forearm from the wrist joint. Pass 60 asked for 2.5, but the solver's short forearm put it ~5.4 cm up
+                    # at runtime, where the strap fits; at a true 2.5 cm (C5 calibrated model) the oval strap hung under the wrist
+                    wrist = tuple(hand[i] - d[i] / n * 4.0 for i in range(3))  # the sleeve (20 cm from the elbow) ends ~6 cm up
                     loc, rot = aimed_on_bone(f"player:lowerarm_{side}", wrist, d)
                     attach_static("PlayerWatch", watch_sm, psmc, f"lowerarm_{side}", loc, rot, "TC_PlayerOpt_watch")
             log("player hand options attached", sorted(hands))

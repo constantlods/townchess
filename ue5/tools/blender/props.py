@@ -540,6 +540,70 @@ def sleeve(name, length, r0, r1, mat, out):
     export(out)
 
 
+def player_sleeve(name="SM_PlayerSleeve", length=0.20, r0=0.05, r1=0.044, mat="M_PlayerSleeve", out="player_sleeve.obj"):
+    """The player's institutional sleeve (C5), a tube along +X from the elbow (origin) to 2.5 cm short of the watch.
+
+    The old sleeve() tube had 32 sides and only its two end rings along the length (512 vertices after subdivision), so
+    its 5-lobe "fold" ripple ran as long diagonal facets: the judge's stair-step banding (baseline V5 #4). This one is
+    dense (60 sides x 36 rings before one subdivision level), with cloth shapes instead of a ripple: soft compression
+    rings bunched towards the elbow and above the cuff (strongest on top and at the sides, fading underneath), a slack
+    sag under the forearm, a rolled cuff band with a frayed edge, the elbow end gathered into the shirt sleeve, and a
+    cylindrical UV layout (seam underneath, V along the arm) so a fabric texture runs straight along the sleeve."""
+    reset()
+    rng = random.Random(23)
+    M, R = 60, 36
+    folds = [(0.06, 0.0035, 0.025, 0.4), (0.15, 0.003, 0.03, 1.9), (0.24, 0.0026, 0.03, 3.6), (0.34, 0.002, 0.035, 0.9),
+             (0.52, 0.0012, 0.04, 2.6), (0.68, 0.0018, 0.03, 5.1), (0.79, 0.0026, 0.025, 4.2)]  # (u, depth m, width, angle)
+    def smooth(e0, e1, x):
+        t = max(0.0, min(1.0, (x - e0) / (e1 - e0)))
+        return t * t * (3 - 2 * t)
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new("UVMap")
+    rings = []
+    for i in range(R + 1):
+        u = i / R
+        row = []
+        for j in range(M):
+            a = 2 * math.pi * j / M - math.pi / 2  # j = 0 underneath (the UV seam)
+            r = r0 + (r1 - r0) * u
+            r *= 1.0 - 0.08 * math.exp(-u * 22)                       # gathered into the shirt sleeve at the elbow
+            top = 0.55 + 0.45 * math.sin(a)                           # folds strongest on top, fading underneath
+            for fu, depth, w, fa in folds:
+                ring = math.exp(-((u - fu) / w) ** 2)
+                r += depth * ring * (0.45 + 0.55 * top) * (0.75 + 0.25 * math.cos(a - fa))
+            r += 0.0012 * math.sin(3 * a + 14 * u + 0.7) * (0.5 + 0.5 * top)  # slack drape between the rings
+            sag = max(0.0, -math.sin(a)) ** 2
+            r *= 1.0 + 0.07 * sag * (0.4 + 0.6 * smooth(0.0, 0.5, u))  # the cloth hangs under the forearm
+            # rolled cuff: a raised band, then the rolled edge turning in
+            r += 0.0042 * smooth(0.855, 0.885, u) * (1.0 - smooth(0.965, 1.0, u))
+            r -= 0.0035 * smooth(0.975, 1.0, u)
+            x = u * length
+            if i == R:  # frayed, uneven edge
+                x += rng.uniform(-0.0025, 0.0015)
+            row.append(bm.verts.new((x, math.cos(a) * r, math.sin(a) * r)))
+        rings.append(row)
+    for i in range(R):
+        for j in range(M):
+            j1 = (j + 1) % M
+            f = bm.faces.new((rings[i][j], rings[i][j1], rings[i + 1][j1], rings[i + 1][j]))
+            for loop, (ii, jj) in zip(f.loops, ((i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j))):
+                loop[uvl].uv = (jj / M, ii / R)  # jj = M on the seam's far side: no stretched face across the seam
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    t = obj_from_bm(name, bm)
+    so = t.modifiers.new("solid", "SOLIDIFY")
+    so.thickness = 0.0025
+    so.offset = -1.0  # thickness inwards: the outside keeps the shaped radius
+    sub = t.modifiers.new("sub", "SUBSURF")
+    sub.levels = 1
+    apply_mods(t)
+    bpy.context.view_layer.objects.active = t
+    t.select_set(True)
+    bpy.ops.object.shade_smooth()
+    t.select_set(False)
+    material(t, mat)
+    export(out)
+
+
 def ledger():
     """Cloth-bound ledger 27 x 20 x 3 cm, oxblood cover, cream page block, ribbon marker. Origin bottom centre."""
     reset()
@@ -1143,7 +1207,7 @@ BUILDERS = {
     "clipboard": clipboard, "med_cart": med_cart, "chess_board": chess_board, "brass_bowl": brass_bowl, "restraint_straps": restraint_straps,
     "coat_sleeve": lambda: sleeve("SM_CoatSleeve", 0.29, 0.068, 0.06, "M_CoatWool", "coat_sleeve.obj"),  # fits over the upper arm
     "book_stack": book_stack, "loose_papers": loose_papers, "pill_bottle": pill_bottle, "wristwatch": wristwatch, "tape_roll": tape_roll,
-    "player_sleeve": lambda: sleeve("SM_PlayerSleeve", 0.20, 0.05, 0.044, "M_PlayerSleeve", "player_sleeve.obj"),  # over the player's forearm
+    "player_sleeve": player_sleeve,  # over the player's forearm (C5: dense cloth tube, was sleeve(..., 0.20, 0.05, 0.044))
 }
 for k, f in BUILDERS.items():
     if not WHICH or k in WHICH:
