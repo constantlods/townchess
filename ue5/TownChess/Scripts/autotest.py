@@ -42,7 +42,9 @@ def arg(name, default=""):
 TEST = arg("TCTest", "cpu")
 OUT = arg("TCOut", "/tmp/tctest")
 MOVES = [m for m in arg("TCMoves", "").split(",") if m]
-MAX_PLIES = int(arg("TCMaxPlies", "300"))
+# a hang guard, not a rule: novice-vs-novice games legally run long (a C5 cpu run reached 307 plies with every sync check
+# passing; GameCore ends any game by the automatic 75-move/fivefold draws), so the budget leaves room for that
+MAX_PLIES = int(arg("TCMaxPlies", "600"))
 ACCEPT_DRAW = arg("TCAcceptDraw", "") == "1"
 KILL_AT_PLY = int(arg("TCKillAtPly", "0"))  # simulate a hard crash (SIGKILL) once the game reaches this ply
 IDLE_AFTER_PLY = int(arg("TCIdleAfterPly", "0"))  # stop moving from this ply on (clock / flag-fall test)
