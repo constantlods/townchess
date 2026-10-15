@@ -115,7 +115,9 @@ permission rule; until then local work runs only through Houtini/Ollama calls th
 | C2 lighting (lamp shadows only, lamp key, haze, grade) | rendering architect | done, lead-reviewed: C2.2 rejected for white-piece readability (white median 11.6), fixed in C2.3 with a shadowless table bounce (white 74.8, white/black 17.8) | C2-*.jpg, C2-lighting.json; GPU 11.57 -> 8.42 ms (editor, 1440p auto); packaged offscreen 116.1 / 96.3 fps |
 | C3 materials (crease dirt, jacket fix, wood pieces, bed/cart scans, detail layer) | materials | done, lead-reviewed; judge pending | C3-*.jpg, C3-materials.json; tests cpu 78/78, drag 8/8 |
 | D1 screen percentage per tier | lead | coded (Cinematic 100, Epic 83, High 67, Medium 58, Low 50; `-tcscreenpct=`); packaged benchmark pending | TCGame.cpp ApplyQualityPreset |
-| C4 board/props/room V5 defects | board/environment | started | |
+| C4 board/props/room V5 defects | board/environment | done b2f8380 except rook specks (Lumen/TSR noise, needs RA) and lamp head (faces the camera; C4.1 running); V1 in bounds both seats (main 29.6/95.3/1.472/1.699, Black 27.6/89.2/1.485/1.698), detail 9.56; cpu 220/220, drag 8/8 | C4-*.jpg, C4-board-env.json |
+| D1 verified | lead | Epic 83%: packaged offscreen 82.3 / 71.7 fps | PERFORMANCE_BENCHMARKS.md |
+| Hands round 2 (fingertips into the frame, hand decal Rotator bug found in C4, nails, sleeves) | hands/character | queued after C4.1 | |
 
 Open after C2/C3: V2 detail (C3 metric 9.47 on the new recipe, lower than C2 because the white bed grids were background detail);
 Black seat r/g 1.514 (V1 limit 1.50); pieces have no cavity bake; skin roughness not driven by dirt; lamp source not visible.
