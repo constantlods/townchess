@@ -484,13 +484,15 @@ def paper_material(form_tex=None):
     t.set_editor_property("parameter_name", "Sheet")
     t.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
     base = t
+    # C8b (judge run 6 V5 #7, header printed twice "WARD - BATIENTRECORD"): the fixed-mip sample was not honoured, so the
+    # form's full-resolution text multiplied the record and its typed header landed under the record's own "WARD B".
+    # form_tex is now a text-free copy of the stock (the form capped at 64 px on import: toning and stains only).
     if form_tex:
         f = MEL.create_material_expression(m, unreal.MaterialExpressionTextureSample, -600, -250)
         f.set_editor_property("texture", form_tex)
-        if setp(f, "mip_value_mode", unreal.TextureMipValueMode.TMVM_MIP_LEVEL) and setp(f, "const_mip_value", 5):
-            base = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -380, -100)
-            MEL.connect_material_expressions(t, "RGB", base, "A")
-            MEL.connect_material_expressions(f, "RGB", base, "B")
+        base = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -380, -100)
+        MEL.connect_material_expressions(t, "RGB", base, "A")
+        MEL.connect_material_expressions(f, "RGB", base, "B")
     MEL.connect_material_property(base, "RGB" if base is t else "", unreal.MaterialProperty.MP_BASE_COLOR)
     k = MEL.create_material_expression(m, unreal.MaterialExpressionMultiply, -300, 200)
     MEL.connect_material_expressions(t, "RGB", k, "A")
@@ -2216,33 +2218,80 @@ def build():
     # C4.1: worn metal: more metallic and smoother so the dome takes highlights from the lamp's own bulb light
     mi_enamel = surface_material(master, "rusty_metal_02", name="MI_LampEnamel", tiling=1.5, metal=0.75, tint=(0.2, 0.21, 0.16), rough=0.5,
                                  grime_color=(1.8, 1.2, 0.7), scalars={"GrimeTiling": 2.5, "GrimeThreshold": 0.62, "GrimeContrast": 2.5, "MicroRough": 0.15})
-    # inside of the shade and its rolled rim (C4.1: only a sliver of either shows from the seat now): (1 - fresnel)^2
-    # fall-off (C4: with the mouth facing the seat a flat 30 read as a grey disc, 200 as a cream one)
-    inner_mat = emissive_material("M_TC_LampInner", (1.0, 0.9, 0.8), float(os.environ.get("TC_LAMP_INNER", 160.0)))
+    # inside of the shade (C8b, judge run 6 V5 #6: "the mouth is a flat pale grey band that reads as unlit plastic").
+    # The (1 - fresnel)^2 emissive of C4/C4.1 was one flat value over the inner face and the rolled rim. Now a lit,
+    # glossy cream enamel (Lumen reflects the lit table and board into it) plus a hot core: emission falls off with
+    # the distance from the bulb in the mesh's own space (props.py desk_lamp_head: bulb centre at local
+    # (23.7, 0.06, 36.45) cm; the inner face lies 4.9 cm (apex) to 9.4 cm (mouth) from it), broken up by the grime
+    # mask so it reads as stained enamel. The rim takes the worn brass (MI_Brass) and catches the key light.
+    LAMP_INNER = float(os.environ.get("TC_LAMP_INNER", 60.0))
+    inner_mat = None
     try:
-        fr = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionFresnel, -700, 200)
-        fr.set_editor_property("exponent", 1.5)
-        fr.set_editor_property("base_reflect_fraction", 0.0)
-        om = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionOneMinus, -560, 200)
-        MEL.connect_material_expressions(fr, "", om, "")
-        sq = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionMultiply, -420, 200)
-        MEL.connect_material_expressions(om, "", sq, "A")
-        MEL.connect_material_expressions(om, "", sq, "B")
-        k = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionConstant3Vector, -560, 0)
-        k.set_editor_property("constant", unreal.LinearColor(*(c * float(os.environ.get("TC_LAMP_INNER", 160.0)) for c in (1.0, 0.9, 0.8)), 1))
-        mul = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionMultiply, -300, 100)
-        MEL.connect_material_expressions(k, "", mul, "A")
-        MEL.connect_material_expressions(sq, "", mul, "B")
-        MEL.connect_material_property(mul, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        path = f"{ROOT}/Materials/M_TC_LampInner"
+        if EAL.does_asset_exist(path):
+            EAL.delete_asset(path)
+        inner_mat = AT.create_asset("M_TC_LampInner", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+        E = lambda cls, x, y: MEL.create_material_expression(inner_mat, cls, x, y)
+        lp = E(unreal.MaterialExpressionLocalPosition, -1300, 200)
+        bc = E(unreal.MaterialExpressionConstant3Vector, -1300, 350)
+        bc.set_editor_property("constant", unreal.LinearColor(23.7, 0.06, 36.45, 1))
+        dist = E(unreal.MaterialExpressionDistance, -1150, 250)
+        MEL.connect_material_expressions(lp, "", dist, "A")
+        MEL.connect_material_expressions(bc, "", dist, "B")
+        sub = E(unreal.MaterialExpressionSubtract, -1020, 250); sub.set_editor_property("const_b", 5.0)
+        MEL.connect_material_expressions(dist, "", sub, "A")
+        sc = E(unreal.MaterialExpressionMultiply, -900, 250); sc.set_editor_property("const_b", 1.0 / 4.6)
+        MEL.connect_material_expressions(sub, "", sc, "A")
+        sat = E(unreal.MaterialExpressionSaturate, -780, 250)
+        MEL.connect_material_expressions(sc, "", sat, "")
+        om = E(unreal.MaterialExpressionOneMinus, -660, 250)
+        MEL.connect_material_expressions(sat, "", om, "")
+        pw = E(unreal.MaterialExpressionPower, -540, 250); pw.set_editor_property("const_exponent", 2.2)
+        MEL.connect_material_expressions(om, "", pw, "Base")
+        # hot core (1, 0.8, 0.55) x LAMP_INNER at the apex, a low warm floor (x 0.06) at the mouth
+        hot = E(unreal.MaterialExpressionMultiply, -420, 250); hot.set_editor_property("const_b", LAMP_INNER)
+        MEL.connect_material_expressions(pw, "", hot, "A")
+        flo = E(unreal.MaterialExpressionAdd, -300, 250); flo.set_editor_property("const_b", LAMP_INNER * 0.06)
+        MEL.connect_material_expressions(hot, "", flo, "A")
+        uv = E(unreal.MaterialExpressionTextureCoordinate, -1150, 450)
+        uv.set_editor_property("u_tiling", 3.0); uv.set_editor_property("v_tiling", 3.0)
+        g = E(unreal.MaterialExpressionTextureSample, -1000, 450)
+        g.set_editor_property("texture", defaults["grime"])
+        g.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+        MEL.connect_material_expressions(uv, "", g, "UVs")
+        gl = E(unreal.MaterialExpressionLinearInterpolate, -800, 450)
+        gl.set_editor_property("const_a", 1.0); gl.set_editor_property("const_b", 0.55)
+        MEL.connect_material_expressions(g, "R", gl, "Alpha")
+        stain = E(unreal.MaterialExpressionMultiply, -180, 300)
+        MEL.connect_material_expressions(flo, "", stain, "A")
+        MEL.connect_material_expressions(gl, "", stain, "B")
+        col = E(unreal.MaterialExpressionConstant3Vector, -180, 450)
+        col.set_editor_property("constant", unreal.LinearColor(1.0, 0.8, 0.55, 1))
+        em = E(unreal.MaterialExpressionMultiply, -60, 350)
+        MEL.connect_material_expressions(stain, "", em, "A")
+        MEL.connect_material_expressions(col, "", em, "B")
+        MEL.connect_material_property(em, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        base = E(unreal.MaterialExpressionMultiply, -180, 0)
+        base.set_editor_property("const_a", 1.0)
+        bcol = E(unreal.MaterialExpressionConstant3Vector, -400, 0)
+        bcol.set_editor_property("constant", unreal.LinearColor(0.62, 0.55, 0.42, 1))  # yellowed cream enamel
+        MEL.connect_material_expressions(bcol, "", base, "A")
+        MEL.connect_material_expressions(gl, "", base, "B")
+        MEL.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
+        rr = E(unreal.MaterialExpressionLinearInterpolate, -180, 150)
+        rr.set_editor_property("const_a", 0.28); rr.set_editor_property("const_b", 0.6)
+        MEL.connect_material_expressions(g, "R", rr, "Alpha")
+        MEL.connect_material_property(rr, "", unreal.MaterialProperty.MP_ROUGHNESS)
         MEL.recompile_material(inner_mat)
         EAL.save_loaded_asset(inner_mat)
     except Exception as e:
-        log("WARNING lamp inner falloff skipped", e)
+        log("WARNING lamp inner gradient failed, flat emissive instead", e)
+        inner_mat = emissive_material("M_TC_LampInner", (1.0, 0.8, 0.55), LAMP_INNER * 0.4)
     lamp_shade = import_prop("dome_lamp_head")  # C4: shade, inner face, bulb (props.py desk_lamp_head, same pivot)
     for sm in lamp + lamp_shade:
         for i, sl in enumerate(sm.static_materials):
             n = str(sl.material_slot_name).lower()
-            sm.set_material(i, bulb_mat if "bulb" in n else inner_mat if "inner" in n else mi_enamel)
+            sm.set_material(i, bulb_mat if "bulb" in n else mi_brass if "rim" in n else inner_mat if "inner" in n else mi_enamel)
         EAL.save_loaded_asset(sm)
     LAMP_BASE, LAMP_YAW = (24.0, -56.0), 101.0
     lamp_actors, llo, lhi = place_model(lamp + lamp_shade, (LAMP_BASE[0], LAMP_BASE[1], 0), yaw=LAMP_YAW, label="Lamp", sit_on=top)
@@ -2304,7 +2353,13 @@ def build():
         clip = EAS.spawn_actor_from_class(unreal.TCClipboard, unreal.Vector(8.0, 44.0, top + 0.25), unreal.Rotator(0, 0, -92))
         clip.set_actor_label("GameRecordClipboard")
         clip.get_editor_property("board").set_static_mesh(board_mesh[0])
-        setp(clip, "paper_material", paper_material(form_tex))
+        stock_tex = None
+        if os.path.exists(form):  # C8b: the forms stock without its text, for the record sheet (paper_material)
+            stock_tex = import_texture(form, f"{ROOT}/Textures/Forms", "T_PaperStock_BaseColor", "color")
+            setp(stock_tex, "max_texture_size", 64)
+            setp(stock_tex, "mip_gen_settings", unreal.TextureMipGenSettings.TMGS_BLUR5)
+            EAL.save_loaded_asset(stock_tex)
+        setp(clip, "paper_material", paper_material(stock_tex))
         for prop, ttf, nm in (("hand_face", "PatrickHand-Regular.ttf", "F_TC_Hand"), ("form_face", "CourierPrime-Bold.ttf", "F_TC_Form")):
             face = next((o for o in import_file(os.path.join(FONTS, ttf), f"{ROOT}/Fonts", nm + "_Face") if isinstance(o, unreal.FontFace)), None)
             if face:
@@ -2346,31 +2401,36 @@ def build():
     placements = [  # variant, x, y, full width along the decal's Y, full width along its Z (None: square), yaw, level
         ("Spatter", -4, -10, 14, None, 75, "board"),
         ("Pool", -15, 42, 12, None, 140, "table"),        # was (-30, 34, 18): over the right hand
-        ("Spatter", 31.8, -34, 6, None, 300, "table"),     # was (30, -30, 12): across the far frame's side
+        ("Spatter", 30.0, -34, 6, None, 300, "table"),     # was (30, -30, 12): across the far frame's side; C8b 31.8 -> 30
         ("Smear", -10, -44, 16, None, 160, "table"),       # was (-28, -40, 22): under the left hand
         ("Spatter", 20, 40, 10, None, 40, "table"),
         # pass 49: the reference has blood across the board and grime everywhere (fine detail 12.9 against our 10.5)
         ("Spatter", 9, 13, 7, None, 30, "board"), ("Spatter", -15, 17, 6, None, 200, "board"), ("Spatter", 15, -16, 8, None, 120, "board"),
         ("Smear", -27, 8, 10, None, 90, "board"),
-        ("Dirt", 31.5, -8, 34, 7, 0, "table"),            # was (42, -8, 34): mostly beyond the far edge; now the far strip
+        ("Dirt", 31.2, -8, 34, 6, 0, "table"),            # was (42, -8, 34): mostly beyond the far edge; now the far strip
         # (Dirt (38, 30, 30) dropped: no free table there now between the clipboard, the mug and the tape roll)
-        ("Dirt", 2, -46, 22, None, 260, "table"), ("Dirt", -16, 49, 14, None, 80, "table"),  # were (-6, -50, 30), (-4, 52, 28)
-        ("Ring", 31, 31, 9, None, 0, "table"), ("Ring", 28, -44, 8, None, 110, "table"),      # were (22, 30, 10), (44, -40, 9)
+        ("Dirt", 2, -42.5, 22, None, 260, "table"), ("Dirt", -16, 47.6, 14, None, 80, "table"),  # were (-6, -50, 30), (-4, 52, 28)
+        ("Ring", 29.8, 32.5, 9, None, 0, "table"), ("Ring", 28, -44, 8, None, 110, "table"),      # were (22, 30, 10), (44, -40, 9)
         # pass 62: knife scars and scuffs on the table round the board (judge run 4: wide flat brown areas; V2 detail)
-        ("Scratch", -20, -48, 24, None, -10, "table"), ("Scratch", 4, -44, 30, None, 80, "table"),
-        ("Scratch", 31.5, 14, 24, 7, 0, "table"),  # ((6, 46, 32) lies under the clipboard now: it drew "pencil" lines on its sheet)
-        ("Scratch", -16, 48, 24, None, 60, "table"), ("Scratch", 24, -44, 22, None, 140, "table"),
+        ("Scratch", -20, -41.8, 24, None, -10, "table"), ("Scratch", 4, -42, 22, None, 80, "table"),
+        ("Scratch", 31.2, 14, 24, 6, 0, "table"),  # ((6, 46, 32) lies under the clipboard now: it drew "pencil" lines on its sheet)
+        ("Scratch", -16, 42, 20, None, 60, "table"), ("Scratch", 23, -44.4, 16, None, 140, "table"),
         # pass 64: blood on the near frame and the table edge in front of it (judge run 4: nothing on the table edge)
-        ("Spatter", -26.5, -8, 7, None, 250, "board"), ("Smear", -32.5, 3, 9, None, 15, "table"),
+        ("Spatter", -26.5, -8, 7, None, 250, "board"), ("Smear", -31.1, 3, 5, None, 15, "edge"),
         # C4: the reference's worn near table edge: Scratch strips on the 7.6 cm of table between the board's near frame
         # (x -27.65) and the table's edge (x -35.3), scars running along the edge, clear of the resting hands.
-        ("Scratch", -31.5, 0, 22, 7.2, 0, "table"), ("Scratch", -31.3, -4, 14, 6.4, 186, "table"),
-        ("Scratch", -31.7, 5, 15, 6.8, 174, "table"), ("Scratch", -31.5, -47, 15, 7.2, 180, "table"),
-        ("Scratch", -31.5, 47, 15, 7.2, 4, "table")]
+        # C8b (judge run 6 V5 #3/#4: a hard-edged red rectangle and fur-like streaks on the near edge's face): the five
+        # overlapping strips (and the smear above) reached past the edge, so the downward projection smeared them down the
+        # vertical face, and three of them stacked on one 15 cm stretch. Now four strips end to end, 4-4.4 cm wide, every
+        # footprint >= 1 cm inside the edge (x >= -34.3), and "edge" decals reach only 0.6 cm below the top.
+        ("Scratch", -31.1, -12, 18, 4.4, 2, "edge"), ("Scratch", -31.1, 10, 16, 4.0, 178, "edge"),
+        ("Scratch", -31.1, -46, 14, 4.4, 180, "edge"), ("Scratch", -31.1, 46, 14, 4.4, 2, "edge")]
+    # C8b: every table decal's footprint stays >= 1 cm inside the table's edges (x +-35.3, y +-56.7; the far and side
+    # faces are what the Black seat and the side views see) and off the board frame's sides (|x|, |y| 27.65)
     for k, (v, x, y, wy, wz, yaw, level) in enumerate(placements):
         if v not in blood:
             continue
-        zc, depth = (top + 2.0, 0.9) if level == "board" else (top + 0.1, 1.4)
+        zc, depth = (top + 2.0, 0.9) if level == "board" else (top + 0.45, 1.05) if level == "edge" else (top + 0.1, 1.4)
         dec = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, zc), unreal.Rotator(0, -90, yaw))
         dec.decal.set_decal_material(blood[v])
         setp(dec.decal, "decal_size", unreal.Vector(depth, wy / 2, (wz or wy) / 2))
@@ -2484,7 +2544,7 @@ def build():
         place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)
         place_model(beds, (cx + L / 2 - 55, 125, 0), yaw=90, label="BedB", sit_on=0.0)
     # barred window high on the back wall, left of the opponent: cold glow + rusty bars (the window rect light sits in it)
-    glow = emissive_material("M_TC_WindowGlow", (0.55, 0.7, 0.8), 6.0)
+    glow = emissive_material("M_TC_WindowGlow", (0.55, 0.7, 0.8), float(os.environ.get("TC_WINDOW_GLOW", 6.0)))
     box("Window_Glow", (cx + L / 2 - 1, -150, 185), (2, 60, 90), glow, folder="Window")
     cyl = unreal.load_asset("/Engine/BasicShapes/Cylinder")
     for k in range(6):
@@ -2508,13 +2568,36 @@ def build():
         rail.set_actor_scale3d(unreal.Vector(0.05, 2.5, 0.06))
         rail.static_mesh_component.set_material(0, mi_bar)
         rail.set_folder_path("Bars")
-    sign = EAS.spawn_actor_from_class(unreal.TextRenderActor, unreal.Vector(cx + L / 2 - 1.5, -95, 205), unreal.Rotator(0, 0, 180))
-    tr = sign.text_render
-    tr.set_text("WARD B")
-    setp(tr, "world_size", 30.0)
-    setp(tr, "horizontal_alignment", unreal.HorizTextAligment.EHTA_CENTER)
-    setp(tr, "text_render_color", unreal.Color(40, 38, 34, 255))
-    sign.set_folder_path("Room")
+    # C8b (judge run 6 gap 5, environment row): the reference's painted "WARD B" sign with its arrow, on the wall at the
+    # opponent's right shoulder. The old TextRenderActor (flat engine font at z 205) sat above the top of the frame (the
+    # seat view meets the back wall at z ~150). Now a decal of our own stencil texture (ue5/tools/textures/ward_sign.py,
+    # Courier Prime OFL) painted onto the back wall's tiles and plaster, lit by BackWall_Wash and Corridor_Glow.
+    sign_png = os.path.join(TEXTURES_DIR, "signs", "T_WardSign_BaseColor.png")
+    if os.path.exists(sign_png):
+        sy, sz, ssize, syaw = (float(v) for v in os.environ.get("TC_SIGN", "62,120,52,0").split(","))
+        stex = import_texture(sign_png, f"{ROOT}/Textures/Signs", "T_WardSign_BaseColor", "color")
+        path = f"{ROOT}/Materials/M_TC_WardSign"
+        if EAL.does_asset_exist(path):
+            EAL.delete_asset(path)
+        sm_ = AT.create_asset("M_TC_WardSign", f"{ROOT}/Materials", unreal.Material, unreal.MaterialFactoryNew())
+        sm_.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)  # blend mode before the domain (C6 lesson)
+        sm_.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
+        st = MEL.create_material_expression(sm_, unreal.MaterialExpressionTextureSample, -500, 0)
+        st.set_editor_property("texture", stex)
+        MEL.connect_material_property(st, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+        MEL.connect_material_property(st, "A", unreal.MaterialProperty.MP_OPACITY)
+        sr = MEL.create_material_expression(sm_, unreal.MaterialExpressionConstant, -300, 200)
+        sr.set_editor_property("r", 0.8)  # matte paint over the tiles' glaze
+        MEL.connect_material_property(sr, "", unreal.MaterialProperty.MP_ROUGHNESS)
+        MEL.recompile_material(sm_)
+        EAL.save_loaded_asset(sm_)
+        sign = EAS.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(cx + L / 2 - 2, sy, sz), unreal.Rotator(0, 0, syaw))
+        sign.decal.set_decal_material(sm_)
+        setp(sign.decal, "decal_size", unreal.Vector(4.0, ssize / 2, ssize / 2))  # x: 4 cm either side of the wall's face
+        sign.set_actor_label("WardSign")
+        sign.set_folder_path("Room")
+    else:
+        log("WARNING ward sign texture missing", sign_png)
     chair = import_model("painted_wooden_chair_01")
     tag(place_model(chair, (92, 0, 0), yaw=180, label="OpponentChair", sit_on=0.0)[0])
     cabinet = import_model("drawer_cabinet")
