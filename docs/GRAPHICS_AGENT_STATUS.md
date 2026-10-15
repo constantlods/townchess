@@ -127,7 +127,7 @@ permission rule; until then local work runs only through Houtini/Ollama calls th
 | C7 rook specks, gown dither, lamp, cold rim | rendering architect | done fa8223f, lead-reviewed: rook specks are real crenel shadows from the grazing key (16 A/B tests; no lighting fix without losing the lamp shadows) -> materials mask / board mesh; gown dither is the jacket weave normal (G-buffer) -> materials; Lamp_Opponent 170 -> 140 lm, Rim 500 lm 9000 K; V1 main 29.74/96.9/1.468/1.658; cpu 32/32, drag 8/8 | C7-*.jpg, C7-lighting.json |
 | capture.py -TCGamePath=1 (capture at the game's screen percentage + TSR, C7 request) | lead | done | capture.py |
 | C8m opponent filth, skin roughness, wood textures (+ gown weave fade, rook floor mask from C7) | materials | running | |
-| C8b judge defects (decal edge, wall panel, lamp underside, clipboard header), WARD B sign | board/environment | started | |
+| C8b judge defects (decal edge, wall panel, lamp underside, clipboard header), WARD B sign | board/environment | done fb8e0c3, lead-reviewed: decals inside the table edges, cabinet faces the room, lamp mouth warm enamel + brass rim, single clipboard header, WARD B sign in the main view; V1 main 29.5/94.0/1.473/1.670 (game path 29.9), detail 9.81; cpu 16/16, drag 8/8. Open: window/cold source above the frame (RA: move Window_Cold + window), watch bezel flat normals (hands: smooth SM_WatchBody), knight faceting is mesh geometry | C8b-*.jpg, C8b-board-env.json |
 | C7 rook-crown specks (shadow/GI noise) | rendering architect | started | |
 
 Open after C2/C3: V2 detail (C3 metric 9.47 on the new recipe, lower than C2 because the white bed grids were background detail);
