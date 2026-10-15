@@ -232,17 +232,17 @@ def desk_lamp():
     export("dome_lamp.obj")
 
 
-# Pass C4 (board/environment): the shade is its own mesh (dome_lamp_head.obj, same pivot as dome_lamp.obj), opening
-# towards the board and the seat round the key light, so the key has a visible source. LAMP_KEY is where build_scene.py
-# puts the Lamp_Key spot (24 cm along the arm, 35.5 cm over the table; the lights are the rendering architect's and do
-# not move); LAMP_AXIS is the opening direction in Blender space for the lamp's placement (base (24, -56), yaw 101):
-# the key's aim (board centre) blended 0.3 with the direction to the seat camera -> 12 deg off the key's axis and
-# 44 deg off the camera's line, so the glowing inside and the bulb face the player (the old dome opened 18 deg away
-# from the board: "the lamp is dead as a light source", judge baseline finding 3).
+# Pass C4 (board/environment): the shade is its own mesh (dome_lamp_head.obj, same pivot as dome_lamp.obj) closed round
+# the key light. LAMP_KEY is where build_scene.py puts the Lamp_Key spot (24 cm along the arm, 35.5 cm over the table;
+# the lights are the rendering architect's and do not move). C4.1 (lead review: C4's mouth faced the seat, a flat dark
+# disc with a bright bulb "like an eye"): the dome now hangs mouth-down over the board like the reference's lamp. Axis
+# (Blender space, for the lamp's placement: base (24, -56), yaw 101) = world (0, 0.3, -0.954): 84 deg off the line to
+# the seat camera, so from the seat the dome is seen from the side with only a sliver of the lit inside and the rim;
+# the key light sits 3.5 cm and the bulb's lowest point 2.7 cm inside the mouth (hidden). Radius 11 -> 8.5 cm.
 LAMP_KEY = Vector((0.24, 0.0, 0.355))
-LAMP_AXIS = Vector((0.653, -0.455, -0.606)).normalized()
-LAMP_R = 0.11
-LAMP_RIM = LAMP_KEY + LAMP_AXIS * 0.015          # centre of the dome's opening: the light sits 1.5 cm inside it
+LAMP_AXIS = Vector((0.294, 0.057, -0.954)).normalized()
+LAMP_R = 0.085
+LAMP_RIM = LAMP_KEY + LAMP_AXIS * 0.025          # centre of the dome's sphere; its mouth is cut 1 cm further out
 LAMP_APEX = LAMP_RIM - LAMP_AXIS * LAMP_R          # back of the dome, where the arm joins
 
 
@@ -298,12 +298,12 @@ def desk_lamp_head():
     parts.append(shade)
     # rolled rim: a bead round the opening catches the light as the lit edge of the reference's shade
     rim_r = math.sqrt(LAMP_R ** 2 - 0.01 ** 2)
-    bpy.ops.mesh.primitive_torus_add(major_radius=rim_r + 0.001, minor_radius=0.0032, major_segments=64, minor_segments=10)
+    bpy.ops.mesh.primitive_torus_add(major_radius=rim_r + 0.001, minor_radius=0.0028, major_segments=64, minor_segments=10)
     rim = bpy.context.active_object
     rim.rotation_mode = "QUATERNION"
     rim.rotation_quaternion = Vector((0, 0, -1)).rotation_difference(LAMP_AXIS)
     rim.location = LAMP_RIM + LAMP_AXIS * 0.01
-    material(rim, "M_LampMetal")
+    material(rim, "M_LampInnerRim")  # C4.1: the rolled rim glows warm (build_scene maps "inner" slots to the inner glow)
     parts.append(rim)
     inner = _dome(LAMP_R - 0.0015, 0.0085, True)
     material(inner, "M_LampInner")
@@ -320,8 +320,8 @@ def desk_lamp_head():
     bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=0.014, location=LAMP_APEX - LAMP_AXIS * 0.008)
     material(bpy.context.active_object, "M_LampMetal")
     parts.append(bpy.context.active_object)
-    # bulb: centred 8 mm behind the key light (the spot sits inside the glass), its front just past the rim plane
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=0.026, location=LAMP_KEY - LAMP_AXIS * 0.008)
+    # bulb: centred 1 cm behind the key light (the spot sits inside the glass), its lowest point 2.7 cm inside the mouth
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=0.018, location=LAMP_KEY - LAMP_AXIS * 0.01)
     material(bpy.context.active_object, "M_LampBulb")
     parts.append(bpy.context.active_object)
     _lamp_join(parts, "SM_DomeLampHead")

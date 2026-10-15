@@ -1598,7 +1598,9 @@ def build():
     # ---- Table, centred at origin; its top height drives everything else.
     table = import_model("wooden_table_02")
     # tiling 1 -> 2.5, normal x1.6 (pass 56): one 2K scan stretched over 1.5 m left the table edges flat next to the reference
-    assign(table, surface_material(master, "wood_table_worn", tiling=3.5, grime_color=(0.3, 0.22, 0.15), tint=(0.7, 0.6, 0.5),
+    # C4.1: tint 0.7/0.6/0.5 -> 0.68/0.6/0.52 (a greyer worn oak, as the reference): hiding the lamp bulb took its white
+    # out of the frame and put g/b at 1.704-1.718 (V1 <= 1.70) and the Black seat's r/g at 1.50
+    assign(table, surface_material(master, "wood_table_worn", tiling=3.5, grime_color=(0.3, 0.22, 0.15), tint=(0.68, 0.6, 0.52),
                                    scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.22, "GrimeContrast": 1.8,
                                             "GrimeStreaks": 0.65, "MicroRough": 0.2, "NormalStrength": 2.2}))
     tlo, thi = bounds_of(table)
@@ -1714,11 +1716,12 @@ def build():
     bulb_mat = emissive_material("M_TC_Bulb", (1.0, 0.86, 0.62), float(os.environ.get("TC_BULB", 2000.0)))
     # pass 61: dark green enamel worn to rust (the blotchy orange brass shade read cheap: judge run 4) and a warm
     # glowing inner face; the bulb now sits up inside the dome
-    mi_enamel = surface_material(master, "rusty_metal_02", name="MI_LampEnamel", tiling=1.5, metal=0.4, tint=(0.17, 0.19, 0.14), rough=0.65,
+    # C4.1: worn metal: more metallic and smoother so the dome takes highlights from the lamp's own bulb light
+    mi_enamel = surface_material(master, "rusty_metal_02", name="MI_LampEnamel", tiling=1.5, metal=0.75, tint=(0.2, 0.21, 0.16), rough=0.5,
                                  grime_color=(1.8, 1.2, 0.7), scalars={"GrimeTiling": 2.5, "GrimeThreshold": 0.62, "GrimeContrast": 2.5, "MicroRough": 0.15})
-    # inside of the shade: brightest where it faces the eye (round the bulb), falling off towards the rim, (1 - fresnel)^2
-    # (a flat 30 read as a grey disc, 200 as a cream one: C4a/C4b lamp close-ups; V1 mean budget ~+1)
-    inner_mat = emissive_material("M_TC_LampInner", (1.0, 0.62, 0.32), float(os.environ.get("TC_LAMP_INNER", 14.0)))
+    # inside of the shade and its rolled rim (C4.1: only a sliver of either shows from the seat now): (1 - fresnel)^2
+    # fall-off (C4: with the mouth facing the seat a flat 30 read as a grey disc, 200 as a cream one)
+    inner_mat = emissive_material("M_TC_LampInner", (1.0, 0.9, 0.8), float(os.environ.get("TC_LAMP_INNER", 160.0)))
     try:
         fr = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionFresnel, -700, 200)
         fr.set_editor_property("exponent", 1.5)
@@ -1729,7 +1732,7 @@ def build():
         MEL.connect_material_expressions(om, "", sq, "A")
         MEL.connect_material_expressions(om, "", sq, "B")
         k = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionConstant3Vector, -560, 0)
-        k.set_editor_property("constant", unreal.LinearColor(*(c * float(os.environ.get("TC_LAMP_INNER", 14.0)) for c in (1.0, 0.62, 0.32)), 1))
+        k.set_editor_property("constant", unreal.LinearColor(*(c * float(os.environ.get("TC_LAMP_INNER", 160.0)) for c in (1.0, 0.9, 0.8)), 1))
         mul = MEL.create_material_expression(inner_mat, unreal.MaterialExpressionMultiply, -300, 100)
         MEL.connect_material_expressions(k, "", mul, "A")
         MEL.connect_material_expressions(sq, "", mul, "B")
@@ -1782,7 +1785,13 @@ def build():
             sm.set_material(i, mi_rubber if "rubber" in str(sl.material_slot_name).lower() else mi_cart)
         EAL.save_loaded_asset(sm)
     CART = (16.0, 80.0)
-    tag(place_model(cart, (CART[0], CART[1], 0), yaw=90, label="Cart", sit_on=0.0)[0])
+    cart_actors, cart_lo, cart_hi = place_model(cart, (CART[0], CART[1], 0), yaw=90, label="Cart", sit_on=0.0)
+    tag(cart_actors)
+    # C4.1: where the cart's top tray really is. The OBJ's pivot is off the cart's centre (mesh bounds x -34..31.5,
+    # y -84.7..-44.3), so after the 90 deg yaw the tray is centred at world (CART.x - mid_y, CART.y + mid_x) ~ (80.5, 80),
+    # 40 x 60 cm, its face 83.6 cm over the floor (props.py med_cart: tray 0.83 m, 1.2 cm thick; the lowest point is the
+    # castors' foot at 0); the push handle (3.5 cm of the mesh's -x) is left out of the centre.
+    CART_TRAY = (CART[0] - (cart_lo[1] + cart_hi[1]) / 2, CART[1] + (cart_lo[0] + 3.5 + cart_hi[0]) / 2, 83.6)
     board_mesh = import_prop("clipboard")
     if GAMEPLAY and board_mesh:
         for sm in board_mesh:
@@ -1908,14 +1917,19 @@ def build():
                                      "Pages": make_mi(master, "MI_BookPages", {"BaseColor": None}, tint=(0.5, 0.45, 0.35), rough=0.92,
                                                       grime_color=(0.25, 0.2, 0.14), scalars={"GrimeTiling": 6.0, "GrimeThreshold": 0.45})})
     if books:
-        tag(place_model([books], (54, 50, 0), yaw=-100, label="Books", sit_on=top)[0])
+        # C4.1: on the cart's tray (it stood at (54, 50) at table height, beyond the table's far edge, the tray running
+        # 3.6 cm into the bottom book); 28 x 21 cm, long side along y, inside the tray's lips, nearer the seat's side
+        tag(place_model([books], (CART_TRAY[0] - 3.0, CART_TRAY[1] - 10.0, 0), yaw=-100, label="Books", sit_on=CART_TRAY[2] + 0.05)[0])
     pills = prop_with("pill_bottle", {"AmberBottle": make_mi(master, "MI_AmberBottle", {"BaseColor": None}, tint=(0.22, 0.08, 0.015), rough=0.3),
                                       "Label": make_mi(master, "MI_PillLabel", {"BaseColor": None}, tint=(0.55, 0.5, 0.4), rough=0.9,
                                                        grime_color=(0.3, 0.22, 0.15), scalars={"GrimeTiling": 8.0, "GrimeThreshold": 0.4}),
                                       "Cap": make_mi(master, "MI_PillCap", {"BaseColor": None}, tint=(0.55, 0.55, 0.52), rough=0.6),
                                       "Tablet": make_mi(master, "MI_Tablet", {"BaseColor": None}, tint=(0.62, 0.6, 0.55), rough=0.7)})
     if pills:
-        tag(place_model([pills], (36, -24, 0), yaw=30, label="Pills", sit_on=top)[0])
+        # C4.1: (36, -24) put the bottle on the table's far edge (x 35.3); the spilled tablets lie up to 9 cm from it,
+        # so it moves where they all land on the top: clear of the board frame (y -27.65), the captured pieces (~(29, -38)),
+        # the lamp base (24, -56) and the bowl (-8, -46)
+        tag(place_model([pills], (14, -42, 0), yaw=30, label="Pills", sit_on=top)[0])
     bowl = import_prop("brass_bowl")
     if bowl:
         for sm in bowl:
@@ -1967,7 +1981,7 @@ def build():
         # C4 (judge V5 #9, "glowing" springs): the scan's pale paint is sRGB ~164/157/145, so x 2.4/2.7/3.2 made it a
         # ~0.9 albedo blue-white that the 7500 K Window_Cold rect right behind bed A turned into a lit wire grid; a duller
         # grey-green paint instead (TC_BED_TINT to tune)
-        bed_tint = tuple(float(v) for v in os.environ.get("TC_BED_TINT", "1.5,1.7,1.85").split(","))
+        bed_tint = tuple(float(v) for v in os.environ.get("TC_BED_TINT", "1.5,1.75,2.6").split(","))
         assign(beds, model_material(master, "old_bed_frame", "old_bed_frame", "MI_OldBedFrame", tint=bed_tint, grime_color=(0.45, 0.4, 0.36),
                                     scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "GrimeStreaks": 0.5, "MicroRough": 0.15}))
         place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)

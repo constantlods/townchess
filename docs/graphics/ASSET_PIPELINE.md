@@ -204,25 +204,28 @@ Measured or seen in the close-ups above; each names its cause in code and what C
    visible under them (`C4-clipboard.jpg`, before), the sheets at (40, -46) and (-36, -46) hung past the far and near
    edges, and the alarm clock (-8, 46) / medical tape (10, 44) slots were inside. C4: clipboard flat on the table at
    (8, 44); the three loose sheets dropped (two were out of frame, and on the table in the lamp's pool they pushed the
-   default view's mean over V1's 30). Pills at (36, -24) still overhang the far edge by ~2 cm (open).
+   default view's mean over V1's 30). C4.1: the pill bottle (36, -24, on the far edge) moved to (14, -42), every tablet on
+   the top (`C4.1-pills.jpg`).
 3. **OBJ pivots.** `props.py` joins parts into `parts[0]`, whose location stays the pivot: the cart's mesh is off its
    centre by ~65 cm (its tray is at world x ~60-100, not at CART (16, 80)), which is why the clipboard "on the cart"
    hung in mid-air; the lamp was off by 1.25 cm. New props bake each part's transform before the join
-   (`_lamp_join`); the cart is left as is. The book stack (54, 50) sits at the cart's near corner at table height, so the
-   tray (z 83.6) runs 3.6 cm into the bottom book; in the close-up (`C4a_books`, build PC) it reads as resting on the
-   cart, but the stack should be lifted onto the tray (open).
+   (`_lamp_join`); the cart is left as is, and C4.1 computes its tray from the mesh bounds (`CART_TRAY`) and puts the
+   book stack on it (it stood at table height at the cart's corner, the tray 3.6 cm into the bottom book; `C4.1-books.jpg`).
 4. **The lamp was not a visible source.** The dome opened 18 deg away from the board (its open side faced away from
    the seat), and at the fixed exposure (EV 8.45, scene white ~240 nits) the bulb's emissive 60 rendered mid-grey and
    the inner face's 2.5 black. C4: the shade is its own mesh (`dome_lamp_head.obj`) opening round the Lamp_Key
-   position (lights not moved), bulb 2000 (clips warm-white), inner face 14 with a fresnel fall-off; the head neither
-   casts shadows nor reaches Lumen/ray tracing, so lighting stays the rendering architect's (board region luma 63.5 ->
-   64.2 with the head in place, i.e. no spill). Remaining: the inside still reads as a flat dark disc; brighter
-   values cost V1 (inner 200: main mean 37.2, p95 133; inner 30: 31.5).
+   position (lights not moved), bulb 2000 (clips warm-white); the head neither casts shadows nor reaches Lumen/ray
+   tracing, so lighting stays the rendering architect's (board region luma 63.5 -> 64.2 with the head in place). C4.1
+   (lead review: C4's open mouth faced the seat, a flat dark disc with the bulb in it): the dome (radius 8.5 cm) hangs
+   mouth-down, its axis 84 deg off the line to the seat, so the seat sees a worn metal dome from the side with a warm
+   lit top and a bright inner rim, and the bulb stays hidden (`C4.1-lamp.jpg`). Hiding the bulb took the frame's most
+   neutral highlight out (g/b 1.699 -> 1.718); a near-white rim glow and a cooler bed paint brought it to 1.689.
 5. **Tape roll.** Poly Haven `medical_tape` imported without its maps and `clutter()` scaled it to 7 cm: a 7 cm white
    marble puck with a 1 cm hole (`C4-tape.jpg`). Replaced by our own roll (5.6 cm across, 2.5 cm wide, 3.4 cm core,
    stepped wound layers, peeled tail). `medical_tape` is now unused.
 6. **Bed springs.** The bed scan's pale paint is sRGB ~164/157/145; the C3 tint x 2.4/2.7/3.2 made it a ~0.9 albedo
-   blue-white grid lit from behind by Window_Cold (7500 K, 2500 lm). C4: 1.5/1.7/1.85 (`C4-beds.jpg`).
+   blue-white grid lit from behind by Window_Cold (7500 K, 2500 lm). C4: 1.5/1.7/1.85 (`C4-beds.jpg`); C4.1: 1.5/1.75/2.6 (a cool
+   grey, ~0.55-0.73 albedo instead of ~0.9; it keeps the frame's g/b in V1 with the bulb hidden).
 7. **Rook crowns.** At the seat with 9x the sampling (FOV 7) the h1 rook's crown is clean in both final and base
    colour (`C4-rook-diagnosis.jpg`); at the game's FOV 62 the inside of the crown, a 3-4 px concave pocket shaded only
    by indirect light, shows grey/white specks. Not an asset defect: screen-probe GI / TSR noise at Epic's 83 % screen

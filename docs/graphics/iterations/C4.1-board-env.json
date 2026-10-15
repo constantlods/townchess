@@ -1,0 +1,36 @@
+{
+ "what": "C4.1 (lead review of C4): lamp head re-aimed mouth-down (side view of a worn metal dome, bulb hidden, warm-lit top and inner rim, smaller), book stack onto the cart tray, pill bottle fully on the table",
+ "base": "e351a4a (upstream incl. C4); before = C4 final build (C4d), build PC 2026-10-14 22:17-22:5x PC time, capture.ps1 -Preset epic 1920x1080, benchmark cameras; metric recipe as C3/C4 (1045x588 bicubic, Rec.709 luma, mean |Laplacian|)",
+ "lamp": {
+  "axis": "world (0, 0.3, -0.954): 84 deg off the line to the seat camera (C4: 44 deg), radius 11 -> 8.5 cm, key light 3.5 cm and the bulb's lowest point 2.7 cm inside the mouth; Lamp_Key / Lamp_Bulb / Lamp_Opponent not moved",
+  "materials": "MI_LampEnamel metal 0.4 -> 0.75, rough 0.65 -> 0.5, tint 0.2/0.21/0.16; rolled rim and inner face share M_TC_LampInner (1, 0.9, 0.8) x 160 with (1 - fresnel)^2",
+  "screen": "dome ~x 170-310 / y 0-95 of 960 x 540 (C4: the open disc filled ~x 145-320 / y 0-130 with the bulb in it)"
+ },
+ "main": {
+  "C4_before": {"mean": 29.6, "p95": 95.3, "rg": 1.472, "gb": 1.699, "detail": 9.56, "median3": 5.99, "below8": 33.0},
+  "C41a": {"mean": 28.6, "p95": 96.0, "rg": 1.488, "gb": 1.718, "detail": 9.61, "median3": 5.95, "below8": 34.5},
+  "C41b": {"mean": 28.7, "p95": 96.4, "rg": 1.484, "gb": 1.704, "detail": 9.66, "median3": 5.98, "below8": 34.3},
+  "C41c": {"mean": 28.6, "p95": 96.4, "rg": 1.482, "gb": 1.704, "detail": 9.62, "median3": 5.97, "below8": 34.4},
+  "C41d_final": {"mean": 28.8, "p95": 96.8, "rg": 1.479, "gb": 1.689, "detail": 9.66, "median3": 6.01, "below8": 34.4}
+ },
+ "black_seat": {
+  "C4_before": {"mean": 27.6, "p95": 89.2, "rg": 1.485, "gb": 1.698, "detail": 9.31, "median3": 5.78, "below8": 33.3},
+  "C41a": {"mean": 26.9, "p95": 91.0, "rg": 1.500, "gb": 1.717, "detail": 9.32, "median3": 5.72, "below8": 34.6},
+  "C41b": {"mean": 27.2, "p95": 91.8, "rg": 1.499, "gb": 1.703, "detail": 9.42, "median3": 5.78, "below8": 34.5},
+  "C41c": {"mean": 27.3, "p95": 92.2, "rg": 1.495, "gb": 1.704, "detail": 9.40, "median3": 5.78, "below8": 34.6},
+  "C41d_final": {"mean": 27.4, "p95": 92.4, "rg": 1.491, "gb": 1.686, "detail": 9.50, "median3": 5.89, "below8": 34.2}
+ },
+ "iterations": {
+  "C41a": "new head (inner (1, 0.62, 0.32) x 60), books, pills: hiding the white bulb took the frame's most neutral highlight out, g/b 1.718 / 1.717 (V1 <= 1.70)",
+  "C41b": "inner colour (1, 0.85, 0.68); bed tint 1.5/1.75/2.3 (was 1.5/1.7/1.85): g/b 1.704",
+  "C41c": "table tint 0.7/0.6/0.5 -> 0.68/0.6/0.52: no measurable g/b change (kept: Black seat r/g 1.499 -> 1.495)",
+  "C41d_final": "inner (1, 0.9, 0.8) x 160 (a bright inner rim edge), bed tint 1.5/1.75/2.6: g/b 1.689 / 1.686"
+ },
+ "V1": "final: both seats inside all four bounds; tightest margins g/b 1.689 (main), r/g 1.491 (Black)",
+ "V2": "main 9.56 -> 9.66, Black 9.31 -> 9.50 (C4 started from 9.49 / 9.18)",
+ "props": {"books": "(54, 50) at table height -> on the cart tray (tray centre computed from the cart's mesh bounds, face z 83.6), C41c_books", "pills": "(36, -24) on the far edge -> (14, -42), every tablet on the top, C41c_pills"},
+ "which_build": "main, black, lamp: C41d (final); books and pills: C41c (C41d changed only the lamp inner colour/intensity and the bed tint)",
+ "files": ["C4.1-main-before-after.jpg", "C4.1-black-before-after.jpg", "C4.1-lamp.jpg", "C4.1-books.jpg", "C4.1-pills.jpg"],
+ "tests": {"cpu": "PASS 158/158 (full game)", "drag": "PASS 8/8", "build": "C41d, 2026-10-14 22:40-22:42 PC time"},
+ "pc": "checkout restored to upstream e351a4a (a first restore also deleted the now-tracked C4 prop files; re-checked out and L_Table rebuilt from upstream, 169 actors, lock re-taken for it)"
+}
