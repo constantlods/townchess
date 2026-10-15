@@ -169,3 +169,19 @@ engine's automatic 60.6% at 1440p. `beta_checks.ps1 -Games 0` at 2560x1440: **82
 margin, offscreen only (no present cost). VRAM after the run 3129 MiB. Benchmark-camera captures (scene capture, not
 driven by the screen percentage): main 28.2 / 96.5 / 1.492 / 1.694, detail 9.49; Black seat 26.5 / 91.5 / 1.511 / 1.695,
 detail 9.16 (same as C3).
+
+## C7 (2026-10-15): light intensity changes only
+
+Same probe as C2 (`ra_gpu.py`: editor `-game` offscreen, 2560x1440, CSV after 30 s). The first window now runs at
+the game's Epic 83% (ApplyQualityPreset); the second runs at 100%.
+
+| State | GPU ms (83%) | Lights + ShadowsDenoiser | TSR | Avg fps (editor) | GPU ms (100%) |
+|---|---|---|---|---|---|
+| B upstream 34698fe | 11.82 | 2.57 + 2.73 | 1.38 | 81.1 | 15.71 |
+| C Rim 350 lm, Lamp_Opponent 110 lm | 11.72 | 2.55 + 2.72 | 1.37 | 81.8 | 15.69 |
+| F final (Rim 500 lm 9000 K, Lamp_Opponent 140 lm) | 12.46 | 2.72 + 2.88 | 1.45 | 77.0 | 16.60 |
+
+The shadowed-light set is unchanged: only one shadowless point light got brighter and one spot got dimmer. The
+spread across B, C and F is run-to-run noise (F ran straight after two autotests). The diagnostic cvars (RT shadow
+4 spp, denoiser off, VSM, short-range AO off) were tested for the rook crowns. They had no visible effect on the
+crowns, none was kept, and so no cost is reported for them.

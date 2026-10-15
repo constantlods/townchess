@@ -2840,9 +2840,14 @@ def build():
     # keeps its shadow (C2): it faces the camera from the back wall, and without one its 7500 K light passed through the
     # opponent onto the board and hands (r/g 1.44 -> 1.33); the window bars' shadow also shapes its shafts in the fog
     rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0, shadows=True)
-    point("Rim", (150, -60, top + 70), 80, 6500, 300, src=8.0, shadows=False)
+    # C7 (judge run 6: "no cold back light"): the back-left rim is the cold accent on the cage, shoulder and chair,
+    # 80 lm 6500 K -> TC_RIM lm (default 500) at 9000 K. Shadowless (no RT cost). It also moves g/b and r/g away from
+    # their V1 upper limits (main 1.697 -> 1.658, Black r/g 1.496 -> 1.481 with the Lamp_Opponent change below)
+    point("Rim", (150, -60, top + 70), float(os.environ.get("TC_RIM", 500)), 9000, 300, src=8.0, shadows=False)
     # aimed at the opponent's chest and hands, not his head (C2: the bald scalp was the brightest thing above the board)
-    tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (68, 0, top + 18)), 170, 2400, 400, 40, src=2.5, vol=0.6))
+    # C7 (judge run 6: the scalp out-shone the lamp): 170 -> TC_OPP lm (default 140): scalp p99 125 -> 113. 110 lm
+    # (p99 100) cost 0.11 of V2 detail on the opponent; a 30 deg cone at 170 lm made the scalp brighter (p99 160)
+    tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (68, 0, top + 18)), float(os.environ.get("TC_OPP", 140)), 2400, 400, float(os.environ.get("TC_OPPCONE", 40)), src=2.5, vol=0.6))
     rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
     # pass C2: no subject fills without a source (VISUAL_ART_DIRECTION section 4.5). Hands_Key (200 lm from the camera
     # side, 40 cm over the near table) and Table_Right (80 lm) are gone. The lamp sits beyond the board's left half, so

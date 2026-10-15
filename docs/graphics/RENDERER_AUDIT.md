@@ -290,3 +290,25 @@ PERFORMANCE_BENCHMARKS.md ("C2"). Commits 7499b8d (C2.1), d5014f1 (C2.2, rejecte
 | D4 grade | done: below luma 8 49.5% → 32.3%, median 8.3 → 15.9, grain 0.5 → 0.2, sharpen 1.0 → 0.5 | V1 met (C2.3: 29.1 / 99.7 / 1.473 / 1.661); detail 11.15 (V2 not met) |
 | D5 atmosphere | done: fog 0.045, falloff 0.001 | room behind the opponent 9.0 → 17.4, top row 13.7 → 22.7 (C2.3) |
 | D6, D8, D9 | not started | |
+
+## C7 status (2026-10-15): rook crowns, gown dither, lamp/scalp, cold back light
+
+Evidence: `docs/graphics/iterations/C7-*.jpg` and `C7-lighting.json`. All A/B frames were taken on the **game path**:
+the capture component inherits the main view's resolution, 83% screen percentage and TSR (`main_view_resolution` +
+`main_view_family`; the engine then forks the main view's screen-percentage interface into the capture). The
+full-resolution `capture.py` path was measured as well. It is sharper (same view: detail 9.28 against 8.98), so
+earlier V2 numbers overstate what the player sees. Request to the lead: make this a `capture.py` option.
+
+| Defect | Cause (measured) | Fix | Evidence |
+|---|---|---|---|
+| Rook-crown mottle (h1), bright patch (a1) | **Not noise.** The key grazes the h1 crown floor from the far left, and the crenel walls cast real, hard-edged shadows across it. At the seat that pattern is 2-4 px patches. The mottle stays with key radius 0, 6 and 10, RT shadow 4 spp, denoiser off, VSM, RT normal bias 0.5/2, self-intersection distance 4, short-range AO off, Lumen reflections off, GI off, and 83%/100% TSR or full resolution. It goes away only with the key's shadow off (also at FOV 7). The a1 patch is direct key light on a floor that faces the lamp. | None in lighting without losing the long lamp shadows. Routes: rook mesh (shallower floor, rounded crenels: board/env), or a crown-floor darken/roughen mask (materials) | C7-rooks.jpg (16 A/Bs), C7-rook-diagnosis.jpg |
+| Gown dither (both seats) | **Not shadow noise.** The pattern is in the G-buffer normal: MI_PatientJacket uses `rough_linen` at tiling 5, a sub-pixel weave normal at the seat distance. It is unchanged with VSM and with Lamp_Opponent's shadow off. | Materials: fade the weave normal by pixel footprint (`DetailFadeInv`, C6) or lower NormalStrength/tiling (C8m) | C7-gown.jpg |
+| Scalp out-shines the lamp | Lamp_Opponent 170 lm | 140 lm: scalp p99 125 → 113. 110 lm cost V2 detail; a 30° cone made the scalp brighter | C7-opponent-lamp.jpg |
+| Lamp mouth a flat grey band | the shade rim's material (p99 200.6 in every light test, including the bulb at 3x) | board/environment (C8b) | C7-lighting.json |
+| No cold back light | Rim was 80 lm at 6500 K | Rim 500 lm at 9000 K, shadowless: a cold edge on the cage, bed frame and chair. It also widens the V1 colour margins (main g/b 1.697 → 1.658, Black r/g 1.496 → 1.479) | C7-opponent-lamp.jpg, C7-main-before-after.jpg |
+
+- V1 in bounds on both seats. The main mean moves 29.46 → 29.74 (limit 30).
+- V2 is not lowered (same-position static: 9.279 → 9.281).
+- White pieces stay readable: white median 81.9 → 81.7, ratio 12.1.
+- GPU: no shadow or GI change. 11.82 ms before, 11.72-12.46 ms after (run-to-run noise) at 83%, 1440p.
+- No quality-tier cvar fixes the crowns.
