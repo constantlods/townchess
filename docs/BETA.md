@@ -23,7 +23,7 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 |---|---|---|---|
 | S1 | Packaged build starts on a clean launch and plays | `test_package.ps1`: smoke 12/12, Job Object pass, Defender 0 | met |
 | S2 | Long play without errors | 10 consecutive packaged CPU-vs-engine games (autoplay), 0 desyncs, 0 crashes, no leaked processes | met 2026-10-06: `beta_checks.ps1` 10/10 (9 checkmates, 1 threefold repetition), 0 failures, 0 leftover processes |
-| S3 | Frame rate | packaged build at 2560x1440, Epic + hardware RT on the RTX 4070 Ti SUPER: average >= 60 fps, 1% low >= 45 over a 60 s game (`stat unit`/CSV profiler) | partial: offscreen measurement 2026-10-06 (2560x1440, Auto: avg 91.4, 1% low 81.2) has no present/vsync cost (oversight run 4); a presented run on the owner's display is still needed |
+| S3 | Frame rate | packaged build at 2560x1440, Epic + hardware RT on the RTX 4070 Ti SUPER: average >= 60 fps, 1% low >= 45 over a 60 s game (`stat unit`/CSV profiler) | partial: offscreen 2026-10-14 at Epic 83% screen percentage (was auto 60.6%): avg 82.3, 1% low 71.7 (PERFORMANCE_BENCHMARKS.md D1); no present/vsync cost (oversight run 4); a presented run on the owner's display is still needed |
 | S4 | Recovers from a core crash and from a restored game | reconnect test + smoke with a journal-restored game | met 2026-10-06: killed at ply 12 (TerminateProcess), no orphan core, restored at the same ply/FEN, played on to checkmate (100/100); packaged smoke resigns a restored game and plays its own |
 
 ## Look (measured against the reference's main gameplay panel)

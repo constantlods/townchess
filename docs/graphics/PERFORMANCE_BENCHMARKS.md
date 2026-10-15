@@ -160,3 +160,12 @@ at 67%, 64.5 fps, 3.1 GB). That scene had no MetaHumans and fewer lights, so it 
 (8.1 ms GPU at 60.6%) gives roughly 19-20 ms, about 50 fps, at 1440p High today. After the light-count fix in
 RENDERER_AUDIT.md it would be about 60 fps. VRAM at High was 5.4 GB on NVIDIA, inside 8 GB with little margin for 8K
 MetaHuman virtual textures.
+
+## D1 screen percentage per tier (lead, 2026-10-14, commit f43a8af, packaged Development, offscreen)
+
+Epic now renders at 83% (log: `quality: epic (level 3), hardware ray tracing on, screen percentage 83`) instead of the
+engine's automatic 60.6% at 1440p. `beta_checks.ps1 -Games 0` at 2560x1440: **82.3 fps average, 71.7 fps 1% low**
+(54-ply game to checkmate, 0 failures; at auto 60.6% the same build ran 116.1 / 96.3). S3 targets (60 / 45) met with
+margin, offscreen only (no present cost). VRAM after the run 3129 MiB. Benchmark-camera captures (scene capture, not
+driven by the screen percentage): main 28.2 / 96.5 / 1.492 / 1.694, detail 9.49; Black seat 26.5 / 91.5 / 1.511 / 1.695,
+detail 9.16 (same as C3).
