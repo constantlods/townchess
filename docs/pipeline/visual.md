@@ -1,6 +1,7 @@
 # Visual judge report (stage 2)
 
-Latest: **run 6 (2026-10-15, base `da356aa`), at the end of this file**: average 6.00; V3, V4 and V5 not met.
+Latest: **run 7 (2026-10-16, base `b847d2d`), at the end of this file**: average 6.27; V3, V4 and V5 not met.
+Previous: run 6 (2026-10-15, base `da356aa`): average 6.00.
 
 Date: 2026-10-13. Run "baseline 2026-10-13" (independent judge, role 15), base `a82c55d`. Reference:
 `docs/reference/concept-reference.jpg`, main panel (top-left, 0..1045 x 0..685) plus the HAND CUSTOMIZATION panel.
@@ -249,3 +250,127 @@ the idle pose. The opponent's fingertips touch the front of the cage; no penetra
 5. **The room has no story props, and its surfaces are stretched.** No WARD B sign in frame, no window or cold
    source. A streaky wall panel behind the lamp, and a double-printed clipboard header (V5 #5, #7). Owner:
    board/environment.
+
+---
+
+# Run 7 (2026-10-16): judge re-score after C7, C8b, C9, C8m and the watch fix
+
+Base `b847d2d` (upstream; contains 5473d2d: C7 lighting, C8b board/environment, C9 window, C8m materials, 25a2edf watch
+bezel). Build PC: lock `judge` 18:22-18:38 PC time (after the lead's gallery hold); `git pull` (already at b847d2d),
+L_Table rebuilt with `setup_content.ps1` (BUILD OK, 170 actors). Captures: the run 6 driver unchanged
+(`C:\TownChess\judge\judge_capture7.ps1` = `judge_capture.ps1` with an `r7_` prefix), `capture.ps1 -Preset epic
+1920x1080 -WarmSec 22`, the same 19 cameras as run 6, plus main and Black seat again with `-TCGamePath=1` (Epic 83 %
+screen percentage + TSR, what the player sees). Evidence (1280x720): `docs/graphics/judge/run7-*.jpg`, same names as
+run 6; `run7-main-gamepath.jpg` and `run7-black-gamepath.jpg` are the scored main/Black frames; `run7-crops.jpg` =
+game-path crops at 1x (row 1: lamp + wall + window, window + WARD B, opponent torso; row 2: left hand, right hand,
+clipboard/right table). Coordinates are in the 1920x1080 originals. Specialists' reports were not used for scoring.
+
+V1/V2 (1045 px, Rec.709; the script reproduces the reference at 26.62 / 97.1 / 1.443 / 1.619 / 12.94):
+
+| Frame | Mean | p95 | r/g | g/b | Detail (V2) | Median | < luma 8 |
+|---|---|---|---|---|---|---|---|
+| Main, full res | 28.99 | 97.1 | 1.472 | 1.661 | 11.48 | 15.1 | 38.3 % |
+| Main, game path | 28.98 | 96.7 | 1.472 | 1.657 | 11.14 | 15.3 | 38.0 % |
+| Black, full res | 27.25 | 90.9 | 1.484 | 1.656 | 11.08 | 14.1 | 38.8 % |
+| Black, game path | 27.60 | 92.2 | 1.479 | 1.650 | 10.81 | 14.3 | 38.7 % |
+
+V1 met in all four. V2 not met (main full res 0.02 under 11.5; the game path loses ~0.35 to TSR upscaling).
+Region luma (main, both paths within 1 %): lamp mouth p95 215 (art direction >= 200: met), scalp p95 103 (<= 90: not
+met), window p95 135 (cold accent <= 50: not met), board mean 59 (40-50: hot), left hand mean 33 (22-35: met).
+
+## Findings first (evidence)
+
+1. **The lamp is now the key.** The mouth is a warm, glowing enamel band with a brass rim and is the brightest thing in
+   frame (p95 215; `run7-lamp`; main x 340-620, y 110-200). No bulb or hot core is visible, but it reads as a light.
+2. **The room has its story props.** A cold barred window between the lamp and the head (main x 650-760, y 20-250),
+   WARD B with an arrow on the back wall (x 1140-1280, y 30-200), the wood cabinet behind the lamp. Weak points: the
+   panes are a flat, uniform blue-grey "lightbox" and its bars look bent; the sign is half hidden by cell bars and the head.
+3. **New: dashed specular sparkle on the vertical bars** in front of the window and lamp (main x 560-940, y 0-300), in
+   both paths (stronger on the game path). It reads as a dotted line of white pixels, not lit metal.
+4. **The opponent is still the clean, hot figure.** The bald scalp is the second-brightest region (p95 103). C8m grime
+   shows on the sleeves and as a faint red stain on the left shoulder (`run7-crops` row 1 right), but the chest is pale,
+   smooth beige and the face is clean; the reference is a filthy, dark stained jacket. The face now has a wet sheen
+   (`run7-cage-side`), which helps.
+5. **Wood is still procedural.** The C8m gouges are continuous, but read as pale paired "claw swoosh" strokes drawn on
+   the surface (main x 0-260, y 815-875; x 1670-1920, y 780-890 over a red smear). The near-edge face is still fuzzy
+   streaks (`run7-table-edge` y 450-840), and a hard-edged red rectangle remains on the table (`run7-table-edge`
+   x 1380-1490, y 375-495). The board's pit grid is gone (`run7-rook`).
+6. **The game path costs little.** Side by side, the game-path frames are slightly softer (detail -0.34) and show the
+   same defects; no row scores differently between the paths.
+
+## Scores (0-10 vs the reference; main and Black rows from the game-path frames)
+
+| Element | Run 6 | Run 7 | Change | Evidence |
+|---|---|---|---|---|
+| Opponent: face | 6 | 6 | same | Wet sheen now (`run7-cage-side`); clean skin; scalp p95 103 is the hottest highlight after the lamp |
+| Opponent: body/pose | 7 | 7 | same | Steepled hands at the cage, unchanged (`run7-main-gamepath` x 840-1000, y 240-480) |
+| Opponent: clothing | 5 | 6 | better | Grimed sleeves, a shoulder stain, weave dither mostly gone. The chest is still pale clean beige; far from the reference jacket |
+| Mask | 7 | 7 | same | Hammered iron, brow band, nose strap (`run7-opponent`). Wire basket, no rust |
+| Player hands | 6 | 6 | same | Veins and specks read; some sheen variation. Index/middle tips are smooth caps; blotchy dirt up close (V4) |
+| Pieces | 6 | 6 | same | Matte beige, few dents; faceted knight; pale patch on the left knight's neck; black set reads as bronze (`run7-opponent-hands`) |
+| Board | 6 | 7 | better | Pit grid gone; mottled grimy squares, brass pins, dark frame (`run7-rook`, `run7-hands`) |
+| Blood / wear | 5 | 5 | same | Vivid saturated red, brighter than the wood (`run7-rook` x 600-1200, y 120-300), against VISUAL_ART_DIRECTION 5. A red rectangle on the table. None on pieces or hands |
+| Table | 5 | 5 | same | Continuous gouges, but drawn-looking claw strokes, a fuzzy near edge, no peeling varnish or worn patches (finding 5) |
+| Props / clutter | 6 | 6 | same | Single clipboard header (`run7-clipboard`), lamp better. The record is upside down from the seat and its lines smear into horizontal streaks (main x 1430-1900, y 590-720); the right cabinet top is a pale untextured slab (x 1720-1920, y 490-690) |
+| Environment | 6 | 7 | better | Window, WARD B sign, cabinet, cell bars, beds: the reference's depth cues are in frame. Lightbox window, half-hidden sign |
+| Lighting | 6 | 7 | better | Visible lamp key (p95 215), board pool, a cold back source. Scalp p95 103, window too bright (135), board mean 59, bar sparkle |
+| Camera / composition | 7 | 7 | same | Unchanged; close to the reference. Wrists cut by the bottom edge |
+| UI / HUD | 6 | 6 | same | Unchanged cards and timers; the player portrait is still a smear (main x 35-100, y 28-90) |
+| Black-seat view | 6 | 6 | same | Correct flip and HUD swap (`run7-black-gamepath`). Carries the main view's gains and defects; lowest detail (10.81) |
+| **Average** | **6.00** | **6.27** (15 rows) | +0.27 | 2 rows at 5 (blood/wear, table); 5 rows at 7 |
+
+The full-res frames score the same on every row, so run 6 stays comparable (6.27 either way).
+
+**V3 (every row >= 6, average >= 7): not met.** Average 6.27; blood/wear and table at 5.
+
+**V4 (hands >= 7: veins, dirt, nails): 6/10, not met.**
+- Veins: read from the seat (`run7-hand-seat-left` x 300-1000, y 250-600); still lumpy and worm-like.
+- Dirt: reads from the seat as crease specks and smudges (`run7-hand-seat-right` x 900-1200, y 300-500); up close it
+  is a leopard-blotch pattern on the fingers (`run7-nails` x 780-1400, y 0-500). In the main view it barely reads.
+- Nails: the right thumbnail reads (`run7-hand-seat-right` x 570-650, y 780-870). The left index and middle tips are
+  smooth rounded caps with no nail (`run7-hand-seat-left` x 1230-1410, y 180-600). No nail reads in the main view.
+- Skin: some roughness variation on the knuckles now (C8m), still a uniform orange albedo, no scars.
+
+**V5 (no placeholder, broken or clipping asset): not met.**
+
+| # | Run 6 defect | Run 7 |
+|---|---|---|
+| 1 | Gown shadow dither | partly fixed: mostly gone; a mild stipple remains in the shoulder shadow (main x 1000-1150, y 380-560) |
+| 2 | Dark grain in the right white rook's crown | still present, minor (main x 1385-1420, y 710-725); C7 attributes it to crenel shadows |
+| 3 | Rectangular red decal on the near edge | partly fixed: gone from the edge in the main view; a hard-edged red rectangle remains on the table (`run7-table-edge` x 1380-1490, y 375-495) |
+| 4 | Fur-like streaks on the near-edge face | still present (`run7-table-edge` y 450-840, `run7-hands` y 650-1080) |
+| 5 | Streaky wall panel behind the lamp | partly fixed: now a wood cabinet face (`run7-beds`); from the seat still a bright gridded panel (main x 360-500, y 170-500) |
+| 6 | Lamp mouth a flat grey band | fixed: warm glowing enamel + brass rim (`run7-lamp`) |
+| 7 | Double clipboard header | fixed (`run7-clipboard`) |
+| 8 | Pale rectangle on the left knight's neck | still present, now confirmed (main x 625-645, y 765-780) |
+| 9 | Pin-prick dot grid on the squares | fixed (`run7-rook`, `run7-rook-seat`) |
+| 10 | Dashed gouges with a hairline halo | partly fixed: continuous, no halo, but they read as drawn claw strokes |
+| 11 | Faceted knight and watch bezel | bezel fixed (`run7-watch-dial`); knight still faceted (`run7-nails` x 0-900) |
+| 12 | Sleeve grime band edge, cuff weave stretch | partly fixed: softer band (`run7-sleeve-watch`); the weave still stretches on the cuff roll (`run7-watch-strap`) |
+| 13 | Blocky strap tab | still present (`run7-watch-strap` x 1490-1920, y 480-910) |
+| base 10 | HUD player portrait smear | still present |
+
+New defects:
+1. Dashed white specular sparkle along the cell bars and window bars, both paths (main x 560-940, y 0-300).
+2. The window is a flat, uniform blue-grey panel with bent-looking bars, too bright for a cold accent (p95 135).
+3. Saturated blood brighter than the wood around it (`run7-rook`; `run7-hands` x 0-90, y 510-630).
+4. The clipboard record's lines smear into horizontal streaks from the seat, both paths (main x 1430-1900, y 590-720).
+5. The right cabinet top reads as a pale untextured slab (main x 1720-1920, y 490-690; present in run 6, not listed).
+
+Checked and not found: no world-grid materials, no floating props, no hand-piece or finger-cage penetration; the
+captured white piece on the table left of the board stands upright.
+
+## Top 5 remaining gaps (ranked by payoff)
+
+1. **Table and blood (the two rows that block V3).** Drawn claw strokes, a fuzzy near edge, a red rectangle, no varnish
+   wear; blood saturated and brighter than the wood. Owner: materials (wood and blood shaders: oxidised dark blood,
+   grain-aligned wear), with board/environment for decal shapes and placement.
+2. **The opponent reads clean and hot.** Scalp p95 103, a pale clean chest, a clean face. Owner: materials (scalp and
+   gown grime, darker gown albedo), with the rendering architect (`Lamp_Opponent` aim off the scalp).
+3. **Hand skin (V4).** Nails on index/middle, fingertip shape, cavity-driven dirt instead of blotches, albedo
+   variation. Owner: hands/character (mesh, nails), with materials (skin textures).
+4. **Pieces.** Matte beige "plastic", a faceted knight with a pale neck patch, a bronze-looking black set, no chips or
+   blood. Owner: materials (ivory/ebony varnish, chips, the knight's texture patch), board/environment (knight mesh).
+5. **Background accents.** Bar sparkle, the lightbox window, a half-hidden WARD B, the white cabinet slab, the HUD
+   portrait. Owner: rendering architect (bar specular/shadow aliasing, window intensity), board/environment (window
+   glass, sign placement, cabinet material), lead (HUD portrait).
