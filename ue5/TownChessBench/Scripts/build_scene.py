@@ -2568,7 +2568,9 @@ def build():
                     t = import_texture(os.path.join(ui_dir, f), f"{ROOT}/UI", os.path.splitext(f)[0], "color")
                     if t:
                         setp(t, "lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
-                        setp(t, "mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+                        # mips: the 256 px tile is drawn at ~62-83 px; without mips it was point-minified and the judge
+                        # read the player portrait as a smear (runs 6-7)
+                        setp(t, "mip_gen_settings", unreal.TextureMipGenSettings.TMGS_SHARPEN2)
                         EAL.save_loaded_asset(t)
         # HUD fonts (ATCHUD loads them by path; DefaultGame.ini always cooks /Game/TownChess/Fonts): Lato for play text,
         # Courier Prime Regular for the thin monospace section titles of the reference
