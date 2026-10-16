@@ -2952,7 +2952,7 @@ def build():
     # C7 (judge run 6: the scalp out-shone the lamp): 170 -> TC_OPP lm (default 140): scalp p99 125 -> 113. 110 lm
     # (p99 100) cost 0.11 of V2 detail on the opponent; a 30 deg cone at 170 lm made the scalp brighter (p99 160)
     tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (68, 0, top + 18)), float(os.environ.get("TC_OPP", 140)), 2400, 400, float(os.environ.get("TC_OPPCONE", 40)), src=2.5, vol=0.6))
-    rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), 4500, 6800, 260, 40, 700, vol=1.5)
+    rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), float(os.environ.get("TC_WASH", 4500)), 6800, 260, 40, 700, vol=1.5)
     # pass C2: no subject fills without a source (VISUAL_ART_DIRECTION section 4.5). Hands_Key (200 lm from the camera
     # side, 40 cm over the near table) and Table_Right (80 lm) are gone. The lamp sits beyond the board's left half, so
     # with its key alone every piece was backlit (s2: board mean 57 -> 23, pieces in silhouette): one soft warm bounce
