@@ -1162,7 +1162,10 @@ def wristwatch():
                                         rotation=(math.radians(90), 0, 0))
     crown = bpy.context.active_object
     material(crown, "M_Steel"); parts.append(crown)
-    _join_uv(parts, "SM_WatchBody")
+    body = _join_uv(parts, "SM_WatchBody")
+    # judge run 6 / C8b: the case, bezel and lugs exported flat face normals (only the strap was smoothed) and the bezel
+    # rendered faceted; smooth by angle keeps the bevelled edges crisp
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
     # dial: a flat disc just above the case top (zc + 3.75 mm), inside the bezel; UV = top view (12 o'clock towards the hand, +X)
     bpy.ops.mesh.primitive_circle_add(vertices=64, radius=0.0145, fill_type="NGON", location=(0, 0, zc + 0.0041))
     dial = bpy.context.active_object
