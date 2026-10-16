@@ -34,6 +34,7 @@ ap.add_argument("--out", required=True)
 ap.add_argument("--variants", default="bare,dirty,scarred,tattooed,gloves")
 ap.add_argument("--seed", type=int, default=7)
 ap.add_argument("--preview", action="store_true", help="also write 1K crops of the hand islands")
+ap.add_argument("--srmf", default=None, help="the body's T_Body_SRMF_VT.tga (8K): also write T_PlayerSkin_<variant>_SRMF.png")
 a = ap.parse_args()
 os.makedirs(a.out, exist_ok=True)
 R = 4096
@@ -474,11 +475,12 @@ def variant(name, rng):
     col = bc_full[yy, xx].copy()
     vt = vein * 0.85
     col *= (1 - np.stack([0.20 * vt, 0.13 * vt, 0.02 * vt], 1))
-    col = col * (1 - 0.12 * knuck_red[:, None]) + col * np.array([1.18, 0.86, 0.84], np.float32) * 0.12 * knuck_red[:, None]
+    # C8 (judge run 6: "one waxy orange tone"): redder knuckles (0.12 -> 0.25) and paler palms (0.12 -> 0.25, below)
+    col = col * (1 - 0.25 * knuck_red[:, None]) + col * np.array([1.2, 0.84, 0.82], np.float32) * 0.25 * knuck_red[:, None]
     # subdermal: +-5 % blood-flow mottling (redder where positive), a redder wrist crease, a paler cooler underside
     col *= 1 + sub_mot[:, None] * np.array([0.06, 0.03, 0.025], np.float32)
     col = col * (1 - 0.1 * wrist_red[:, None]) + col * np.array([1.15, 0.9, 0.88], np.float32) * 0.1 * wrist_red[:, None]
-    col = col * (1 - 0.12 * underside[:, None]) + np.clip(col * np.array([1.06, 1.08, 1.12], np.float32), 0, 1) * 0.12 * underside[:, None]
+    col = col * (1 - 0.25 * underside[:, None]) + np.clip(col * np.array([1.1, 1.12, 1.16], np.float32), 0, 1) * 0.25 * underside[:, None]
     col *= 1 - 0.07 * spots[:, None] * np.array([0.7, 0.9, 1.0], np.float32)
     # grime film: grey-brown, at most ~20 % darker (a uniform layer of handling dirt, not patches)
     lum = (col * np.array([0.2126, 0.7152, 0.0722], np.float32)).sum(1, keepdims=True)
@@ -551,6 +553,23 @@ def variant(name, rng):
     del out, delta
     flat = dense((leg | (glove > 0.5 if name == "gloves" else np.zeros(len(idx), bool))).astype(np.float32))
     write_normal(name, sx.astype(np.float32), sy.astype(np.float32), ndimage.gaussian_filter(flat, 2.0))
+    if a.srmf:
+        # C8 skin roughness from the dirt (C6 open item; judge run 6: "waxy, no roughness or wetness driven by the dirt").
+        # SRMF = R specular, G roughness, B 0, A the body's mask (kept). Dirt in the creases and nail folds is matte and
+        # dull; a slow +-0.05 roughness drift breaks the one uniform highlight; palms are drier; nail plates are glossier.
+        # The dirty variant (the patient, and the player's "Dirty" option) is damp: the clean skin between the dirt is
+        # wetter (lower roughness, a little more specular). The uniform specular comes down 15 % everywhere on the arms.
+        damp = 1.0 if name == "dirty" else 0.0
+        drift = fbm(pos * 0.6, 2, 81)
+        dirtm = np.clip(g * max(grime_amt, 0.6) * 1.6, 0, 1)   # the crease dirt, at least at "dirty"-like strength
+        rough_d = (0.4 * dirtm + 0.12 * film_amt + 0.3 * nail_dirt + 0.08 * drift + 0.06 * underside
+                   - 0.15 * nl - damp * 0.15 * (1 - dirtm))
+        spec_m = 0.82 * (1 - 0.5 * dirtm - 0.15 * film_amt - 0.4 * nail_dirt) * (1 + 0.1 * drift) * (1 + 0.3 * nl) * (1 + 0.15 * damp)
+        if name == "gloves":
+            rough_d = rough_d * (1 - glove) + glove * (0.05 + 0.1 * np.clip(cre + grime, 0, 1))
+        rough_d = np.where(leg, 0.2, rough_d)     # trousers: matte cotton
+        spec_m = np.where(leg, 0.6, spec_m)
+        write_srmf(name, rough_d.astype(np.float32), spec_m.astype(np.float32))
 
 
 def write_normal(name, sx, sy, flat):
@@ -576,6 +595,31 @@ def write_normal(name, sx, sy, flat):
     log("wrote", name)
 
 
+def write_srmf(name, rough_d, spec_m):
+    """the body's SRMF (8K) with our roughness offset and specular factor on the arm/leg texels (4K, doubled)"""
+    rd = dilate_fill(dense(rough_d), arm_mask, 6)
+    sm = dilate_fill(dense(spec_m, 1.0), arm_mask, 6)
+    sm = np.where(arm_mask | (ndimage.distance_transform_edt(~arm_mask) <= 6), sm, 1.0).astype(np.float32)
+    rd = np.where(arm_mask | (ndimage.distance_transform_edt(~arm_mask) <= 6), rd, 0.0).astype(np.float32)
+    out = SRMF.copy()
+    W = out.shape[0]
+    f = W // R
+    for y0 in range(0, W, 1024):
+        ys = slice(y0 // f, (y0 + 1024) // f)
+        r_ = np.repeat(np.repeat(rd[ys], f, 0), f, 1)
+        s_ = np.repeat(np.repeat(sm[ys], f, 0), f, 1)
+        blk = out[y0:y0 + 1024].astype(np.float32)
+        blk[..., 0] = blk[..., 0] * s_
+        blk[..., 1] = blk[..., 1] + r_ * 255
+        out[y0:y0 + 1024] = np.clip(blk + 0.5, 0, 255).astype(np.uint8)
+    Image.fromarray(out, "RGBA").save(os.path.join(a.out, f"T_PlayerSkin_{name}_SRMF.png"), optimize=False)
+    log("wrote", name, "SRMF")
+
+
+SRMF = None
+if a.srmf:
+    SRMF = np.asarray(Image.open(a.srmf).convert("RGBA")).copy()
+    log("srmf", SRMF.shape, "median spec/rough", np.median(SRMF[::16, ::16, 0]), np.median(SRMF[::16, ::16, 1]))
 rng = np.random.default_rng(a.seed)
 for name in a.variants.split(","):
     variant(name, rng)

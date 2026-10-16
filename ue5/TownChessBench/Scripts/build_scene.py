@@ -263,6 +263,23 @@ def build_master_material(defaults):
     cdk = op(unreal.MaterialExpressionMultiply, cav, scalar("CavityDarken", 0.0, -700, 1700), -550, 1600)
     cdk1 = expr(unreal.MaterialExpressionOneMinus, -420, 1600)
     MEL.connect_material_expressions(cdk, "", cdk1, "")
+    # C8 top mask (C7 diagnosis: the rook-crown specks are the lamp key's real crenel shadows, 2-4 px at the seat): the
+    # up-facing surfaces above TopMaskZ (mesh-local cm) darker and rougher, so the crown floor's lit and shadowed patches
+    # read alike. TopMaskZ default 1e6 = off.
+    lpos = expr(unreal.MaterialExpressionLocalPosition, -1400, 2000)
+    lz = mask(lpos, "b", -1300, 2000)
+    t1 = expr(unreal.MaterialExpressionSaturate, -1000, 2000)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionMultiply,
+                                        op(unreal.MaterialExpressionSubtract, lz, scalar("TopMaskZ", 1.0e6, -1300, 2100), -1200, 2000),
+                                        1.5, -1100, 2000), "", t1, "")
+    vnw = expr(unreal.MaterialExpressionVertexNormalWS, -1400, 2200)
+    vz = mask(vnw, "b", -1300, 2200)
+    t2 = expr(unreal.MaterialExpressionSaturate, -1000, 2200)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionMultiply, op(unreal.MaterialExpressionSubtract, vz, 0.5, -1200, 2200), 3.0, -1100, 2200), "", t2, "")
+    topm = op(unreal.MaterialExpressionMultiply, t1, t2, -900, 2100)
+    tdk = expr(unreal.MaterialExpressionOneMinus, -700, 2100)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionMultiply, topm, scalar("TopDarken", 0.0, -900, 2200), -800, 2100), "", tdk, "")
+    cdk1 = op(unreal.MaterialExpressionMultiply, cdk1, tdk, -350, 1650)
     bcc = op(unreal.MaterialExpressionMultiply, bcd, cdk1, 0, -500)
     MEL.connect_material_property(bcc, "", unreal.MaterialProperty.MP_BASE_COLOR)
     csp = op(unreal.MaterialExpressionMultiply, cav, scalar("CavitySpec", 0.0, -700, 1800), -550, 1800)
@@ -280,6 +297,18 @@ def build_master_material(defaults):
     flat = expr(unreal.MaterialExpressionConstant3Vector, -700, 120)
     flat.set_editor_property("constant", unreal.LinearColor(0, 0, 1, 1))
     nstr = scalar("NormalStrength", 1.0, -700, 200)
+    # C8 normal fade (C7 finding: the patient's linen weave at tiling 5 is finer than a pixel at the seat and dithered
+    # the G-buffer normal, read as shadow noise on the gown): full map while one pixel covers < 1/NormalFadeInv cm,
+    # flat at twice that. NormalFadeInv 0 (default) = never fades.
+    nfade = expr(unreal.MaterialExpressionSaturate, -900, 1400)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionSubtract, 2.0,
+                                        op(unreal.MaterialExpressionMultiply, pxw, scalar("NormalFadeInv", 0.0, -1100, 1400), -1000, 1400),
+                                        -950, 1400), "", nfade, "")
+    nstr = op(unreal.MaterialExpressionMultiply, nstr, nfade, -600, 250)
+    # ... and WearMask.B (default 0) flattens it where the mesh's UVs stretch the tiled scan (the sleeve's rolled cuff)
+    wmb = expr(unreal.MaterialExpressionOneMinus, -700, 300)
+    MEL.connect_material_expressions(wm, "B", wmb, "")
+    nstr = op(unreal.MaterialExpressionMultiply, nstr, wmb, -560, 300)
     nl = expr(unreal.MaterialExpressionLinearInterpolate, -450, 0)
     MEL.connect_material_expressions(flat, "", nl, "A")
     MEL.connect_material_expressions(nm, "RGB", nl, "B")
@@ -343,7 +372,8 @@ def build_master_material(defaults):
     MEL.connect_material_expressions(drm, "", radd2, "B")
     crg = op(unreal.MaterialExpressionMultiply, cav, scalar("CavityRough", 0.0, -700, 1900), -550, 1900)
     rsat = expr(unreal.MaterialExpressionSaturate, -100, 400)
-    MEL.connect_material_expressions(op(unreal.MaterialExpressionAdd, radd2, crg, -120, 520), "", rsat, "")
+    trg = op(unreal.MaterialExpressionMultiply, topm, scalar("TopRough", 0.0, -700, 2300), -550, 2300)
+    MEL.connect_material_expressions(op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionAdd, radd2, crg, -120, 520), trg, -110, 560), "", rsat, "")
     # C6 specular anti-aliasing: alpha^2 + SpecAA x footprint^2 (a pixel-sized NDF widening, Kaplanyan-style but from
     # the analytic footprint instead of normal derivatives). SpecAA 0 (default) = sqrt(r^2) = r.
     r2 = op(unreal.MaterialExpressionMultiply, rsat, rsat, 0, 400)
@@ -682,6 +712,28 @@ def blood_decals():
     fneg = E(unreal.MaterialExpressionMultiply, -780, 550); MEL.connect_material_expressions(fsub, "", fneg, "A"); fneg.set_editor_property("const_b", -8.0)
     fsat = E(unreal.MaterialExpressionSaturate, -660, 550); MEL.connect_material_expressions(fneg, "", fsat, "")
     op = E(unreal.MaterialExpressionMultiply, -540, 450); MEL.connect_material_expressions(bc, "A", op, "A"); MEL.connect_material_expressions(fsat, "", op, "B")
+    # C8 slope fade: every wear decal projects straight down, and where its box reaches over the table's edge it
+    # smeared its texture down the vertical face (judge run 6: the fur-like near edge and the hard-edged red rectangle,
+    # V5 #3/#4). The receiving surface's normal comes from the screen derivatives of the reconstructed world position
+    # (no GBuffer read, so it works for DBuffer decals too); the decal fades out where the surface is steeper than ~45 deg.
+    try:
+        wp = E(unreal.MaterialExpressionWorldPosition, -1500, 800)
+        dx = E(unreal.MaterialExpressionDDX, -1350, 760); MEL.connect_material_expressions(wp, "", dx, "")
+        dy = E(unreal.MaterialExpressionDDY, -1350, 840); MEL.connect_material_expressions(wp, "", dy, "")
+        cr = E(unreal.MaterialExpressionCrossProduct, -1200, 800); MEL.connect_material_expressions(dx, "", cr, "A"); MEL.connect_material_expressions(dy, "", cr, "B")
+        nn = E(unreal.MaterialExpressionNormalize, -1080, 800); MEL.connect_material_expressions(cr, "", nn, "")
+        nz = E(unreal.MaterialExpressionComponentMask, -960, 800)
+        for ch in "rgba":
+            nz.set_editor_property(ch, ch == "b")
+        MEL.connect_material_expressions(nn, "", nz, "")
+        az = E(unreal.MaterialExpressionAbs, -850, 800); MEL.connect_material_expressions(nz, "", az, "")
+        sf = E(unreal.MaterialExpressionSmoothStep, -740, 800); MEL.connect_material_expressions(az, "", sf, "Value")
+        for pin, v, yy in (("Min", 0.6, 880), ("Max", 0.85, 940)):
+            kk = E(unreal.MaterialExpressionConstant, -900, yy); kk.set_editor_property("r", v); MEL.connect_material_expressions(kk, "", sf, pin)
+        op2 = E(unreal.MaterialExpressionMultiply, -420, 500); MEL.connect_material_expressions(op, "", op2, "A"); MEL.connect_material_expressions(sf, "", op2, "B")
+        op = op2
+    except Exception as e:
+        log("WARNING decal slope fade skipped", e)
     MEL.connect_material_property(op, "", unreal.MaterialProperty.MP_OPACITY)
     # (the generated relief map shaded the blood near-black under the lamp; colour + gloss only for now)
     # thick blood is glossy, but a near-mirror reflects the dark room and reads black: keep it satin (0.32..0.8)
@@ -1920,6 +1972,10 @@ def look_at_rot(src, dst):
 # ---------------------------------------------------------------- scene
 
 SKIN_DIR = os.environ.get("TC_SKIN_DIR", os.path.join(os.path.dirname(ASSETS), "skin"))
+SKIN_ASSET_VERSION = "_C8"
+# factors on the parent's own values (multiply-type controls only: the first C8 build set "Basecolor Global Saturation
+# Post-Bake" 0.88 as if it were a factor and the skin rendered saturated red; it is not a multiplier)
+PLAYER_SKIN_POST = {"Specular Global Multiply Post-Bake": 0.75}
 
 
 def player_skins(mhn):
@@ -1941,30 +1997,56 @@ def player_skins(mhn):
     except Exception as e:
         log("skin parent params unavailable", e)
     reimport = os.environ.get("TC_SKIN_REIMPORT", "0") == "1"
+    reimport_kinds = set(filter(None, os.environ.get("TC_SKIN_REIMPORT_KINDS", "").split(",")))  # e.g. BC,SRMF: skip the 8K normals
     for f in sorted(os.listdir(SKIN_DIR)):
         if not (f.startswith("T_PlayerSkin_") and f.endswith("_BC.png")):
             continue
         var = f[len("T_PlayerSkin_"):-len("_BC.png")]
         texs = {}
-        for kind, suffix in (("color", "BC"), ("normal", "N")):
-            name = f"T_PlayerSkin_{var}_{suffix}"
-            src = os.path.join(SKIN_DIR, name + ".png")
-            if reimport or not EAL.does_asset_exist(f"{dest}/{name}"):
+        # C8: SRMF (R specular, G roughness, B 0, A the body's own mask) from skin.py --srmf: roughness raised by the
+        # cavity dirt, a wet sheen on the dirty variant, less of the uniform "waxy" specular. Optional: without the PNG
+        # the variant keeps the parent's SRMF.
+        for kind, suffix in (("color", "BC"), ("normal", "N"), ("linear", "SRMF")):
+            src = os.path.join(SKIN_DIR, f"T_PlayerSkin_{var}_{suffix}.png")
+            # C8: the regenerated BC/SRMF get versioned asset names, so a build imports them once by itself (an unchanged
+            # name would keep the old import unless TC_SKIN_REIMPORT is set) and builds of older revisions keep theirs
+            name = f"T_PlayerSkin_{var}_{suffix}" + (SKIN_ASSET_VERSION if suffix != "N" else "")
+            if suffix == "SRMF" and not os.path.exists(src) and not EAL.does_asset_exist(f"{dest}/{name}"):
+                continue
+            if reimport or suffix in reimport_kinds or not EAL.does_asset_exist(f"{dest}/{name}"):
                 if not os.path.exists(src):
                     break
                 tex = import_texture(src, dest, name, kind)
+                if suffix == "SRMF":
+                    try:  # match the parent's own SRMF texture (compression, sRGB) so the VT sampler type agrees
+                        ref = mel.get_material_instance_texture_parameter_value(parent, "SRMF Baked VT")
+                        for prop in ("compression_settings", "srgb"):
+                            tex.set_editor_property(prop, ref.get_editor_property(prop))
+                        log("skin SRMF", name, "as", ref.get_name(), ref.get_editor_property("compression_settings"), ref.get_editor_property("srgb"))
+                    except Exception as e:
+                        log("WARNING skin SRMF settings", e)
                 tex.set_editor_property("virtual_texture_streaming", True)  # the parent samples them as virtual textures
                 tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_CHARACTER_NORMAL_MAP if kind == "normal"
                                         else unreal.TextureGroup.TEXTUREGROUP_CHARACTER)
                 EAL.save_loaded_asset(tex)
             texs[suffix] = unreal.load_asset(f"{dest}/{name}")
-        if len(texs) < 2:
+        if "BC" not in texs or "N" not in texs:
             continue
-        mi = AT.create_asset(f"MI_PlayerSkin_{var}", dest, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew()) \
-            if not EAL.does_asset_exist(f"{dest}/MI_PlayerSkin_{var}") else unreal.load_asset(f"{dest}/MI_PlayerSkin_{var}")
+        # C8: recreated every build. A reused instance kept every override an earlier build set (a C8 WIP build's
+        # saturation and SRMF overrides survived clean upstream rebuilds and rendered the hands red on the build PC)
+        if EAL.does_asset_exist(f"{dest}/MI_PlayerSkin_{var}"):
+            EAL.delete_asset(f"{dest}/MI_PlayerSkin_{var}")
+        mi = AT.create_asset(f"MI_PlayerSkin_{var}", dest, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
         mel.set_material_instance_parent(mi, parent)
         mel.set_material_instance_texture_parameter_value(mi, "Basecolor Baked VT", texs["BC"])
         mel.set_material_instance_texture_parameter_value(mi, "Normal Baked VT", texs["N"])
+        if texs.get("SRMF"):
+            mel.set_material_instance_texture_parameter_value(mi, "SRMF Baked VT", texs["SRMF"])
+        # C8 (judge run 6: "one waxy orange tone"): a little less specular and saturation overall; the SRMF does the rest
+        for k, v in PLAYER_SKIN_POST.items():
+            mel.set_material_instance_scalar_parameter_value(mi, k, v * mel.get_material_instance_scalar_parameter_value(parent, k))
+        done = {k: round(mel.get_material_instance_scalar_parameter_value(mi, k), 2) for k in PLAYER_SKIN_POST}
+        log("player skin", var, "post-bake", done)
         EAL.save_loaded_asset(mi)
         out[var] = mi
     log("player skins", sorted(out))
@@ -1984,6 +2066,10 @@ def outfit_slot_material(spec, orig):
         return _OUTFIT_MIS[path]
     if EAL.does_asset_exist(path):
         EAL.delete_asset(path)
+    gown = gown_material(spec, orig, name, dest)
+    if gown:
+        _OUTFIT_MIS[path] = gown
+        return gown
     try:
         tint = MEL.get_material_instance_vector_parameter_value(spec, "Tint")
     except Exception:
@@ -2003,6 +2089,90 @@ def outfit_slot_material(spec, orig):
 
 
 _OUTFIT_MIS = {}
+GARMENT_DIR = os.environ.get("TC_GARMENT_DIR", os.path.join(os.path.dirname(ASSETS), "garment"))
+GOWN_SPECS = ("MI_PatientShirt",)
+
+
+def gown_material(spec, orig, name, dest):
+    """C8 (judge run 6: opponent clothing 5/10, "a clean, smooth beige gown"): the patient's garment slots as M_TC_PBR
+    instances painted by ue5/tools/textures/garment.py in the garment's own UVs (dirt pooled in the folds, soiled and
+    frayed seams, sweat, dried blood, rust), on the garment's own normal map (its folds and seams stay) with the
+    rough_linen scan's weave as the detail normal. The garment shader's fuzz is lost; canvas does not need it.
+    None (the C3 colour-only child) when the textures are missing or the slot is not a DefaultGarment part."""
+    if spec.get_name() not in GOWN_SPECS:
+        return None
+    part = next((p for p in ("Shirt", "Short") if orig.get_name().endswith("_" + p)), None)
+    bc = os.path.join(GARMENT_DIR, f"T_PatientGown_{part}_BC.png") if part else None
+    if not (bc and os.path.exists(bc)):
+        log("gown: no textures for", orig.get_name(), GARMENT_DIR)
+        return None
+    gdir = f"{ROOT}/Characters/Gown"
+    T = lambda f, k: import_texture(os.path.join(GARMENT_DIR, f"T_PatientGown_{part}_{f}.png"), gdir, f"T_PatientGown_{part}_{f}", k)
+    nrm = unreal.load_asset(f"/Game/TownChess/MetaHumans/Common/Optional/Clothing/DefaultGarment/ClothAssets/bodyShapeA/Textures/DG_bodyShapeA_{part}_Normal")
+    if nrm and nrm.get_editor_property("compression_settings") != unreal.TextureCompressionSettings.TC_NORMALMAP:
+        log("gown: garment normal is", nrm.get_editor_property("compression_settings"), "- not used")
+        nrm = None
+    lin = next((unreal.load_asset(p) for p in EAL.list_assets(f"{ROOT}/Textures/rough_linen", recursive=False) if "nor" in p.lower()), None)
+    master = spec.get_editor_property("parent")
+    mi = make_mi(master, name, {"BaseColor": T("BC", "color"), "ARM": T("ARM", "linear"), "Normal": nrm},
+                 tiling=1.0, rough=1.0, tint=(1.0, 1.0, 1.0),
+                 scalars={"NormalStrength": 1.0, "DetailTiling": 14.0, "DetailNormalStrength": 0.7, "MicroRough": 0.0,
+                          "DetailFadeInv": 20.0})  # weave off at the seat's distance (C7: a sub-pixel weave dithered the normals)
+    if lin:
+        MEL.set_material_instance_texture_parameter_value(mi, "DetailNormal", lin)
+    try:  # the garment is two-sided (collar and cuff openings show the inside)
+        bpo = mi.get_editor_property("base_property_overrides")
+        bpo.set_editor_property("override_two_sided", True)
+        bpo.set_editor_property("two_sided", True)
+        mi.set_editor_property("base_property_overrides", bpo)
+    except Exception as e:
+        log("WARNING gown two-sided", e)
+    MEL.update_material_instance(mi)
+    EAL.save_loaded_asset(mi)
+    log("gown material", name, "normal", nrm.get_name() if nrm else None, "detail", lin.get_name() if lin else None)
+    return mi
+
+
+# C8: the caged patient's face skin: grimy and damp (judge run 6: "the face and hands are clean and dry", the scalp the
+# hottest orange highlight above the board). Post-bake controls of the MetaHuman skin shader (logged by player_skins):
+# factors on the parent's own multiply controls: lower roughness with a little less specular (a wet sheen, not a hot spot).
+# (Basecolor Value/Saturation Post-Bake are not factors: setting them like this rendered the skin saturated red.)
+PATIENT_FACE = {"Roughness Global Multiply Post-Bake": 0.82, "Specular Global Multiply Post-Bake": 0.9}
+
+
+def patient_face_materials(face_actor):
+    """Children of the face's skin materials with PATIENT_FACE (every LOD's skin slot; eyes, teeth, lashes untouched)."""
+    if not face_actor:
+        return
+    smc = face_actor.skeletal_mesh_component
+    dest = f"{ROOT}/Characters/PatientFace"
+    for i in range(smc.get_num_materials()):
+        orig = smc.get_material(i)
+        if not orig or "Skin" not in orig.get_name():
+            continue
+        # the face component holds dynamic instances (MID_...); a constant child of a MID renders as untextured clay
+        # (first C8 build), so parent on the MID's own parent, the baked skin instance
+        # (isinstance did not catch them in the second build: resolve by name, MID_<asset>_<n> -> <face dir>/Materials/<asset>)
+        if orig.get_name().startswith("MID_"):
+            base = orig.get_name()[4:].rsplit("_", 1)[0]
+            fdir = smc.get_editor_property("skeletal_mesh").get_path_name().rsplit("/", 1)[0]
+            cand = f"{fdir}/Materials/{base}"
+            orig = unreal.load_asset(cand) if EAL.does_asset_exist(cand) else None
+            if not orig:
+                log("WARNING patient face: no asset", cand)
+                continue
+        name = f"MI_PatientFace_{orig.get_name()}"
+        if EAL.does_asset_exist(f"{dest}/{name}"):
+            EAL.delete_asset(f"{dest}/{name}")
+        mi = AT.create_asset(name, dest, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        MEL.set_material_instance_parent(mi, orig)
+        for k, v in PATIENT_FACE.items():
+            MEL.set_material_instance_scalar_parameter_value(mi, k, v * MEL.get_material_instance_scalar_parameter_value(orig, k))
+        done = {k: round(MEL.get_material_instance_scalar_parameter_value(mi, k), 2) for k in PATIENT_FACE}
+        MEL.update_material_instance(mi)
+        EAL.save_loaded_asset(mi)
+        smc.set_material(i, mi)
+        log("patient face", i, name, "set", done)
 
 
 METAL_ARM = None
@@ -2094,7 +2264,11 @@ def build():
     # out of the frame and put g/b at 1.704-1.718 (V1 <= 1.70) and the Black seat's r/g at 1.50
     assign(table, surface_material(master, "wood_table_worn", tiling=3.5, grime_color=(0.3, 0.22, 0.15), tint=(0.68, 0.6, 0.52),
                                    scalars={"GrimeTiling": 1.3, "GrimeThreshold": 0.22, "GrimeContrast": 1.8,
-                                            "GrimeStreaks": 0.65, "MicroRough": 0.2, "NormalStrength": 2.2}))
+                                            "GrimeStreaks": 0.65, "MicroRough": 0.2, "NormalStrength": 2.2,
+                                            # C8: handling relief (smudges, scuffs, fingerprints) as real structure on the
+                                            # large wood surfaces (judge run 6: the table reads procedural; the hairline
+                                            # "fur" that C8 removed was a share of the V2 detail)
+                                            "DetailTiling": 5.0, "DetailNormalStrength": 0.5, "DetailRough": 0.25, "DetailDarken": 0.12}))
     tlo, thi = bounds_of(table)
     # Long side runs across the player's view (along Y). Poly Haven models are centred on their origin in XY.
     yaw = 90.0 if (thi[0] - tlo[0]) > (thi[1] - tlo[1]) else 0.0
@@ -2135,6 +2309,25 @@ def build():
     assign(chess, mi_pw, lambda n: "white" in n)
     assign(chess, mi_pb, lambda n: "black" in n)
     assign(chess, mi_cb, lambda n: "board" in n)
+    # C8 rook crowns (C7: the specks are the key's real crenel shadows, 2-4 px at the seat; lighting cannot remove them):
+    # the rooks get children with the master's top mask over their crown (the top 1.4 cm, up-facing): darker and matte,
+    # so its lit and shadowed patches are closer in value
+    for colour, parent in (("white", mi_pw), ("black", mi_pb)):
+        rook = next((m for m in chess if "rook" in m.get_name().lower() and colour in m.get_name().lower()), None)
+        if not (rook and parent):
+            continue
+        rz = rook.get_bounding_box().max.z
+        name = f"MI_Rook{colour.title()}Crown"
+        if EAL.does_asset_exist(f"{ROOT}/Materials/{name}"):
+            EAL.delete_asset(f"{ROOT}/Materials/{name}")
+        mi_r = AT.create_asset(name, f"{ROOT}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        MEL.set_material_instance_parent(mi_r, parent)
+        for k, v in (("TopMaskZ", rz - 1.4), ("TopDarken", 0.45 if colour == "white" else 0.2), ("TopRough", 0.35)):
+            MEL.set_material_instance_scalar_parameter_value(mi_r, k, v)
+        MEL.update_material_instance(mi_r)
+        EAL.save_loaded_asset(mi_r)
+        assign([rook], mi_r)
+        log("rook crown mask", rook.get_name(), "top z", round(rz, 2))
     king_w = next((m for m in chess if "king_white" in m.get_name()), None)
     cyaw = 0.0
     if king_w:
@@ -2726,6 +2919,8 @@ def build():
     skins = player_skins(mhn) if (mhn and GAMEPLAY) else {}
     if smc and "dirty" in skins:  # the reference's patient has grimy hands too (and the clean tan ones caught the lamp)
         smc.set_material(0, skins["dirty"])
+    if smc:  # C8 (materials): grimy, damp face skin
+        patient_face_materials(next((a for a in EAS.get_all_level_actors() if a.get_actor_label() == "Opponent_caged_Face"), None))
     if smc and "head" in SEATED:
         cage = import_prop("cage_mask")
         if cage:
@@ -2901,9 +3096,11 @@ def build():
         # shirt (judge run 4: clothing 4/10; the reference's jacket is long-sleeved and filthy); material per actor, the
         # meshes stay the Annotator's (prop_with re-imports delete older meshes)
         if smc:
+            # C8: filthier (grime threshold 0.3 -> 0.12, darker grime), and the weave normal fades out at the seat's distance
+            # (C7-gown.jpg: the tiling-5 weave was sub-pixel there and dithered the G-buffer normal: the judge's "shadow dither")
             mi_jacket = surface_material(master, "rough_linen", name="MI_PatientJacket", tiling=5.0, tint=(0.46, 0.26, 0.13), rough=0.95,
-                                         grime_color=(0.32, 0.17, 0.1), scalars={"GrimeTiling": 1.4, "GrimeThreshold": 0.3, "GrimeContrast": 1.8,
-                                                                                    "GrimeStreaks": 0.7, "MicroRough": 0.1})
+                                         grime_color=(0.26, 0.16, 0.1), scalars={"GrimeTiling": 1.4, "GrimeThreshold": 0.12, "GrimeContrast": 1.6,
+                                                                                    "GrimeStreaks": 0.7, "MicroRough": 0.1, "NormalFadeInv": 20.0})
             arm_sleeves(smc, "Patient", "TC_Opponent_caged", mi_jacket)
         led = prop_with("ledger", {"LedgerCloth": mi_oxblood, "Pages": mi_pages, "Ribbon": mi_oxblood})
         pen = prop_with("pencil", {"PencilPaint": mi_coat, "PencilWood": mi_pages, "Ferrule": mi_copper, "Eraser": mi_oxblood})

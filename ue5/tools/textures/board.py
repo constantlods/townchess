@@ -111,15 +111,25 @@ if a.dirt > 0:
     lum = bc.mean(2)
     grain = lum - ndimage.gaussian_filter(lum, 3)                                  # dirt packed into the open grain
     bc *= (1 + np.clip(grain, -0.2, 0.0) * 2.5 * a.dirt * lightsq)[..., None]
-    pr = 0.0009 * a.dirt * (0.2 + 1.6 * mott)                                     # specks cluster in the grime
+    pr = 0.0004 * a.dirt * (0.05 + 1.9 * mott)                                    # specks cluster in the grime (C8: fewer, off the clean wood)
     specks = np.clip(ndimage.gaussian_filter((rng.random((R, R)) < pr).astype(np.float32), 0.8) * 5, 0, 1) \
         + np.clip(ndimage.gaussian_filter((rng.random((R, R)) < pr * 0.15).astype(np.float32), 2.2) * 14, 0, 1)
     bc *= (1 - 0.5 * np.clip(specks, 0, 1) * rng.uniform(0.6, 1.0, (R, R)).astype(np.float32))[..., None]
     bc += (0.05 * mott * (1 - lightsq))[..., None] * np.array([0.9, 0.85, 0.8], np.float32)  # dust and scuffs on the dark squares
-    pits = np.clip(ndimage.gaussian_filter((rng.random((R, R)) < 0.0012 * a.dirt).astype(np.float32), 1.6) * 9, 0, 1)
-    py, px = np.gradient(pits)
-    nm[..., 0] = np.clip(nm[..., 0] + px * 2.0, 0, 1)
-    nm[..., 1] = np.clip(nm[..., 1] - py * 2.0, 0, 1)
+    # C8: dents. The old pits (density 0.0012, one size, one depth: ~300 identical 0.2 mm craters per square at an even
+    # spacing) caught the lamp as a regular pin-prick grid in close-ups (judge run 6, V5 #9). Now few (~1/8), clustered
+    # where the grime is (handled areas), each a different size, depth and elongation along the grain, so they read
+    # as knocks in the wood rather than a pattern
+    seeds = (rng.random((R, R)) < 0.00015 * a.dirt * (0.15 + 1.7 * mott)) * rng.uniform(0.3, 1.0, (R, R)).astype(np.float32)
+    pits = np.zeros((R, R), np.float32)
+    for sig, share in ((1.2, 0.5), (2.6, 0.35), (5.0, 0.15)):
+        pick = seeds * (rng.random((R, R)) < share)
+        pits += ndimage.gaussian_filter(pick, (sig, sig * 2.2)) * (sig * sig * 2.2 * 6.0)   # elongated along u (the grain)
+    pits = np.clip(pits, 0, 1) * 0.7
+    py, px = np.gradient(ndimage.gaussian_filter(pits, 0.8))
+    nm[..., 0] = np.clip(nm[..., 0] + px * 1.6, 0, 1)
+    nm[..., 1] = np.clip(nm[..., 1] - py * 1.6, 0, 1)
+    bc *= (1 - 0.18 * pits)[..., None]   # dirt in the dents
     arm[..., 1] = np.clip(arm[..., 1] + 0.2 * mott, 0, 1)
 bc = bc * (1 - 0.25 * scr[..., None]) + 0.06 * scr[..., None]
 arm[..., 1] = np.clip(arm[..., 1] + 0.18 * grime + 0.25 * (1 - seam), 0, 1)   # grime and joints are matte
