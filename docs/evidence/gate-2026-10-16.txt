@@ -1,0 +1,47 @@
+CONTENT exit 0
+BUILD SUCCESSFUL
+AutomationTool exiting with ExitCode=0 (Success)
+PACKAGE exit 0
+{
+    "smoke":  "pass=True reason=plies reached plies=12 failures=0 rhi=D3D12",
+    "smokeCorePid":  8324,
+    "smokeLeftover":  0,
+    "coreStarted":  "pid 17864: C:\\TownChess\\builds\\Development\\Windows\\TownChess\\Content\\TownChessCore\\node.exe",
+    "jobObject":  "PASS core terminated with the game",
+    "defender":  "realtime=True antivirus=True",
+    "defenderDetections":  0
+}
+RELEASED by lead
+ACQUIRED by lead
+{
+    "commit":  "5473d2d Status: C8m accepted, red-skin fixed (stale MI override), C8m skins promoted to the default skin folder on the PC; FREE_ASSETS row for garment.py",
+    "started":  "2026-10-16T14:07:23",
+    "tests":  {
+                  "cpu":  "pass=True 166/166 at 2026-10-16T14:09:03",
+                  "drag":  "pass=True 8/8 at 2026-10-16T14:09:21",
+                  "keys":  "pass=True 13/13 at 2026-10-16T14:09:41",
+                  "rematch":  "pass=True 8/8 at 2026-10-16T14:10:00",
+                  "promo":  "pass=True 8/8 at 2026-10-16T14:10:17"
+              },
+    "finished":  "2026-10-16T14:10:21"
+}
+RELEASED by lead
+ACQUIRED by lead
+killed at ply 12
+PASS no orphan local core after the kill
+RECONNECT pass=True checks=28/28 
+S2 PASS 10/10
+game1 pass=True checkmate plies=70 leftover=0
+game2 pass=True checkmate plies=44 leftover=0
+game3 pass=True checkmate plies=54 leftover=0
+game4 pass=True checkmate plies=68 leftover=0
+game5 pass=True checkmate plies=88 leftover=0
+game6 pass=True checkmate plies=36 leftover=0
+game7 pass=True checkmate plies=68 leftover=0
+game8 pass=True checkmate plies=52 leftover=0
+game9 pass=True checkmate plies=54 leftover=0
+game10 pass=True checkmate plies=78 leftover=0
+PERF avg=81.0 low1=73.2 2560x1440
+RELEASED by lead
+
+[exited with code 0]
