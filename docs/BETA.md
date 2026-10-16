@@ -31,10 +31,10 @@ Status is kept in the table; the lead updates it after each milestone and the ov
 | # | Criterion | Check | Status |
 |---|---|---|---|
 | V1 | Exposure and grade | default view: mean luminance 24-30 (ref 26.6), 95th percentile <= 105 (97), red/green 1.38-1.50 (1.44), green/blue 1.55-1.70 (1.62) | met (pass 64: mean 25.3, p95 101.4, r/g 1.46, g/b 1.65; `63-main.jpg`, same view) |
-| V2 | Detail and wear | fine detail (mean abs Laplacian at 1045 px) >= 11.5 (ref 12.9) | not met: baseline 2026-10-13 measured 11.19 (Black seat 10.6) against >= 11.5; pass 64's 11.54 was within capture noise, and the metric counts film grain (judge) |
-| V3 | Visual judge | every row of docs/pipeline/visual.md >= 6/10, average >= 7/10 | not met: judge run 6 (2026-10-15, da356aa) average 6.00/10 (baseline 5.53); 3 rows at 5 (opponent clothing, blood/wear, table); docs/pipeline/visual.md |
-| V4 | Hands like the reference | player hands show veins, dirt, nails in a close-up; judge score >= 7 | not met: judge run 6 hands 6/10 (veins read, dirt sparse, nails missing from the seat on index/middle, waxy uniform skin); C5 pose fixed contact and curl |
-| V5 | No placeholder or broken asset in any view | judge finds none (floating props, world-grid materials, clipping) in the main view, Black seat, close-ups | not met: judge run 6: 7 baseline defects fixed, 1 retracted, rook specks partly fixed, portrait still reads only at 2x; 13 new defects listed (shadow dither on the gown, decal edge/fur streaks, wall panel stretch, lamp underside, double clipboard header, dot grid on squares, dashed gouges, ...); C7/C8m/C8b working on them |
+| V2 | Detail and wear | fine detail (mean abs Laplacian at 1045 px) >= 11.5 (ref 12.9) | not met: judge run 7 (b847d2d) main full res 11.48 (0.02 short of 11.5), game path 11.14; baseline 11.19 |
+| V3 | Visual judge | every row of docs/pipeline/visual.md >= 6/10, average >= 7/10 | not met: judge run 7 (2026-10-16, b847d2d) average 6.27 (run 6 6.00, baseline 5.53); blood/wear and table at 5; docs/pipeline/visual.md |
+| V4 | Hands like the reference | player hands show veins, dirt, nails in a close-up; judge score >= 7 | not met: judge run 7 hands 6/10 (veins lumpy, dirt blotchy up close and faint from the seat, nails missing on the index/middle fingertips, one orange tone) |
+| V5 | No placeholder or broken asset in any view | judge finds none (floating props, world-grid materials, clipping) in the main view, Black seat, close-ups | not met: judge run 7: lamp mouth, double clipboard header, square dot grid, watch bezel fixed; gown dither, red decal, wall panel, gouges, sleeve band partly; rook grain, fuzzy near edge, knight neck patch and faceting, strap tab, HUD portrait still present; new: dotted bar highlights, flat bright window, saturated blood, smeared record lines, cabinet slab |
 
 ## Content and UX
 

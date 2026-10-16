@@ -135,3 +135,13 @@ permission rule; until then local work runs only through Houtini/Ollama calls th
 
 Open after C2/C3: V2 detail (C3 metric 9.47 on the new recipe, lower than C2 because the white bed grids were background detail);
 Black seat r/g 1.514 (V1 limit 1.50); pieces have no cavity bake; skin roughness not driven by dirt; lamp source not visible.
+
+## Judge run 7 (2026-10-16, b847d2d): 6.27, V3/V4/V5 not met -> round C10
+
+| Task | Owner | State |
+|---|---|---|
+| C10m table and blood (drawn claw strokes, fuzzy near edge, saturated blood), opponent scalp/face/chest grime, pieces (plastic look, black reads bronze, knight neck patch, chips) | materials | started |
+| C10r bar highlights, window brightness (p95 135 -> <= 50), Lamp_Opponent off the scalp (p95 103 -> <= 90), board slightly hot | rendering architect | started |
+| C10b window glass and bars, WARD B sign placement, cabinet slab, red decal rectangle, knight mesh | board/environment | started |
+| C10h nails, veins, crease dirt, sleeve-to-shirt edge | hands/character | after C10m (shares skin) |
+| HUD player portrait smear | lead | open |
