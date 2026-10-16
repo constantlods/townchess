@@ -7,7 +7,17 @@ percentage upscaled by TSR); close-ups render at full resolution. The reference 
 
 ## Latest
 
-Fresh gameplay set from the current build: pending (being captured after the 2026-10-16 QA gate).
+**2026-10-16, build b847d2d** (passed the full QA gate: all autotests, 10/10 long games, reconnect; 81 fps avg / 73 fps 1% low at 1440p Epic, offscreen). 2560x1440 captures, shown at 1920x1080; main, midgame, Black seat and end card on the game path with the HUD.
+
+| | |
+|---|---|
+| Opening, White seat (game path, HUD) | ![main](2026-10-16-b847d2d/main.jpg) |
+| Midgame | ![midgame](2026-10-16-b847d2d/midgame.jpg) |
+| Black seat | ![black](2026-10-16-b847d2d/black.jpg) |
+| End card after resigning (game record clipboard) | ![endcard](2026-10-16-b847d2d/endcard.jpg) |
+| Close-up: player's hand and the white pieces | ![hands](2026-10-16-b847d2d/hands.jpg) |
+| Close-up: the caged patient | ![opponent](2026-10-16-b847d2d/opponent.jpg) |
+
 
 Most recent work in progress (graphics passes, before/after on the same camera):
 
