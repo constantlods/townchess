@@ -2543,13 +2543,27 @@ def build():
                                     scalars={"GrimeTiling": 2.0, "GrimeThreshold": 0.4, "GrimeContrast": 2.0, "GrimeStreaks": 0.5, "MicroRough": 0.15}))
         place_model(beds, (cx + L / 2 - 55, -120, 0), yaw=90, label="BedA", sit_on=0.0)
         place_model(beds, (cx + L / 2 - 55, 125, 0), yaw=90, label="BedB", sit_on=0.0)
-    # barred window high on the back wall, left of the opponent: cold glow + rusty bars (the window rect light sits in it)
-    glow = emissive_material("M_TC_WindowGlow", (0.55, 0.7, 0.8), float(os.environ.get("TC_WINDOW_GLOW", 6.0)))
-    box("Window_Glow", (cx + L / 2 - 1, -150, 185), (2, 60, 90), glow, folder="Window")
+    # barred window on the back wall, behind the opponent's right shoulder: cold glow + iron frame, mullion and bars
+    # (the Window_Cold rect light sits in it, lighting block). C9 (rendering architect, lead-authorised move; judge run 6
+    # gaps 1/5 "no cold back light", "no window/cold source in frame"): the window was at y -150, z 140-230, above the
+    # top of the seat view (it meets the back wall at z ~140-150) and behind the lamp head. Now a narrow upright window
+    # like the reference's, between the lamp head and the opponent's head (seat view x ~0.34-0.40, top ~0.03-0.23 of
+    # the frame), on the wainscot's face (x 317, the wainscot runs to z 140). TC_WINDOW=y,z,width,height (centre, cm).
+    WIN = [float(v) for v in os.environ.get("TC_WINDOW", "-63,110,26,56").split(",")]
+    wf = cx + L / 2 - 3  # the wainscot's face
+    glow = emissive_material("M_TC_WindowGlow", (0.55, 0.7, 0.8), float(os.environ.get("TC_WINDOW_GLOW", 60.0)))
+    box("Window_Glow", (wf - 0.5, WIN[0], WIN[1]), (1, WIN[2], WIN[3]), glow, folder="Window")
+    fr = 4.0  # frame width
+    for nm, loc, size in (("Window_FrameTop", (wf - 2, WIN[0], WIN[1] + WIN[3] / 2 + fr / 2), (4, WIN[2] + 2 * fr, fr)),
+                          ("Window_FrameSill", (wf - 3, WIN[0], WIN[1] - WIN[3] / 2 - fr / 2), (6, WIN[2] + 2 * fr + 4, fr)),
+                          ("Window_FrameL", (wf - 2, WIN[0] - WIN[2] / 2 - fr / 2, WIN[1]), (4, fr, WIN[3])),
+                          ("Window_FrameR", (wf - 2, WIN[0] + WIN[2] / 2 + fr / 2, WIN[1]), (4, fr, WIN[3])),
+                          ("Window_Mullion", (wf - 1.75, WIN[0], WIN[1] + WIN[3] * 0.12), (1.5, WIN[2], 2.5))):
+        box(nm, loc, size, mi_bar, folder="Window")
     cyl = unreal.load_asset("/Engine/BasicShapes/Cylinder")
-    for k in range(6):
-        b = EAS.spawn_actor_from_object(cyl, unreal.Vector(cx + L / 2 - 5, -150 - 25 + k * 10, 185), unreal.Rotator(0, 0, 0))
-        b.set_actor_scale3d(unreal.Vector(0.022, 0.022, 0.92))
+    for k in (-1, 0, 1):  # three bars in front of the panes; they also shape the cold light's shafts in the haze
+        b = EAS.spawn_actor_from_object(cyl, unreal.Vector(wf - 4, WIN[0] + k * WIN[2] / 4, WIN[1]), unreal.Rotator(0, 0, 0))
+        b.set_actor_scale3d(unreal.Vector(0.018, 0.018, WIN[3] / 100))
         b.static_mesh_component.set_material(0, mi_bar)
         b.set_folder_path("Window")
     # (the white binder was the brightest thing in frame and pulled the eye off the board: removed)
@@ -2925,7 +2939,11 @@ def build():
     # cold window light from back-left (fill, 3-4 stops under the key) and a back-rim on the opponent's shoulder
     # keeps its shadow (C2): it faces the camera from the back wall, and without one its 7500 K light passed through the
     # opponent onto the board and hands (r/g 1.44 -> 1.33); the window bars' shadow also shapes its shafts in the fog
-    rect("Window_Cold", (cx + L / 2 - 8, -150, 185), (0, 0, 180), 2500, 7500, 60, 90, 900, vol=3.0, shadows=True)
+    # C9: moved with the window into the seat view (window block, TC_WINDOW): just inside the panes, behind the bars, the
+    # source the size of the glass. From behind the opponent's right shoulder it is now also his cold back light.
+    # TC_WINDOW_LIGHT=lumens,volumetric scattering
+    wlm, wvol = (float(v) for v in os.environ.get("TC_WINDOW_LIGHT", "2500,3.0").split(","))
+    rect("Window_Cold", (wf - 2.5, WIN[0], WIN[1]), (0, 0, 180), wlm, 7500, WIN[2], WIN[3], 900, vol=wvol, shadows=True)
     # C7 (judge run 6: "no cold back light"): the back-left rim is the cold accent on the cage, shoulder and chair,
     # 80 lm 6500 K -> TC_RIM lm (default 500) at 9000 K. Shadowless (no RT cost). It also moves g/b and r/g away from
     # their V1 upper limits (main 1.697 -> 1.658, Black r/g 1.496 -> 1.481 with the Lamp_Opponent change below)
