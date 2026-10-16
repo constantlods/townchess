@@ -2551,7 +2551,7 @@ def build():
     # the frame), on the wainscot's face (x 317, the wainscot runs to z 140). TC_WINDOW=y,z,width,height (centre, cm).
     WIN = [float(v) for v in os.environ.get("TC_WINDOW", "-63,110,26,56").split(",")]
     wf = cx + L / 2 - 3  # the wainscot's face
-    glow = emissive_material("M_TC_WindowGlow", (0.55, 0.7, 0.8), float(os.environ.get("TC_WINDOW_GLOW", 60.0)))
+    glow = emissive_material("M_TC_WindowGlow", (0.55, 0.7, 0.8), float(os.environ.get("TC_WINDOW_GLOW", 30.0)))
     box("Window_Glow", (wf - 0.5, WIN[0], WIN[1]), (1, WIN[2], WIN[3]), glow, folder="Window")
     fr = 4.0  # frame width
     for nm, loc, size in (("Window_FrameTop", (wf - 2, WIN[0], WIN[1] + WIN[3] / 2 + fr / 2), (4, WIN[2] + 2 * fr, fr)),
@@ -2941,8 +2941,10 @@ def build():
     # opponent onto the board and hands (r/g 1.44 -> 1.33); the window bars' shadow also shapes its shafts in the fog
     # C9: moved with the window into the seat view (window block, TC_WINDOW): just inside the panes, behind the bars, the
     # source the size of the glass. From behind the opponent's right shoulder it is now also his cold back light.
-    # TC_WINDOW_LIGHT=lumens,volumetric scattering
-    wlm, wvol = (float(v) for v in os.environ.get("TC_WINDOW_LIGHT", "2500,3.0").split(","))
+    # In view, the old 2500 lm / volumetric 3.0 lit the haze, wall, beds and cabinet in front of the camera (C9 build A:
+    # main mean +6.0, g/b 1.63 -> 1.46, below V1): 600 lm / 1.0 and BackWall_Wash 4500 -> 2600 pay for the window
+    # (C9-metrics.json). TC_WINDOW_LIGHT=lumens,volumetric scattering
+    wlm, wvol = (float(v) for v in os.environ.get("TC_WINDOW_LIGHT", "600,1.0").split(","))
     rect("Window_Cold", (wf - 2.5, WIN[0], WIN[1]), (0, 0, 180), wlm, 7500, WIN[2], WIN[3], 900, vol=wvol, shadows=True)
     # C7 (judge run 6: "no cold back light"): the back-left rim is the cold accent on the cage, shoulder and chair,
     # 80 lm 6500 K -> TC_RIM lm (default 500) at 9000 K. Shadowless (no RT cost). It also moves g/b and r/g away from
@@ -2952,7 +2954,7 @@ def build():
     # C7 (judge run 6: the scalp out-shone the lamp): 170 -> TC_OPP lm (default 140): scalp p99 125 -> 113. 110 lm
     # (p99 100) cost 0.11 of V2 detail on the opponent; a 30 deg cone at 170 lm made the scalp brighter (p99 160)
     tag(spot("Lamp_Opponent", lamp_head, look_at_rot(lamp_head, (68, 0, top + 18)), float(os.environ.get("TC_OPP", 140)), 2400, 400, float(os.environ.get("TC_OPPCONE", 40)), src=2.5, vol=0.6))
-    rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), float(os.environ.get("TC_WASH", 4500)), 6800, 260, 40, 700, vol=1.5)
+    rect("BackWall_Wash", (cx + L / 2 - 60, 0, 270), (0, -55, 0), float(os.environ.get("TC_WASH", 2600)), 6800, 260, 40, 700, vol=1.5)
     # pass C2: no subject fills without a source (VISUAL_ART_DIRECTION section 4.5). Hands_Key (200 lm from the camera
     # side, 40 cm over the near table) and Table_Right (80 lm) are gone. The lamp sits beyond the board's left half, so
     # with its key alone every piece was backlit (s2: board mean 57 -> 23, pieces in silhouette): one soft warm bounce
