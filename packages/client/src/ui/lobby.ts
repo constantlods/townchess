@@ -64,7 +64,7 @@ export class Lobby {
     this.sub.replaceChildren();
     this.msg.textContent = '';
     if (m === 'ai') {
-      const lvl = h('select', { 'aria-label': 'AI strength' }, ...(Object.keys(AI_LEVELS) as AiLevel[]).map((k) => h('option', { value: k }, `${AI_LEVELS[k].label} (${AI_LEVELS[k].rating})`)));
+      const lvl = h('select', { 'aria-label': 'AI strength' }, ...(Object.keys(AI_LEVELS) as AiLevel[]).map((k) => h('option', { value: k }, AI_LEVELS[k].label)));
       lvl.value = this.aiLevel;
       lvl.onchange = () => { this.aiLevel = lvl.value as AiLevel; };
       const col = h('select', { 'aria-label': 'Your colour' }, h('option', { value: 'w' }, 'White'), h('option', { value: 'b' }, 'Black'), h('option', { value: 'random' }, 'Random'));

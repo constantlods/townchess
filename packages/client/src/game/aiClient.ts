@@ -1,12 +1,6 @@
-import type { SearchOptions } from './ai';
+import { AI_LEVELS, type AiLevel } from '@hc/engine';
 
-export type AiLevel = 'novice' | 'patient' | 'warden';
-
-export const AI_LEVELS: Record<AiLevel, SearchOptions & { rating: number; label: string }> = {
-  novice: { maxDepth: 2, timeMs: 400, noise: 60, rating: 850, label: 'Novice' },
-  patient: { maxDepth: 3, timeMs: 1200, noise: 25, rating: 1187, label: 'Patient' },
-  warden: { maxDepth: 5, timeMs: 2500, noise: 0, rating: 1550, label: 'Warden' },
-};
+export { AI_LEVELS, type AiLevel };
 
 /** Promise-based wrapper around the engine worker. */
 export class AiClient {

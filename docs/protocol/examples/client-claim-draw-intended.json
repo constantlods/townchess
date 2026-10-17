@@ -1,0 +1,8 @@
+{
+  "type": "CLAIM_DRAW",
+  "gameId": "GAME-0A1B2C",
+  "intended": {
+    "from": "f6",
+    "to": "g8"
+  }
+}

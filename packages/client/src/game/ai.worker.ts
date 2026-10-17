@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { search } from './ai';
+import { search } from '@hc/engine';
 
 self.onmessage = (e: MessageEvent) => {
   const { id, fen, opts } = e.data;

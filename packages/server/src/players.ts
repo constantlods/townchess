@@ -66,10 +66,15 @@ export class PlayerStore {
     this.byId.set(p.id, p);
     this.byToken.set(p.tokenHash, p.id);
     this.dirty = true;
+    // A new identity is written at once, not on the 5 s timer: a crash right after creating it would otherwise leave a
+    // journaled game whose player no longer exists (found by the sidecar crash/resume test).
+    this.flush();
     return { player: p, token: newToken };
   }
 
   get(id: string) { return this.byId.get(id); }
+
+  hasToken(token: string) { return this.byToken.has(hash(token)); }
 
   setCosmetics(id: string, c: Cosmetics) {
     const p = this.byId.get(id);
@@ -77,6 +82,11 @@ export class PlayerStore {
   }
 
   publicOf(id: string): PlayerPublic | null {
+    if (id.startsWith('ai:')) {
+      // Engine seats: 'ai:<level>'. No rating is claimed for the house engine (labels only, not calibrated).
+      const level = id.split(':')[1];
+      return { id, username: 'UNKNOWN_13', rating: null, cosmetics: { ...DEFAULT_COSMETICS }, ai: { level } };
+    }
     const p = this.byId.get(id);
     return p ? { id: p.id, username: p.username, rating: Math.round(p.rating), cosmetics: p.cosmetics } : null;
   }
@@ -96,5 +106,6 @@ export class PlayerStore {
       b.rating += k * ((1 - score) - (1 - ew));
     }
     this.dirty = true;
+    this.flush(); // results and ratings are not left to the timer either
   }
 }

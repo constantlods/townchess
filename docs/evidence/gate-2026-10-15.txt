@@ -1,0 +1,47 @@
+CONTENT exit 0
+BUILD SUCCESSFUL
+AutomationTool exiting with ExitCode=0 (Success)
+PACKAGE exit 0
+{
+    "smoke":  "pass=True reason=plies reached plies=12 failures=0 rhi=D3D12",
+    "smokeCorePid":  7504,
+    "smokeLeftover":  0,
+    "coreStarted":  "pid 33924: C:\\TownChess\\builds\\Development\\Windows\\TownChess\\Content\\TownChessCore\\node.exe",
+    "jobObject":  "PASS core terminated with the game",
+    "defender":  "realtime=True antivirus=True",
+    "defenderDetections":  0
+}
+RELEASED by lead
+ACQUIRED by lead
+{
+    "commit":  "8d71234 Status: C4.1 and C5 reviewed and accepted, gate on f086766 recorded, C6 materials started",
+    "started":  "2026-10-15T02:45:47",
+    "tests":  {
+                  "cpu":  "pass=True 114/114 at 2026-10-15T02:47:01",
+                  "drag":  "pass=True 8/8 at 2026-10-15T02:47:18",
+                  "keys":  "pass=True 13/13 at 2026-10-15T02:47:38",
+                  "rematch":  "pass=True 8/8 at 2026-10-15T02:47:57",
+                  "promo":  "pass=True 8/8 at 2026-10-15T02:48:14"
+              },
+    "finished":  "2026-10-15T02:48:18"
+}
+RELEASED by lead
+ACQUIRED by lead
+killed at ply 12
+PASS no orphan local core after the kill
+RECONNECT pass=True checks=76/76 
+S2 PASS 10/10
+game1 pass=True checkmate plies=48 leftover=0
+game2 pass=True checkmate plies=54 leftover=0
+game3 pass=True checkmate plies=50 leftover=0
+game4 pass=True checkmate plies=56 leftover=0
+game5 pass=True checkmate plies=100 leftover=0
+game6 pass=True checkmate plies=54 leftover=0
+game7 pass=True checkmate plies=60 leftover=0
+game8 pass=True draw_repetition plies=101 leftover=0
+game9 pass=True checkmate plies=72 leftover=0
+game10 pass=True checkmate plies=64 leftover=0
+PERF avg=81.4 low1=72.7 2560x1440
+RELEASED by lead
+
+[exited with code 0]

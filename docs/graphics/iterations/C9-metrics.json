@@ -1,0 +1,42 @@
+{
+ "what": "C9 rendering architect: the cold window source in the main view (judge run 6 gap 1 'no cold back light', gap 5 'no window/cold source in frame'; C8b not_done.window_cold_source). Lead-authorised for this task: board/env's window block moved together with the Window_Cold rect light",
+ "base": "upstream 25a2edf. Build PC 2026-10-16 02:28-03:03 PC time (lock ra; the lock had been taken at 23:28 and sat idle while this agent was cut off by the usage limit). B = L_Table rebuilt from 25a2edf; A, C, D = iterations; E = final (code defaults, no env overrides). capture.ps1 -Preset epic 1920x1080 -WarmSec 22; main = cpu:novice:w:5+0 -TCHud=1 -TCPlay=10 (full res) and the same with -TCGamePath=1; start_gp = static start position, -TCPlay=0 -TCGamePath=1 (same position in B and E: the V2 comparison); black = cpu:novice:b:untimed -TCHud=1 -TCPlay=10",
+ "pc_content_warning": "Both B and E render the player's and the patient's hands saturated red (C9-main-before-after.jpg, both halves). Not a C9 change: it is already in B, which was built from a clean upstream checkout. Materials (C8m) had uncommitted skin/garment/board/stain work in the PC checkout when this session started; they restored their tracked files at 02:28:46. The red skin is probably content left over from that work. Effect: absolute V1 numbers on this PC are off (B main 28.21 / r/g 1.545 against C8b's 29.5 / 1.473 on nearly the same upstream), so the evaluation below uses B -> E deltas on identical content and projects them onto the C8b numbers. Backup of what was found in the checkout: C:/TownChess/work/ra/c9/found-wip (tracked.patch UTF-16, DefaultInput.ini)",
+ "placement": {
+  "method": "pinhole model of the default seat view (eye -90,0,top+34, pitch -14.5, 30 mm on 36x20.25); checked against the WARD B sign (predicted 806,95 px at 1280x720, observed ~805,30-130)",
+  "window": "TC_WINDOW=-63,110,26,56 (y, z centre; width, height cm) on the wainscot face (x 317; the wainscot covers the back wall to z 140, so the old wall-face glow at x 319 would be buried below z 140). Seat view x 0.34-0.40, y 0.03-0.23: between the lamp head (right edge x ~0.32) and the opponent's head (left edge ~0.42), left of and away from the WARD B sign (x ~0.63). The cell-partition bars at x 245 cross it, like the reference's barred window",
+  "geometry": "Window_Glow emissive box 1 cm (M_TC_WindowGlow, colour unchanged 0.55/0.7/0.8, TC_WINDOW_GLOW default 6 -> 30), iron frame (top, sill, sides) and a mullion at 62% height in MI_BarIron, three bars 1.8 cm in front of the panes",
+  "light": "Window_Cold rect at x 314.5, between the glass and the bars (the bars shadow its shafts), source = the glass 26x56 cm, 7500 K, shadows on (unchanged), TC_WINDOW_LIGHT=lumens,vol default 600,1.0 (was 2500,3.0 at y -150 z 185, 60x90)"
+ },
+ "iterations_game_path_main": {
+  "B_before": {"mean": 28.43, "p95": 93.38, "rg": 1.5424, "gb": 1.631, "detail": 9.426, "win_roi_mean": 16.5},
+  "A_glow60_2500lm_vol3": {"mean": 34.43, "p95": 113.54, "rg": 1.4195, "gb": 1.4615, "detail": 11.449, "win_roi_mean": 103.4, "verdict": "rejected: in view, the light lit the haze, wall, beds and cabinet in front of the camera; mean +6.0, g/b under 1.55"},
+  "C_glow30_600lm_vol1": {"mean": 29.61, "p95": 98.8, "rg": 1.5172, "gb": 1.602, "detail": 10.438, "win_roi_mean": 53.0, "verdict": "window right, mean +1.2"},
+  "D_C_plus_wash3000": {"mean": 28.63, "p95": 96.84, "rg": 1.5308, "gb": 1.617, "detail": 10.157, "win_roi_mean": 51.8, "verdict": "mean +0.2: still over the C8b margin"},
+  "E_final_wash2600": {"mean": 28.38, "p95": 96.22, "rg": 1.5343, "gb": 1.6239, "detail": 10.129, "win_roi_mean": 51.5}
+ },
+ "paid_by": "BackWall_Wash 4500 -> 2600 lm (TC_WASH; 6800 K overhead wash on the back wall). The back wall around the window is darker, which also helps the window read",
+ "final_E_vs_B": {
+  "main_full_res": {"B": {"mean": 28.21, "p95": 92.82, "rg": 1.5447, "gb": 1.6336, "detail": 9.748, "median3": 6.098, "below8": 33.23},
+                    "E": {"mean": 28.33, "p95": 96.62, "rg": 1.5349, "gb": 1.6267, "detail": 10.401, "median3": 6.463, "below8": 38.11}},
+  "main_game_path": {"B": {"mean": 28.43, "p95": 93.38, "rg": 1.5424, "gb": 1.631, "detail": 9.426, "median3": 6.051, "below8": 33.0},
+                     "E": {"mean": 28.38, "p95": 96.22, "rg": 1.5343, "gb": 1.6239, "detail": 10.129, "median3": 6.481, "below8": 37.92}},
+  "static_start_game_path": {"B": {"mean": 28.2, "p95": 92.69, "rg": 1.5494, "gb": 1.6403, "detail": 9.002, "median3": 5.707},
+                             "E": {"mean": 28.15, "p95": 95.55, "rg": 1.5429, "gb": 1.6341, "detail": 9.66, "median3": 6.101}},
+  "black_seat_full_res": {"B": {"mean": 26.71, "p95": 87.34, "rg": 1.5606, "gb": 1.6278, "detail": 9.371, "median3": 5.814},
+                          "E": {"mean": 26.36, "p95": 89.57, "rg": 1.5527, "gb": 1.6198, "detail": 10.051, "median3": 6.202}},
+  "window_region": {"E_main_gp": {"mean": 51.5, "p99": 190.5, "g_over_b": 1.089}, "reference_window_strip": {"mean": 58.7, "p90": 147.9, "max": 223.9}}
+ },
+ "V1": {
+  "deltas": "main full res mean +0.12, game path -0.05, static -0.05, Black -0.35; p95 +2.8 to +3.8 (the panes); r/g -0.007 to -0.010; g/b -0.007 to -0.008",
+  "projected_on_C8b_clean_content": "main full res 29.6 / 97.8 / 1.463 / 1.663; game path 29.85 / 97.6 / 1.464 / 1.661; Black 27.65 / 90.3 / 1.477 / 1.658: inside mean 24-30, p95 <= 105, r/g 1.38-1.50, g/b 1.55-1.70",
+  "caveat": "projection, not a measurement: needs a re-measure once the PC's red-skin content is fixed"
+ },
+ "V2": "not lowered: detail main full res 9.75 -> 10.40, game path 9.43 -> 10.13, same-position static 9.00 -> 9.66, Black 9.37 -> 10.05 (median3 up by the same order: the window, bars and frame are real edges)",
+ "white_piece_readability": {"method": "C2.3 masks from the B start-view basecolor capture (min ch > 115 and chroma < 25% of max / max < 55 and chroma < 13, inside the board box, eroded 1 px; 100994 white / 24421 black px), median Rec.709 luma of the start_gp frame",
+  "B": {"white_median": 78.0, "black_median": 7.1, "ratio": 10.93}, "E": {"white_median": 78.1, "black_median": 7.0, "ratio": 11.17}, "verdict": "kept (target >= 2.5)"},
+ "gpu": "not measured: no shadow setting changed. Window_Cold was already shadowed (RT); it is now smaller (26x56 vs 60x90 cm source) and 600 instead of 2500 lm, BackWall_Wash is shadowless. No light was added",
+ "tests": {"cpu": "PASS 194/194 (full game to checkmate, resyncs 0)", "drag": "PASS 8/8", "build": "E level (final defaults), 2026-10-16 ~02:58-03:00 PC time"},
+ "files": ["C9-main-before-after.jpg (full res)", "C9-main-gamepath-before-after.jpg (-TCGamePath=1)", "C9-window.jpg (close-up camera 120,-20,118 -> 317,-63,108 fov 40: build A vs final; final main view crop x3)"],
+ "pc": "build_scene.py restored with git checkout, git pull to 25a2edf (clean; only the untracked DefaultInput.ini, not ours, left in place), L_Table rebuilt from upstream (BUILD OK 168 actors), lock released 03:03. Scratch: C:/TownChess/work/ra/c9"
+}

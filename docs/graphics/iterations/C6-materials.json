@@ -1,0 +1,56 @@
+{
+ "what": "C6 materials/shading: (1) MI_PlayerSleeve woven canvas with cuff/fold grime and stains, (2) rook-crown specks (V5): baked piece AO cavity term, Toksvig roughness mips, master detail fade + specular AA, (3) deep grime-filled gouges in the stains.py Scratch decal; (4) skin roughness from dirt: not done (route below)",
+ "base": "upstream 83665e5 (scene = a266f7c: C2.3 lighting, C3, C4.1, C5). Before = C6b_* on the upstream level; after = C6f_* (final build). Build PC 2026-10-15 02:57-03:31 and 03:32-, capture.ps1 -Preset epic 1920x1080 -WarmSec 22; main = -Auto cpu:novice:w:5+0 -Extra '-TCHud=1 -TCPlay=10', black = cpu:novice:b:untimed same extra, static = cpu:novice:w:untimed '-TCHud=1' (start position, no plies: same board before/after)",
+ "metric": "C3 recipe (C3-materials.json): 1045x588 PIL bicubic, Rec.709 luma, mean |4-neighbour Laplacian| (detail), median3 after a 3x3 median, below8 = % luma < 8. This script gives 9.60 / 9.26 on C5c_main / C5c_black (C5 json 9.59 / 9.24)",
+ "V1_bounds": "mean 24-30, p95 <= 105, r/g 1.38-1.50, g/b 1.55-1.70",
+ "main": {
+  "before_C6b": {"mean": 29.4, "p95": 97.3, "rg": 1.484, "gb": 1.695, "detail": 9.61, "median3": 6.00, "below8": 33.2},
+  "C6a": {"mean": 29.5, "p95": 97.0, "rg": 1.487, "gb": 1.699, "detail": 9.57, "median3": 5.97, "below8": 33.3},
+  "C6c": {"mean": 29.4, "p95": 96.3, "rg": 1.487, "gb": 1.700, "detail": 9.56, "median3": 5.99, "below8": 33.4},
+  "C6d": {"mean": 29.3, "p95": 96.1, "rg": 1.486, "gb": 1.696, "detail": 9.60, "median3": 6.01, "below8": 33.4},
+  "after_C6f_final": {"mean": 29.3, "p95": 96.2, "rg": 1.4845, "gb": 1.6960, "detail": 9.65, "median3": 6.02, "below8": 33.2}
+ },
+ "black_seat": {
+  "before_C6b": {"mean": 27.7, "p95": 92.1, "rg": 1.499, "gb": 1.695, "detail": 9.33, "median3": 5.76, "below8": 33.7},
+  "C6a": {"mean": 27.6, "p95": 91.2, "rg": 1.499, "gb": 1.698, "detail": 9.23, "median3": 5.71, "below8": 33.9},
+  "C6c": {"mean": 28.1, "p95": 92.0, "rg": 1.498, "gb": 1.702, "detail": 9.33, "median3": 5.79, "below8": 33.4},
+  "C6d": {"mean": 27.7, "p95": 91.8, "rg": 1.4985, "gb": 1.6941, "detail": 9.25, "median3": 5.73, "below8": 33.9},
+  "after_C6f_final": {"mean": 27.7, "p95": 91.1, "rg": 1.4956, "gb": 1.6972, "detail": 9.40, "median3": 5.80, "below8": 33.7}
+ },
+ "static_same_position": {
+  "before_C6b": {"mean": 29.1, "p95": 96.3, "rg": 1.492, "gb": 1.708, "detail": 9.19, "median3": 5.65},
+  "C6d (piece fade + spec AA on)": {"mean": 29.2, "p95": 95.7, "rg": 1.492, "gb": 1.708, "detail": 9.13, "median3": 5.63},
+  "after_C6f_final": {"mean": 29.2, "p95": 95.7, "rg": 1.492, "gb": 1.709, "detail": 9.26, "median3": 5.69},
+  "note": "static is not a V1 benchmark view (its g/b was 1.708 before C6)"
+ },
+ "iterations": {
+  "C6a": "all features; piece AO 1 cm rays, CavityDarken 0.55, DetailFadeInv 30, SpecAA 20; beige sleeve tint 1.27/0.76/0.41; sleeve wear mask V-flipped (wrong: cuff grime landed at the elbow); gouges along texture x (ran across the 22 x 7 cm edge strips)",
+  "C6c": "mask unflipped, gouges along texture y, AO 2.5 cm, CavityDarken 0.9: Black g/b 1.702 (over 1.70); per-cell diff (static) put the whole g/b rise in the two bottom corners = the pale warm sleeves",
+  "C6d": "sleeve tint 1.06/0.71/0.51 (pale grey canvas ~0.30/0.30/0.31 linear), grime (0.32, 0.27, 0.21): g/b back to 1.696 / 1.694; static detail 9.19 -> 9.13 with the piece fade/AA on",
+  "C6f_final": "piece DetailFadeInv / SpecAA off (no visible effect on the specks, cost detail), gouges wider (40-60 px of 1024) with a wider chipped pale rim"
+ },
+ "V1": "final: both benchmark views inside all four bounds. Tightest: main g/b 1.6960 (limit 1.70, before 1.6954), Black r/g 1.4956 (limit 1.50, before 1.499), Black g/b 1.6972. No lighting touched",
+ "V2": "raised, no grain or sharpening: same-position static 9.19 -> 9.26 (median3 5.65 -> 5.69, so it is structure, not pixel noise); benchmark views main 9.61 -> 9.65, Black 9.33 -> 9.40 (different random positions; capture noise ~0.04). The gain is the wider gouges and the sleeve weave/creases",
+ "sleeve": {
+  "material": "MI_PlayerSleeve = surface_material(rough_linen) (CC0 Poly Haven scan, already used by MI_OpponentCloth / MI_PatientJacket), Tiling 0.8 x UVScale (1, 0.64) on the C5 cylindrical UVs (31.4 cm round x 20 cm along: square weave, ~12 threads/cm), NormalStrength 1.5, tint 1.06/0.71/0.51 (the scan is blue: linear mean 0.28/0.42/0.61), tiled grime 1.3 / threshold 0.5 / streaks 0.35",
+  "wear_mask": "ue5/tools/textures/sleeve.py -> ue5/assets/textures/sleeve/T_PlayerSleeve_Wear.png (1024, linear): R grime = rolled cuff (darkest at the frayed edge) + crease valleys on both flanks of each props.py compression fold (fold-depth and top-weighted) + slack underside + elbow gather, broken up by fBm; G = 5 dried stains with darker rims. Sampled in the mesh's own UVs through M_TC_PBR WearMask (WearGrime, StainColor)",
+  "uv_finding": "the OBJ import keeps Blender's V (no flip): image row 0 = elbow, last row = cuff (C6a showed the flipped mask's cuff band at the elbow)",
+  "evidence": "C6-sleeve.jpg (C6b_sleeve / C6f_sleeve camera -TCCamLoc=-30,-62,96 -TCCamTarget=-52,-34,88 -TCFov=34; C6f_sideL -40,-75,104 -> -35,-15,82 fov 40)"
+ },
+ "rooks": {
+  "done": "ue5/tools/textures/piece_ao.py (Blender 5.0 Cycles, 2.5 cm AO rays, one instance per piece kind baked alone into the shared atlas, 256 spp, 2048) -> ue5/assets/textures/pieces/T_Pieces{White,Black}_ARM.png (R = AO, G 160, B 0) as the pieces' ARM: Lumen AO + CavityDarken 0.9 / CavityRough 0.5 / CavitySpec 0.9 (crenel walls and piece crevices darker/duller). Roughness 2k/8k textures composite the normal map (CTM_NormalRoughnessToRed: Toksvig mips)",
+  "result": "specks NOT removed. At the seat FOV (C6-rooks.jpg, static start position, x4 crops of a1/h1) the h1 crown's inside keeps its grey/white mottle and a1 its hot lit patch; the base-colour buffer is clean and uniform on the crown floor (C6f_static_bc), and the FOV-7 zoom shows a fine dark stipple on the crown floor in the lit/shadow transition: stochastic soft-shadow / screen-space GI noise inside a 3-4 px pocket, i.e. lighting, not material (C4 reached the same diagnosis). Material AO does not darken the crown floor because it is open to the sky (AO ~0.9 there even at 2.5 cm)",
+  "tried": "pixel-footprint detail fade (DetailFadeInv 30) and specular AA (SpecAA 20, roughness 0.33 -> ~0.42 at the seat) on the pieces: no visible change on the specks, static detail -0.06 -> left in M_TC_PBR (default off), not used",
+  "request_to_rendering_architect": "the lamp key's soft shadow / GI denoising inside the crown pockets: shadow samples or denoiser for Lamp_Key (source radius), Lumen screen-probe/short-range AO quality, or TSR history for that region; a hard-shadow test (source radius 0) at the seat would confirm"
+ },
+ "gouges": {
+  "texture": "stains.py scratch(): 4 wandering gouges (48-step jittered bent paths, sin^0.6 taper, 40-60 px of 1024 wide at 2x supersampling) packed with black grime (0.008/0.006/0.004 linear), chipped pale rim (1.35 x width + 6-16 px), soft dark grime halo (Gaussian 18 px, fBm-modulated); along texture y = the long side of the 22 x 7 cm near-edge strips, ~3-4 mm wide x ~9 cm there (8-12 mm on the square table decals). The ~260 hairlines are unchanged (same RNG order); Ring/Dirt bit-identical",
+  "projection": "unchanged (board/environment's placements and decal material)",
+  "evidence": "C6-table-edge.jpg (camera -TCCamLoc=-40,-6,112 -TCCamTarget=-32,-4,80 -TCFov=45)"
+ },
+ "master_material_M_TC_PBR": "new parameters, all neutral by default (verified: V1/V2 unchanged in views without them): UVScale (vector, 1,1), WearMask (texture in UV0, default black) + WearGrime + StainColor, CavityDarken / CavityRough / CavitySpec (from ARM.R; Specular output now 0.5 x (1 - cav x CavitySpec) = UE's default 0.5), DetailFadeInv + SpecAA (pixel footprint = PixelDepth x 2 tan(fov/2) / ViewSize: no DDX/DDY, works on Nanite). Compiles (no M_TC_PBR error in build-level.log); M_TC_Blood 'Failed to compile for PCD3D_SM6' is pre-existing (every backup log since 2026-10-15 02:37, not touched by C6)",
+ "skin_roughness_from_dirt": "not done (budget). Route: MI_Body_Baked_VT exposes 'SRMF Baked VT' (logged by player_skins this build); the source C:/TownChess/assets/rs_export/T_Body_SRMF_VT.tga (8K) exists. skin.py would write T_PlayerSkin_<var>_SRMF.png with roughness raised by its cavity dirt mask, player_skins() set 'SRMF Baked VT' (8K VT import, minutes per variant)",
+ "tests": {"cpu": "PASS 104/104 (full game to checkmate, resyncs 0)", "drag": "PASS 8/8", "build": "C6f (final), 2026-10-15 03:35-03:42 PC time"},
+ "files": ["C6-main-before-after.jpg", "C6-static-before-after.jpg", "C6-sleeve.jpg", "C6-rooks.jpg", "C6-table-edge.jpg"],
+ "pc": "checkout restored to upstream with git checkout of my 4 tracked files and removal of my own untracked new files only; L_Table rebuilt from upstream after each session; lock released"
+}

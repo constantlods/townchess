@@ -1,0 +1,390 @@
+{
+ "what": "C5 hands round 2 (hands/character): closed-loop pose calibration, relaxed finger curl with pads on the frame/table, torso untwist and body nearer the table, steepled patient hands before the mouth, breathing idle for the opponents, dense cloth player sleeve, hand-decal Rotator fix, watch 4 cm from the wrist",
+ "base": "upstream 6ef6c53 (= f086766 scene, C4.1). Before = C5b_* on the upstream level; after = C5c_* (final build); C5a_* = previous after-build (same hand pose; steeple 4 cm higher, watch 2.5 cm from the wrist). Build PC 2026-10-14 23:09-23:24 and 2026-10-15 06:10-06:38 PC time, capture.ps1 -Preset epic 1920x1080 -WarmSec 22 -Probe Player",
+ "metric": "C3/C4 recipe: 1045x588 PIL bicubic, Rec.709 luma, mean |Laplacian| (detail), median3 (after a 3x3 median), below8 = % luma < 8. Same script gives 9.65 on C41d_main (C4.1 json 9.66)",
+ "calibration": {
+  "finding": "the game scales every keyed bone translation to the MetaHuman mesh's proportions (evaluated/keyed 1.03-1.32 per bone, same direction); the solver modelled the skeleton's reference lengths, so the runtime hands were 6-9 cm further forward and the body 15-18 cm higher than predicted (C1 fingertips in the frame, PLAYER_Z_FIX 15.3)",
+  "check": "editor evaluation of the authored sequence on the mesh (AnimPoseEvaluationOptions.optional_skeletal_mesh) vs the runtime -TCProbe: <= 0.11 cm on all 13 probed bones (s1 build)",
+  "loop": "pass 0 keys the reference translations and evaluates; the model takes the evaluated lengths + pelvis offset (7.57 cm z); pass 1 residual model vs evaluated 0.0 cm on pelvis, head, elbows, wrists and every probed finger joint (player, probe and clasp poses); PLAYER_Z_FIX no longer applied (fallback 15.3 if the evaluation fails)",
+  "probe_vs_build": "runtime _03 joints equal the build's predicted joints to 0.1 cm (e.g. index_03_l (-28.8, -19.1, 82.5) in both)"
+ },
+ "fingertips": {
+  "rule": "table top z 79.95, frame top +1.92 (|x| or |y| 23.2..27.65), squares +1.71; finger centre line to skin: 0.65 cm at the pad, 0.8 cm elsewhere. A pad centre line 0.5-0.8 cm over the surface = skin touching (0-0.15 cm)",
+  "C1_before": "index/middle _03 joints 1.8-2.4 cm below the frame top (in the frame); fingers hyperextended (solver at its -30 deg bound)",
+  "after_tip_centre_line_heights_cm": {
+   "index_03_l": 0.6,
+   "middle_03_l": 0.5,
+   "ring_03_l": 0.7,
+   "pinky_03_l": 0.6,
+   "thumb_03_l": 0.5,
+   "index_03_r": 0.7,
+   "middle_03_r": 0.6,
+   "ring_03_r": 0.5,
+   "pinky_03_r": 0.5,
+   "thumb_03_r": 0.7
+  },
+  "after_tip_surfaces": {
+   "index_03_l": "table",
+   "middle_03_l": "frame",
+   "ring_03_l": "frame",
+   "pinky_03_l": "table",
+   "thumb_03_l": "table",
+   "index_03_r": "table",
+   "middle_03_r": "frame",
+   "ring_03_r": "frame",
+   "pinky_03_r": "table",
+   "thumb_03_r": "table"
+  },
+  "after_probe_joint_heights_cm": {
+   "index_03_l": 2.55,
+   "middle_03_l": 1.93,
+   "pinky_03_l": 2.05,
+   "thumb_03_l": 1.15,
+   "index_03_r": 2.35,
+   "middle_03_r": 1.93,
+   "pinky_03_r": 1.75,
+   "thumb_03_r": 1.35
+  },
+  "nearest_piece": "left middle tip x -24.1, 1.4 cm from the a1 rook's base (x -22.7); no finger over a square",
+  "detail": {
+   "probe_joints": {
+    "index_03_l": {
+     "world": [
+      -28.8,
+      -19.1,
+      82.5
+     ],
+     "over": "table",
+     "centre_line_height_cm": 2.55
+    },
+    "middle_03_l": {
+     "world": [
+      -26.0,
+      -21.4,
+      83.8
+     ],
+     "over": "frame",
+     "centre_line_height_cm": 1.93
+    },
+    "pinky_03_l": {
+     "world": [
+      -28.8,
+      -27.2,
+      82.0
+     ],
+     "over": "table",
+     "centre_line_height_cm": 2.05
+    },
+    "thumb_03_l": {
+     "world": [
+      -35.3,
+      -18.8,
+      81.1
+     ],
+     "over": "table",
+     "centre_line_height_cm": 1.15
+    },
+    "index_03_r": {
+     "world": [
+      -29.9,
+      18.8,
+      82.3
+     ],
+     "over": "table",
+     "centre_line_height_cm": 2.35
+    },
+    "middle_03_r": {
+     "world": [
+      -27.3,
+      21.2,
+      83.8
+     ],
+     "over": "frame",
+     "centre_line_height_cm": 1.93
+    },
+    "pinky_03_r": {
+     "world": [
+      -30.0,
+      26.9,
+      81.7
+     ],
+     "over": "table",
+     "centre_line_height_cm": 1.75
+    },
+    "thumb_03_r": {
+     "world": [
+      -36.7,
+      18.5,
+      81.3
+     ],
+     "over": "table",
+     "centre_line_height_cm": 1.35
+    }
+   },
+   "build_tips": {
+    "index_03_l": {
+     "joint": [
+      -28.8,
+      -19.1,
+      82.5
+     ],
+     "tip": [
+      -28.5,
+      -18.8,
+      80.6
+     ],
+     "tip_over": "table",
+     "tip_centre_line_height_cm": 0.6
+    },
+    "middle_03_l": {
+     "joint": [
+      -26.0,
+      -21.4,
+      83.8
+     ],
+     "tip": [
+      -24.1,
+      -20.7,
+      82.4
+     ],
+     "tip_over": "frame",
+     "tip_centre_line_height_cm": 0.5
+    },
+    "ring_03_l": {
+     "joint": [
+      -26.2,
+      -24.3,
+      83.8
+     ],
+     "tip": [
+      -24.0,
+      -23.5,
+      82.6
+     ],
+     "tip_over": "frame",
+     "tip_centre_line_height_cm": 0.7
+    },
+    "pinky_03_l": {
+     "joint": [
+      -28.8,
+      -27.2,
+      82.0
+     ],
+     "tip": [
+      -28.4,
+      -26.7,
+      80.6
+     ],
+     "tip_over": "table",
+     "tip_centre_line_height_cm": 0.6
+    },
+    "thumb_03_l": {
+     "joint": [
+      -35.3,
+      -18.8,
+      81.1
+     ],
+     "tip": [
+      -33.2,
+      -17.9,
+      80.5
+     ],
+     "tip_over": "table",
+     "tip_centre_line_height_cm": 0.5
+    },
+    "index_03_r": {
+     "joint": [
+      -29.9,
+      18.8,
+      82.3
+     ],
+     "tip": [
+      -29.0,
+      18.3,
+      80.6
+     ],
+     "tip_over": "table",
+     "tip_centre_line_height_cm": 0.7
+    },
+    "middle_03_r": {
+     "joint": [
+      -27.3,
+      21.2,
+      83.8
+     ],
+     "tip": [
+      -25.3,
+      20.4,
+      82.5
+     ],
+     "tip_over": "frame",
+     "tip_centre_line_height_cm": 0.6
+    },
+    "ring_03_r": {
+     "joint": [
+      -27.4,
+      24.1,
+      83.6
+     ],
+     "tip": [
+      -25.2,
+      23.3,
+      82.4
+     ],
+     "tip_over": "frame",
+     "tip_centre_line_height_cm": 0.5
+    },
+    "pinky_03_r": {
+     "joint": [
+      -30.0,
+      26.9,
+      81.7
+     ],
+     "tip": [
+      -29.2,
+      26.4,
+      80.5
+     ],
+     "tip_over": "table",
+     "tip_centre_line_height_cm": 0.5
+    },
+    "thumb_03_r": {
+     "joint": [
+      -36.7,
+      18.5,
+      81.3
+     ],
+     "tip": [
+      -34.6,
+      17.6,
+      80.7
+     ],
+     "tip_over": "table",
+     "tip_centre_line_height_cm": 0.7
+    }
+   }
+  }
+ },
+ "pose": {
+  "player_rest": "wrists (-42, +-27) 3.4 cm over the table, yaw 22 inward, knuckles 4.4 cm, thumb side up 10 deg; spine_01 turned -10 deg (right shoulder was 10 cm back); eye 3 cm before the hidden head bone (was 9: chest 59 cm from the table edge); wrists 0.5 / 1.0 cm off target (C1: 6.5 / 16.4)",
+  "fingers": "absolute flexion near MCP 12-18 / PIP 38-46 deg (index to pinky), DIP 0.7 x added PIP, splay closed 35 % towards the middle finger",
+  "patient": "wrists 19 cm under / 20 cm before the head bone (0.6 / 1.9 cm off), palms facing, fingertips meeting at the midline: min finger-joint distance from the midline 1.02 cm (centre line; > 0.8 finger radius: no overlap), approx. cage clearance 3.4 cm",
+  "breathing": "opponents (clasp pose) loop 150 frames / 5 s: spine_03 -0.7 / spine_05 -0.5 deg x sin, head counter-rotation + slow drift (turn <= 1.3 deg); turns propagate rigidly (hands keep their spacing, move <= 0.7 cm); player has none (hands must not slide); TC_IDLE_AMP=0 restores the statue"
+ },
+ "main": {
+  "before_C5b": {
+   "mean": 29.0,
+   "p95": 97.4,
+   "rg": 1.478,
+   "gb": 1.689,
+   "detail": 9.66,
+   "median3": 6.04,
+   "below8": 34.2
+  },
+  "after_C5a": {
+   "mean": 29.1,
+   "p95": 97.0,
+   "rg": 1.482,
+   "gb": 1.691,
+   "detail": 9.52,
+   "median3": 5.97,
+   "below8": 33.7
+  },
+  "after_C5c_final": {
+   "mean": 29.5,
+   "p95": 97.4,
+   "rg": 1.484,
+   "gb": 1.696,
+   "detail": 9.59,
+   "median3": 6.02,
+   "below8": 33.2
+  }
+ },
+ "black_seat": {
+  "before_C5b": {
+   "mean": 27.5,
+   "p95": 91.8,
+   "rg": 1.489,
+   "gb": 1.69,
+   "detail": 9.44,
+   "median3": 5.87,
+   "below8": 34.4
+  },
+  "after_C5a": {
+   "mean": 27.7,
+   "p95": 92.8,
+   "rg": 1.496,
+   "gb": 1.691,
+   "detail": 9.31,
+   "median3": 5.79,
+   "below8": 33.7
+  },
+  "after_C5c_final": {
+   "mean": 27.7,
+   "p95": 92.0,
+   "rg": 1.497,
+   "gb": 1.695,
+   "detail": 9.24,
+   "median3": 5.74,
+   "below8": 33.7
+  }
+ },
+ "static_same_position": {
+  "why": "-TCPlay=10 plays random engine moves, so before/after boards differ (C5a vs C5c, same pose: Black detail 9.31 vs 9.24); static captures (no plies, HUD on) compare the same position",
+  "main": {
+   "before": {
+    "mean": 28.6,
+    "p95": 96.0,
+    "rg": 1.486,
+    "gb": 1.701,
+    "detail": 9.22,
+    "median3": 5.67
+   },
+   "after": {
+    "mean": 29.1,
+    "p95": 96.3,
+    "rg": 1.492,
+    "gb": 1.708,
+    "detail": 9.18,
+    "median3": 5.67
+   }
+  },
+  "black": {
+   "before": {
+    "mean": 27.0,
+    "p95": 91.4,
+    "rg": 1.49,
+    "gb": 1.684,
+    "detail": 9.3,
+    "median3": 5.77
+   },
+   "after": {
+    "mean": 27.5,
+    "p95": 91.9,
+    "rg": 1.496,
+    "gb": 1.691,
+    "detail": 9.26,
+    "median3": 5.78
+   }
+  },
+  "reading": "V2 detail -0.04 in both seats (capture noise is up to 0.04: C41d vs C5b, same scene), median3 unchanged; the steepled hands cover part of the cage grid (-0.9 in that cell), the curled hands at the bottom corners add (+0.6 / +1.1)"
+ },
+ "V1": "final benchmark views inside all four bounds in both seats; tightest: main g/b 1.696 (limit 1.70, was 1.689), Black r/g 1.497 (limit 1.50, was 1.491). Thin margins: the hands and arms are now larger in frame",
+ "V2": "not lowered beyond noise on the same position (static -0.04, median3 +-0.01); benchmark views -0.07 / -0.20 include different board positions",
+ "tests": {
+  "cpu": "306/307: every board-sync check passed (resyncs 0); FAIL 'game within ply budget 300' (this CPU-vs-CPU game ran past 300 plies; earlier runs ended at 78/158/220)",
+  "drag": "PASS 8/8",
+  "build": "C5c (final), 2026-10-15 ~06:29 PC time"
+ },
+ "sleeve": "props.py player_sleeve(): 60 sides x 36 rings before one subdivision (old: 32 sides x end rings only, 512 verts, OBJ 's 0'), compression rings, under-sag, rolled frayed cuff, cylindrical UVs, OBJ 's 1' with per-vertex normals; 35.5k tris per sleeve (C5-sleeve.jpg, Blender workbench). Material is not mine: MI_PlayerSleeve is a flat tint (0.11/0.12/0.13) with no fabric texture and reads grey-green; request to materials: woven canvas like MI_PatientJacket (rough_linen) or a CC0 canvas, pale stained colour (reference 'Institutional Sleeves'); the new cylindrical UVs run V along the arm",
+ "hand_decals": "Rotator(-90, yaw, 0) -> Rotator(0, -90, yaw) (pitch -90 = straight down), size as half extents (2, 4, 4.5), box centred on the back of the hand (it was 8 cm over the wrist, reaching no skin), and the player body receives decals when TC_HAND_DECALS=1 (spawn_opponent turns decals off on every body). Still off by default (veins/dirt are in the skin textures since C3); not captured with decals on",
+ "files": [
+  "C5-main-before-after.jpg",
+  "C5-black-before-after.jpg",
+  "C5-hands.jpg",
+  "C5-patient.jpg",
+  "C5-sleeve.jpg",
+  "C5-static-before-after.jpg"
+ ],
+ "pc": "checkout restored to upstream 6ef6c53 with git checkout of the three changed files only (nothing deleted), L_Table rebuilt from upstream after each session (169 actors), lock released"
+}

@@ -1,6 +1,7 @@
 # Horror Chess — Build Report
 
-Status as of 2026-10-02. This report follows the deliverables format from the build specification:
+Sections 1–8 describe the browser build as of 2026-10-02. Later phases are appended at the end; the latest is
+[Milestone 2 progress](#milestone-2-ue5-playable-client-progress-2026-10-03). This report follows the deliverables format from the build specification:
 what was implemented, which files, how to run it, what remains, and technical limitations.
 
 ![Gameplay at 1920×1080](screenshots/gameplay-1920x1080.jpg)
@@ -142,3 +143,49 @@ npm run start          # production: builds the client and serves it plus /ws on
 | ![Lobby](screenshots/lobby-1920x1080.jpg) | ![Checkmate](screenshots/checkmate-1280x720.jpg) |
 | ![Hand customization](screenshots/hand-customization-1600x900.jpg) | ![Environments](screenshots/environments-1440x900.jpg) |
 | ![Tablet](screenshots/tablet-768x1024.jpg) | ![Phone](screenshots/mobile-390x844.jpg) |
+
+## Photorealistic rendering phase — status
+
+| Phase | Status |
+| --- | --- |
+| 0 Repository audit | Done |
+| 1 Hardware audit | Done ([PERFORMANCE.md](PERFORMANCE.md)) |
+| 2 Engine evaluation | Done: UE5 primary, Godot 4 fallback ([RENDERING.md](RENDERING.md)) |
+| 3 UE5 benchmark scene | **Done.** 1440p HIGH with TSR at 67%: 64.5 fps, 1% low 59.6, 3.1 GB VRAM. Full matrix in PERFORMANCE.md |
+| 4 Proxmox GPU configuration | **Done.** VM 131 with the RX 6650 XT passed through. Mesa 26.2.3 is required for UE hardware ray tracing |
+| 5 Pixel Streaming | **Blocked by an engine limitation.** UE 5.8's only Linux hardware encoder is NVENC, and AMF is Windows-only. Options A–D are in RENDERING.md and need the owner's decision |
+| 6–19 | Not started |
+
+## Master directive: audit, roadmap and Milestone 1 (2026-10-03)
+
+- **Audit and roadmap.** [ROADMAP.md](ROADMAP.md), revised after an adversarial review by a critique agent.
+- **Milestone 1, core foundation: complete.** The item-by-item table is in ROADMAP.md §5.
+- **Tests and builds.**
+  - 305 automated tests, run three times in a row with no failures.
+  - Typecheck of all four packages is clean.
+  - The client build passes.
+  - Both end-to-end scripts (online and offline) pass.
+- **Agents used:**
+  - critique (roadmap review; findings adopted or answered in ROADMAP.md);
+  - rules (123 FIDE fixture cases plus a chess.js deviation report);
+  - character design ("The Annotator": [CHARACTERS.md](CHARACTERS.md) and `content/characters/`);
+  - GitHub (keeps draft PR #1 current at each checkpoint).
+
+## Milestone 2: UE5 playable client, progress (2026-10-03)
+
+Item-by-item evidence is in [ROADMAP.md](ROADMAP.md) §5b.
+
+- **Proven on Linux (render VM):** the UE client (`ue5/TownChess`) plays full games against the core. That covers:
+  - the server-hosted engine, played to checkmate;
+  - a browser opponent through one server: special moves, mate, stalemate and an accepted draw offer;
+  - clocks and flag fall;
+  - an illegal move refused and not animated;
+  - killing the UE client, then relaunching and rejoining with the board, turn and clocks rebuilt.
+- **Also done:** the packaged core bundle runs on stock Node (`npm run bundle:core`). The chess engine and learning
+  foundation (`packages/engine`, `packages/learning`) landed, and BUG-001..004 from their audit are fixed
+  ([KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)). New identities and results are now persisted immediately.
+- **Windows dev PC:** set up with Visual Studio 2022 17.14 and Node 24, and scripts for build, content and packaging
+  are added (`ue5/tools/win/`). UE 5.8.3 is installing. The log is [WINDOWS_SETUP.md](WINDOWS_SETUP.md).
+- **Pending:** the packaged Win64 build (DX12, Job Object, antivirus behaviour), and checking real mouse picking and
+  the on-screen HUD.
+- **Checks:** 407 automated tests pass (16 files), and the typecheck of all five packages is clean.

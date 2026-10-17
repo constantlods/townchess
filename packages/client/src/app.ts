@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ChessRules, type Color, type Cosmetics, TIME_CONTROLS } from '@hc/shared';
+import { ChessRules, type Color, type Cosmetics, type Promotion, TIME_CONTROLS } from '@hc/shared';
 import { World } from './scene/world';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { PlayerArms } from './scene/choreo';
@@ -379,7 +379,8 @@ export class App {
         case 'play': this.play('ai', a ?? '5+0', { aiLevel: (b as AiLevel) ?? 'patient', color: 'w' }); break;
         case 'fen': this.startLocal('w', '5+0', 'patient', cmd.slice(4)); break;
         case 'online': this.play(a as PlayMode, b ?? '5+0', { aiLevel: 'patient', color: 'w', joinCode: cmd.split(' ')[3] }); break;
-        case 'move': s?.submitMove(a, b); break;
+        case 'move': s?.submitMove(a, b, (cmd.split(' ')[3] as Promotion | undefined) || undefined); break;
+        case 'draw': if (a === 'offer') s?.offerDraw(); else if (a === 'accept') s?.acceptDraw(); else if (a === 'decline') s?.declineDraw(); break;
         case 'screen': this.go(a as Screen); break;
         case 'settings': this.settingsPanel.show(a !== 'off'); break;
         case 'env': await this.setEnvironment(a as EnvId); break;

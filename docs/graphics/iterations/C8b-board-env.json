@@ -1,0 +1,44 @@
+{
+ "what": "C8b board/environment: judge run 6 V5 #3 (red rectangle on the table's near edge), #4 (fur-like decal streaks on that edge), #5 (stretched streaky panel behind the lamp), #6 (lamp mouth a flat grey band), #7 (clipboard header printed twice); gap 5 story props: the WARD B wall sign",
+ "base": "f95115a (upstream incl. C7 fa8223f). Build PC 2026-10-15 19:12-19:53 PC time (lock board-env). Before = L_Table rebuilt from f95115a; after = f95115a + C8b build_scene.py + T_WardSign_BaseColor.png (iterations C1-C3, final F). capture.ps1 -Preset epic 1920x1080 -WarmSec 22; main = -Auto cpu:novice:w:5+0 -Extra '-TCHud=1 -TCPlay=10', black = cpu:novice:b:untimed same extra (benchmark.ps1 cameras); one extra main view with -TCGamePath=1",
+ "metric": "C3 recipe: 1045x588 PIL bicubic, Rec.709 luma mean / p95, mean R/G and G/B, detail = mean |4-neighbour Laplacian|, median3 = same after a 3x3 median, below8 = % luma < 8. Before main reproduces the C7 numbers the lead quoted (29.74 / r/g 1.468 / g/b 1.658)",
+ "V1_bounds": "mean 24-30, p95 <= 105, r/g 1.38-1.50, g/b 1.55-1.70",
+ "main": {
+  "before": {"mean": 29.7, "p95": 96.4, "rg": 1.469, "gb": 1.658, "detail": 9.68, "median3": 6.02, "below8": 32.5},
+  "C1": {"mean": 29.5, "p95": 95.3, "rg": 1.474, "gb": 1.671, "detail": 9.62, "median3": 6.03, "below8": 32.4},
+  "C2": {"mean": 29.6, "p95": 93.8, "rg": 1.474, "gb": 1.673, "detail": 9.85, "median3": 6.19, "below8": 32.5},
+  "C3": {"mean": 29.7, "p95": 94.3, "rg": 1.474, "gb": 1.670, "detail": 9.84, "median3": 6.18, "below8": 32.5},
+  "final": {"mean": 29.5, "p95": 94.0, "rg": 1.473, "gb": 1.670, "detail": 9.81, "median3": 6.17, "below8": 32.7},
+  "final_gamepath": {"mean": 29.9, "p95": 94.8, "rg": 1.472, "gb": 1.668, "detail": 9.55, "median3": 6.17, "below8": 32.6, "note": "-TCGamePath=1 (83% + TSR); no before on this path"}
+ },
+ "black_seat": {
+  "before": {"mean": 28.0, "p95": 90.1, "rg": 1.481, "gb": 1.654, "detail": 9.32, "median3": 5.74, "below8": 33.1},
+  "C3": {"mean": 28.1, "p95": 87.7, "rg": 1.484, "gb": 1.669, "detail": 9.55, "median3": 5.97, "below8": 33.0},
+  "final": {"mean": 28.0, "p95": 88.1, "rg": 1.485, "gb": 1.666, "detail": 9.51, "median3": 5.93, "below8": 33.1}
+ },
+ "V1": "final inside all four bounds in both seats; mean not raised (main 29.7 -> 29.5, Black 28.0 -> 28.0); g/b +0.012 (main 1.670, Black 1.666), r/g +0.004 (1.473 / 1.485), both still >= 0.015 under their limits",
+ "V2": "not lowered: main 9.68 -> 9.81 (median3 6.02 -> 6.17), Black 9.32 -> 9.51 (5.74 -> 5.93)",
+ "iterations": {
+  "C1": "all fixes, sign roll 0: the stencil came out rotated 90 deg and dark paint read as nothing on the dark tiles",
+  "C2": "cabinet yaw 180 -> 0, form stock 64 -> 32 px, off-white paint, sign roll -90 (rendered rotated 180)",
+  "C3": "sign roll +90 (upright); WARD row cut by the frame top at z 120",
+  "final": "sign centre z 110"
+ },
+ "fixes": {
+  "red_rectangle": "the near-edge Smear decal (-32.5, 3, 9 cm) reached 2.7 cm past the edge (x -35.3); its downward box (top-1.3..+1.5) painted the vertical face as a hard-edged rectangle. Now 5 cm at x -31.1, level 'edge' (reaches only 0.6 cm under the top). C8b-table-edge-seat.jpg",
+  "fur_edge": "five overlapping Scratch strips on the near strip, three stacked on one 15 cm stretch, reached 0.2-0.6 cm past the edge and smeared down the face. Now four end-to-end strips 4-4.4 cm wide, all >= 1 cm inside the edge, level 'edge'. Every other table decal (14) is also kept >= 1 cm inside all four table edges (far and side faces are the Black seat's near edge) and off the board frame. C8b-table-edge-close.jpg: the face has no decal streaks; its remaining fine fibre is the table scan's own normal (NormalStrength 2.2, materials)",
+  "panel": "the 'streaky lit panel' was the Poly Haven drawer_cabinet's back (yaw 180 turned its drawers to the wall): one flat board whose UVs stretch the grain over ~1 m, lit by Window_Cold 30 cm away. Yaw 0: the drawer front faces the room. C8b-panel.jpg (behind the lamp in C8b-lamp.jpg)",
+  "lamp_mouth": "M_TC_LampInner: default-lit glossy cream enamel (roughness 0.28-0.6 by grime) + emissive (1, 0.8, 0.55) x 60 falling off with the distance from the bulb in mesh space (LocalPosition, apex 4.9 cm -> mouth 9.4 cm, power 2.2, floor 6%) and stained by the grime mask; the rolled rim (M_LampInnerRim) is MI_Brass instead of the glow. TC_LAMP_INNER tunes it. C8b-lamp.jpg, C8b-lamp-seat.jpg",
+  "clipboard": "M_TC_Paper multiplied the record by the forms texture at a 'fixed mip 5' that was not honoured: the full-res form (its own 'WARD B - PATIENT RECORD' header and notes) printed under the record. Now a separate import of the form capped at 32 px (T_PaperStock_BaseColor: toning and stains only). C8b-clipboard.jpg",
+  "ward_sign": "new ue5/tools/textures/ward_sign.py (Courier Prime Bold OFL; numpy/PIL like forms.py): 'WARD' / 'B' / double arrow, flaked off-white paint with runs, RGBA. Decal M_TC_WardSign on the back wall at (318, 62, 110), 56 cm, roll 90; it replaces the TextRenderActor at z 205 that was above the frame. TC_SIGN=y,z,size,roll tunes it. C8b-ward-sign.jpg, C8b-main-before-after.jpg"
+ },
+ "not_done": {
+  "window_cold_source": "Window_Glow (z 140-230 on the back wall at y -150) is above the top of the seat frame (the view meets the back wall at z ~150) and behind the lamp head; making it readable means moving the window down/right together with the Window_Cold rect light (rendering architect's). Not changed; TC_WINDOW_GLOW env added for the glow strength only (default unchanged 6)",
+  "knight_faceting": "report only: the Poly Haven chess_set FBX piece meshes are imported as-is (Nanite on, default FBX normal import); no smoothing step of ours touches them (the faceting is in the silhouette, i.e. geometry, which normals cannot cause); triangle count not measured this session. A fix is a subdivided/re-meshed piece set (Blender pre-pass) - not attempted",
+  "watch_bezel": "report only (hands/character, props.py wristwatch): the bezel torus, case and lugs are joined by _join_uv, which never calls shade_smooth (only the strap is smoothed), so the OBJ carries flat face normals: the 64 x 10-segment bezel renders as visible facets. Fix: shade_smooth (or smooth-by-angle) on SM_WatchBody before export"
+ },
+ "files": ["C8b-main-before-after.jpg", "C8b-black-before-after.jpg", "C8b-main-gamepath.jpg", "C8b-ward-sign.jpg", "C8b-lamp.jpg", "C8b-lamp-seat.jpg", "C8b-clipboard.jpg", "C8b-panel.jpg", "C8b-table-edge-seat.jpg", "C8b-table-edge-close.jpg"],
+ "closeup_cameras": {"lamp": "-35,-12,113 -> 19.4,-32.4,113 fov 40", "clipboard": "-30,28,112 -> 8,44,80 fov 45", "panel": "130,-50,115 -> 265,-120,50 fov 55", "edge_close": "-58,0,98 -> -33,0,76 fov 50 (after only; before = judge run6-table-edge)"},
+ "tests": {"cpu": "PASS 16/16 (full game to checkmate)", "drag": "PASS 8/8", "build": "final F level, 2026-10-15 ~19:44-19:50 PC time"},
+ "pc": "checkout restored (git checkout build_scene.py, sign PNG removed), L_Table rebuilt from upstream f95115a (BUILD OK, 169 actors), lock released"
+}

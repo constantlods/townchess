@@ -1,0 +1,88 @@
+{
+ "what": "C7 rendering architect: (1) rook-crown specks (BETA V5, judge run 6 #2), (2) dithered shadow noise on the opponent's gown (run 6 #1), (3) the lamp does not read as the key / the scalp out-shines it (run 6 #6), (4) no cold back light (run 6 lighting row)",
+ "base": "upstream 34698fe (scene = da356aa: C2.3 lighting, C3-C6). Build PC 2026-10-15; B = upstream level, E/F = final level (C7 lights). Lock held 12:48-13:40 PC time (52 min, over the 45 min rule by 7 min; released after L_Table was rebuilt from upstream)",
+ "capture_path": {
+  "problem": "capture.py renders a SceneCapture2D at full render-target resolution with its own temporal history; the game renders 83% (Epic) and TSR-upscales",
+  "method": "C:/TownChess/work/ra/c7/ra_c7cap.py (not in the repo) wraps the lead's capture.py and sets the capture component's main_view_resolution + main_view_family (ignore_screen_percentage off): the engine then forks the main view's screen-percentage interface into the capture (SceneCaptureRendering.cpp, bInheritMainViewScreenPercentage), i.e. 1594x896 -> 1920x1080 through TSR, as the player sees it at -TCShotRes 1920x1080. Log confirms r.ScreenPercentage 83, r.AntiAliasingMethod 4",
+  "check": "game-path frames are visibly softer than the full-res capture (static view detail 9.28 full-res vs 8.98 game path, same scene). Every A/B below was judged on the game path. V1/V2 rows are reported on BOTH paths: the full-res path is the one all earlier V1/V2 numbers used",
+  "request_to_lead": "make this a capture.py option (-TCGamePath=1: cc.main_view_resolution/main_view_family = True) so the judge scores the frame the player sees"
+ },
+ "rooks": {
+  "views": "static start position (cpu:novice:w:untimed -TCHud=1), seat camera, 1920x1080, Epic; crops a1 = (480,690)-(570,735), h1 = (1345,690)-(1435,735) at x5; FOV-7 close-up -TCCamLoc=-90,0,114 -TCCamTarget=-20.3,20.3,86",
+  "ab_h1_crown": {
+   "full_res_capture": "mottle",
+   "83pct_TSR (game)": "mottle (same pattern, softer)",
+   "100pct_TSR": "mottle",
+   "Lamp_Key+Lamp_Opponent source radius 0": "mottle",
+   "Lamp_Key source radius 6 / 10": "mottle",
+   "r.RayTracing.Shadows.SamplesPerPixel 4": "mottle",
+   "r.Shadow.Denoiser 0": "mottle",
+   "r.RayTracing.Shadows 0 (VSM)": "mottle",
+   "r.RayTracing.NormalBias 0.5 / 2": "mottle",
+   "r.RayTracing.Shadows.AvoidSelfIntersectionTraceDistance 4": "mottle",
+   "r.Lumen.ScreenProbeGather.ShortRangeAO 0": "mottle",
+   "r.Lumen.Reflections.Allow 0": "mottle",
+   "r.DynamicGlobalIlluminationMethod 0": "mottle",
+   "Lamp_Opponent cast_shadows off": "mottle",
+   "Lamp_Key cast_shadows off": "GONE: floor clean and uniform (also at FOV 7)"
+  },
+  "cause": "not noise. The lamp stands beyond the board's left half, so on h1 (far right) the key grazes the crown floor and the crenel walls cast real, hard-edged shadows across it (FOV 7: the back half of the floor is in the wall's shadow, lit tongues through the gaps). At the seat that pattern is 30 x 7 px, i.e. lit/shadow patches of 2-4 px, which TSR resolves as grey/white mottle. Independent of shadow method, sample count, denoiser, bias, source size, GI, AO, reflections and screen percentage. a1's bright patch is direct key light on a crown floor that faces the lamp (persists in every test, a1 floor p99 ~218)",
+  "fix_in_lighting": "none without losing the key's piece shadows (the long lamp shadows are the run-6 judge's biggest lighting gain). Not changed",
+  "routes_for_other_owners": "board/environment: shallower crown floor or bevelled/rounded crenel tops on the rook mesh (fewer, larger shadow shapes); materials: a crown-floor mask that darkens and roughens the floor (the cavity AO is ~0.9 there because the floor is open to the sky) so lit and shadowed patches converge",
+  "metric_h1_floor_luma_mean_std_lap (B -> F, game path)": "[43.2, 16.5, 14.7] -> [43.2, 16.0, 13.5]"
+ },
+ "gown": {
+  "cause": "not shadow noise: the dither is in the G-buffer normal (k_normal capture, C7-gown.jpg): MI_PatientJacket = rough_linen at tiling 5, a sub-pixel weave normal map at the seat distance. It shows as salt-and-pepper wherever the gown is not in direct light. Same with VSM, with Lamp_Opponent's shadow off, at 83/100% TSR",
+  "request_to_materials (via lead)": "MI_PatientJacket: fade the weave normal with pixel footprint (M_TC_PBR DetailFadeInv already exists, C6) or NormalStrength ~0.3 / lower Tiling; the C8m gown grime pass is the natural place"
+ },
+ "lights_changed": {
+  "Rim": "point (150,-60,top+70): 80 lm 6500 K -> 500 lm 9000 K (TC_RIM), shadowless: a cold edge on the cage, bed frame, chair and shoulder (C7-opponent-lamp.jpg)",
+  "Lamp_Opponent": "170 -> 140 lm (TC_OPP): scalp mean 46.4 -> 42.7, p99 125.0 -> 113.3 (game path, static)",
+  "rejected": {
+   "Lamp_Opponent 110 lm (build C)": "scalp p99 100 but static detail 9.279 -> 9.165 (V2 lowered)",
+   "Lamp_Opponent 170 lm, cone 30 (build D)": "scalp p99 160 (same lumens in a narrower cone), main mean 29.92",
+   "Rim 600 lm": "main mean +0.7 would leave ~0 margin to 30",
+   "Lamp_Bulb 60 -> 180 lm": "lamp mouth p99 unchanged (200.6): the mouth band is the shade's material, not light"
+  },
+  "lamp_mouth": "no light-side fix: the flat grey band is the shade rim's emissive/material (board/environment, C8b). Measured: lamp mouth region p99 200.6 in every light test",
+  "gpu": "no shadowed light added or changed; see gpu block"
+ },
+ "V1_bounds": "mean 24-30, p95 <= 105, r/g 1.38-1.50, g/b 1.55-1.70",
+ "metric": "C3 recipe: 1045x588 PIL bicubic, Rec.709 luma, mean |4-neighbour Laplacian| (detail), median3 after a 3x3 median, below8 = % luma < 8 (this script gives 29.31 / 96.17 / 1.4845 / 1.696 / 9.651 on C6f_main, C6 json 29.3 / 96.2 / 1.4845 / 1.696 / 9.65)",
+ "full_res_capture_path": {
+  "main": {"B_before": {"mean": 29.46, "p95": 96.25, "rg": 1.485, "gb": 1.6973, "detail": 9.695, "median3": 6.044, "below8": 33.23},
+           "F_after": {"mean": 29.74, "p95": 96.91, "rg": 1.4682, "gb": 1.6582, "detail": 9.715, "median3": 6.045, "below8": 32.58}},
+  "black_seat": {"B_before": {"mean": 27.97, "p95": 92.66, "rg": 1.496, "gb": 1.6946, "detail": 9.417, "median3": 5.833, "below8": 33.78},
+                 "F_after": {"mean": 27.78, "p95": 88.38, "rg": 1.4787, "gb": 1.6523, "detail": 9.35, "median3": 5.749, "below8": 33.11}},
+  "static_same_position": {"B_before": {"mean": 29.19, "p95": 95.69, "rg": 1.4918, "gb": 1.7087, "detail": 9.279, "median3": 5.69},
+                           "F_after": {"mean": 29.45, "p95": 95.48, "rg": 1.4759, "gb": 1.6687, "detail": 9.281, "median3": 5.681}},
+  "note": "main/black are cpu games (-TCPlay=10) with different positions per run (capture noise ~0.05-0.1 detail): the same-position static view is the V2 comparison. E (same lights, separate run): main 29.74/96.69/1.4685/1.6581/9.692, Black 28.04/90.38/1.4811/1.6554/9.315"
+ },
+ "game_path_83pct_TSR": {
+  "static": {"B_before": {"mean": 29.31, "p95": 95.87, "rg": 1.4907, "gb": 1.7052, "detail": 8.975, "median3": 5.653},
+             "F_after": {"mean": 29.57, "p95": 95.59, "rg": 1.4748, "gb": 1.6657, "detail": 8.981, "median3": 5.646}},
+  "black_start": {"B_before": {"mean": 27.78, "p95": 91.82, "rg": 1.4957, "gb": 1.6898, "detail": 9.021},
+                  "E_after": {"mean": 28.05, "p95": 90.38, "rg": 1.4785, "gb": 1.6483, "detail": 9.033}}
+ },
+ "V1": "in bounds on both seats; colour margins much wider (main g/b 1.697 -> 1.658, Black r/g 1.496 -> 1.479, Black g/b 1.695 -> 1.652); main mean margin narrower (29.46 -> 29.74, limit 30)",
+ "V2": "not lowered: same-position static 9.279 -> 9.281 (full res), 8.975 -> 8.981 (game path); Black start (game path) 9.021 -> 9.033",
+ "white_piece_readability": {
+  "method": "C2.3 method (masks from a -TCSource=basecolor capture of the start view, F_bc; 88175 white / 21656 black px), median Rec.709 luma of the final frame",
+  "before_B_static": {"white_median": 81.9, "black_median": 6.8, "ratio": 12.09},
+  "after_F_static": {"white_median": 81.7, "black_median": 6.8, "ratio": 12.06},
+  "game_path": {"before": {"white_median": 82.2, "ratio": 12.13}, "after": {"white_median": 82.0, "ratio": 11.73}},
+  "note": "kept (target ratio >= 2.5). Numbers differ from C2.3's 74.8 / 17.8 because the scene changed since (C3-C6 materials) and the board box/mask counts differ"
+ },
+ "gpu": {
+  "method": "editor -game offscreen, 2560x1440, ra_gpu.py CSV after 30 s warm-up; first window at the game's Epic 83% (ApplyQualityPreset), then 100%",
+  "B_upstream_83": {"gpu_ms": 11.82, "lights": 2.57, "shadows_denoiser": 2.73, "tsr": 1.38, "fps": 81.1},
+  "C_rim350_opp110_83": {"gpu_ms": 11.72, "lights": 2.55, "shadows_denoiser": 2.72, "tsr": 1.37, "fps": 81.8},
+  "F_final_83": {"gpu_ms": 12.46, "lights": 2.72, "shadows_denoiser": 2.88, "tsr": 1.45, "fps": 77.0},
+  "B_100": 15.71, "C_100": 15.69, "F_100": 16.6,
+  "reading": "no shadow/GI change was made (one shadowless point light brighter, one spot dimmer). C and F bracket B: 11.72-12.46 against 11.82 is run-to-run noise (F ran right after two autotests). The rejected diagnostic cvars were never kept, so no cost to report"
+ },
+ "tests": {"cpu": "PASS 32/32 (full game to checkmate, resyncs 0)", "drag": "PASS 8/8", "build": "final lights (build E = F), 2026-10-15 13:30-13:35 PC time"},
+ "cvar_for_lead": "none: no quality-tier cvar fixes the crown (all tested; see ab_h1_crown)",
+ "files": ["C7-rooks.jpg", "C7-rook-diagnosis.jpg", "C7-gown.jpg", "C7-opponent-lamp.jpg", "C7-main-before-after.jpg"],
+ "pc": "checkout restored (git checkout of build_scene.py, git pull to 34698fe), L_Table rebuilt from upstream, lock released. Scratch scripts in C:/TownChess/work/ra/c7"
+}

@@ -1,0 +1,9 @@
+{
+  "type": "MOVE",
+  "gameId": "GAME-0A1B2C",
+  "seq": 12,
+  "from": "b7",
+  "to": "a8",
+  "promotion": "n",
+  "ply": 22
+}

@@ -10,8 +10,8 @@ const wait = Number(process.env.WAIT ?? 6000);
 fs.mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM ?? '/opt/pw-browsers/chromium',
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+  executablePath: process.env.CHROMIUM ?? `${process.env.HOME}/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome`,
+  args: [process.env.SOFTWARE ? '--use-angle=swiftshader' : '--use-angle=vulkan', '--enable-unsafe-swiftshader', '--enable-features=Vulkan', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
 });
 for (const s of sizes) {
   const [w, h] = s.split('x').map(Number);

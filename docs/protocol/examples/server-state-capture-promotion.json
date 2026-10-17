@@ -1,0 +1,133 @@
+{
+  "type": "GAME_STATE_UPDATED",
+  "reason": "move",
+  "state": {
+    "id": "GAME-0A1B2C",
+    "white": {
+      "id": "P-EXAMPLE01",
+      "username": "PATIENT_07",
+      "rating": 1204,
+      "cosmetics": {
+        "hands": "dirty",
+        "gloves": "none",
+        "sleeves": "jacket",
+        "accessories": "strap"
+      }
+    },
+    "black": {
+      "id": "ai:warden",
+      "username": "UNKNOWN_13",
+      "rating": null,
+      "cosmetics": {
+        "hands": "dirty",
+        "gloves": "none",
+        "sleeves": "jacket",
+        "accessories": "strap"
+      },
+      "ai": {
+        "level": "warden"
+      }
+    },
+    "fen": "N3k3/8/8/8/8/8/8/4K3 b - - 0 1",
+    "moveHistory": [
+      {
+        "from": "b7",
+        "to": "a8",
+        "promotion": "n",
+        "san": "bxa8=N",
+        "color": "w",
+        "piece": "p",
+        "captured": "r",
+        "flags": "cp",
+        "fenAfter": "N3k3/8/8/8/8/8/8/4K3 b - - 0 1",
+        "effects": [
+          {
+            "kind": "capture",
+            "square": "a8",
+            "piece": "r",
+            "color": "b"
+          },
+          {
+            "kind": "move",
+            "piece": "p",
+            "color": "w",
+            "from": "b7",
+            "to": "a8"
+          },
+          {
+            "kind": "promote",
+            "square": "a8",
+            "color": "w",
+            "from": "p",
+            "to": "n"
+          }
+        ],
+        "clockAfterMs": 300000
+      }
+    ],
+    "turn": "b",
+    "whiteClockMs": 300000,
+    "blackClockMs": 300000,
+    "clockSampledAt": 1791028800000,
+    "clockRunning": null,
+    "status": "draw_insufficient",
+    "winner": null,
+    "rated": false,
+    "timeControl": {
+      "initialMs": 300000,
+      "incrementMs": 0
+    },
+    "drawOfferBy": null,
+    "rematchOfferBy": null,
+    "createdAt": 1791028740000,
+    "updatedAt": 1791028800000,
+    "disconnected": [],
+    "termination": "insufficient_material",
+    "drawPolicy": "automatic",
+    "claimableDraw": null,
+    "legalMoves": [],
+    "opening": null,
+    "inBook": false,
+    "lastEvents": [
+      {
+        "type": "move",
+        "ply": 1,
+        "color": "w",
+        "san": "bxa8=N",
+        "piece": "p"
+      },
+      {
+        "type": "capture",
+        "ply": 1,
+        "color": "w",
+        "san": "bxa8=N",
+        "piece": "p",
+        "captured": "r"
+      },
+      {
+        "type": "promotion",
+        "ply": 1,
+        "color": "w",
+        "san": "bxa8=N",
+        "piece": "p",
+        "promotion": "n"
+      },
+      {
+        "type": "material_swing",
+        "ply": 1,
+        "color": "w",
+        "san": "bxa8=N",
+        "piece": "p",
+        "balance": 3,
+        "swing": 7
+      },
+      {
+        "type": "draw_insufficient",
+        "ply": 1,
+        "color": null
+      }
+    ],
+    "eventSeq": 2,
+    "firstMoveDeadline": null
+  }
+}

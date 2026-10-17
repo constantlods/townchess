@@ -1,0 +1,151 @@
+{
+ "what": "C8m materials: (1) the patient's gown painted filthy in the garment's own UVs (garment.py), jacket grime, damp face; (2) player skin roughness/specular from the dirt (SRMF per variant) + tone variation; (3) wood: continuous gouges without the hairline halo, board pin-prick grid removed, decal slope fade, table handling relief; plus C7's two requests (weave normal fade, rook crown top mask)",
+ "base": "upstream 81450aa (C9 window). Before = m11b_* (upstream build), after = m11a_* (same session, same base). Close-ups without a same-base before compare with judge run 6 (da356aa) or m8b (f95115a), labelled in the sheets. Build PC 2026-10-16 13:33-13:58, capture.ps1 -Preset epic 1920x1080 -WarmSec 22; main = cpu:novice:w:5+0 '-TCHud=1 -TCPlay=10', maingp = same + -TCGamePath=1, black = cpu:novice:b:untimed same extra, static = cpu:novice:w:untimed -TCHud=1",
+ "metric": "C3 recipe (1045x588 bicubic, Rec.709 luma, mean |4-neighbour Laplacian|, median3, below8). The script reproduces the judge's run-6 numbers (j_main 29.4/96.5/1.4842/1.6964)",
+ "V1_bounds": "mean 24-30, p95 <= 105, r/g 1.38-1.50, g/b 1.55-1.70",
+ "metrics": {
+  "main": {
+   "before_m11b": {
+    "mean": 29.7,
+    "p95": 97.3,
+    "rg": 1.467,
+    "gb": 1.6648,
+    "detail": 10.53,
+    "median3": 6.72,
+    "below8": 37.5
+   },
+   "after_m11a": {
+    "mean": 28.8,
+    "p95": 96.2,
+    "rg": 1.472,
+    "gb": 1.6609,
+    "detail": 10.3,
+    "median3": 6.61,
+    "below8": 38.0
+   }
+  },
+  "maingp": {
+   "before_m11b": {
+    "mean": 29.6,
+    "p95": 97.0,
+    "rg": 1.4662,
+    "gb": 1.6617,
+    "detail": 10.15,
+    "median3": 6.65,
+    "below8": 37.4
+   },
+   "after_m11a": {
+    "mean": 29.0,
+    "p95": 96.8,
+    "rg": 1.4714,
+    "gb": 1.6588,
+    "detail": 10.02,
+    "median3": 6.61,
+    "below8": 37.8
+   }
+  },
+  "black": {
+   "before_m11b": {
+    "mean": 28.1,
+    "p95": 92.2,
+    "rg": 1.4773,
+    "gb": 1.6588,
+    "detail": 10.16,
+    "median3": 6.44,
+    "below8": 38.1
+   },
+   "after_m11a": {
+    "mean": 27.3,
+    "p95": 90.0,
+    "rg": 1.4855,
+    "gb": 1.6601,
+    "detail": 10.03,
+    "median3": 6.4,
+    "below8": 38.3
+   }
+  },
+  "static": {
+   "before_m11b": {
+    "mean": 29.3,
+    "p95": 96.1,
+    "rg": 1.4743,
+    "gb": 1.6753,
+    "detail": 10.07,
+    "median3": 6.33,
+    "below8": 37.7
+   },
+   "after_m11a": {
+    "mean": 28.7,
+    "p95": 95.6,
+    "rg": 1.4797,
+    "gb": 1.6728,
+    "detail": 9.89,
+    "median3": 6.26,
+    "below8": 38.2
+   }
+  },
+  "clean_upstream_after_restore_m11u_main": {
+   "mean": 29.7,
+   "p95": 97.1,
+   "rg": 1.4676,
+   "gb": 1.6648,
+   "detail": 10.48,
+   "median3": 6.66,
+   "below8": 37.4
+  },
+  "red_skin_fix_m9u_main": {
+   "mean": 29.6,
+   "p95": 97.0,
+   "rg": 1.4673,
+   "gb": 1.664,
+   "detail": 10.48,
+   "median3": 6.68,
+   "below8": 37.5
+  },
+  "red_skin_state_m9b_main": {
+   "mean": 28.3,
+   "p95": 93.2,
+   "rg": 1.5428,
+   "gb": 1.6325,
+   "detail": 9.74,
+   "median3": 6.25,
+   "below8": 33.1
+  }
+ },
+ "V1": "in bounds in all four views after (main 28.8/96.2/1.472/1.661, Black 27.3/90.0/1.486/1.660). The darker gown takes main mean 29.7 -> 28.8 (more margin to 30); r/g +0.005-0.008",
+ "V2": "LOWER: main 10.53 -> 10.30, game path 10.15 -> 10.02, Black 10.16 -> 10.03, static 10.07 -> 9.89. Per cell (static): the loss is in the opponent cells (-0.8..-1.2: the patient's sub-pixel linen weave, C7's 'gown dither', now faded out; jacket and gown smoother) and the two bottom corners (-1.0..-1.3: the hands' lower specular and rougher dirt, the sleeve). No grain added to compensate. Lead decision: keep (defect noise removed) or ask for weave/specular back",
+ "gown": {
+  "textures": "ue5/tools/textures/garment.py -> C:/TownChess/assets/garment/T_PatientGown_{Shirt,Short}_{BC,ARM}.png (workspace only: painted on the Epic DefaultGarment AO/stitch masks, exported by an editor step to C:/TownChess/assets/garment_src). Canvas linear 0.17/0.155/0.12 mottled; dirt pooled in the folds (AO) + film + blotches; soiled frayed seams/hems (stitch mask, island edges); collar ring; 10 sweat areas with tide lines; 24 dried-blood stains (dark brown-red, darker rims, soaked halo) + 4 big ones on the front chest, spatter, drips; 9 rust smears; roughness 0.9 canvas, 0.62 blood, damp sweat lower",
+  "material": "outfit_slot_material -> gown_material(): M_TC_PBR instance per garment slot of MI_PatientShirt (patient and player body): BaseColor/ARM ours, Normal = the garment's own DG_*_Normal (folds and seams kept), DetailNormal = rough_linen weave tiling 14 faded by DetailFadeInv 20 (no sub-pixel weave at the seat), two-sided override. TC_GARMENT_DIR, default C:/TownChess/assets/garment; without the PNGs the C3 colour-only child is used",
+  "jacket": "MI_PatientJacket: grime threshold 0.3 -> 0.12, darker grime colour, new master NormalFadeInv 20 (C7-gown.jpg dither)",
+  "face": "patient_face_materials(): children of the face's baked skin MIs (the component holds MIDs; parent resolved by name; a child of the MID rendered as clay in the first build) with Roughness Global Multiply x0.82 and Specular Global Multiply x0.9 (damp sheen). The Basecolor Value/Saturation post-bake controls are not factors (0.88 rendered the skin saturated red) and are not used",
+  "evidence": "C8m-opponent.jpg: opponent vs run 6, gown close-up vs m8b, the gown in the base-colour buffer after. At the seat the visible upper chest still reads light; the heavy stains sit lower on the gown"
+ },
+ "skin": {
+  "srmf": "skin.py --srmf T_Body_SRMF_VT.tga (8K; R specular, G roughness, B 0, A mask) writes T_PlayerSkin_<var>_SRMF.png: roughness +0.4 crease dirt (at least 'dirty' strength), +0.12 film, +0.3 nail dirt, +-0.08 slow drift, +0.06 palms, -0.15 nail plates; dirty variant (patient) damp, -0.15 off the dirt; specular x0.82 x(1 - 0.5 dirt - ...) x(1 + 0.3 nails)",
+  "tone": "knuckle redness 0.12 -> 0.25, palms paler 0.12 -> 0.25",
+  "import": "player_skins(): BC and SRMF imported under versioned names (_C8): picked up once without TC_SKIN_REIMPORT, older revisions keep theirs; SRMF compression/sRGB copied from the parent's T_Body_SRMF_VT (TC_MASKS, linear); MI_PlayerSkin_* recreated every build; Specular Global Multiply x0.75 on the parent's value. Skin PNGs are Epic-derived, workspace only: C:/TownChess/assets/skin_c8 via TC_SKIN_DIR until accepted (C:/TownChess/assets/skin untouched; copy BC+SRMF there or set TC_SKIN_DIR to adopt)",
+  "evidence": "C8m-hands.jpg (vs run 6). Modest: less uniform highlight, redder knuckles, paler palms; still tan-orange at the seat"
+ },
+ "sleeve": "sleeve.py: wear-mask B = weave fade on the rolled cuff (master: NormalStrength x (1 - WearMask.B)); a wider, darker elbow gather. The 'hard vertical edge' is where the C5 sleeve mesh ends in the body's shirt sleeve (props.py geometry, hands/character): open",
+ "wood": {
+  "gouges": "stains.py scratch(): each gouge one polygon with a smoothly varying width (no per-segment random rim), a thin continuous pale rim, lit and shaded groove walls; hairlines 260 pale-cored -> 150 mostly dark, a faint pale edge on a third. The 'chalk' strokes (main x 270-350) were those hairlines' pale rims",
+  "board_dots": "board.py: the grid was the normal-map pits (density 0.0012, one size: ~300 identical 0.2 mm craters per square); now 1/8 as many, clustered in the grime, three sizes, elongated along the grain, varied depth, dirt in them; fine dark specks 0.0009 -> 0.0004, clustered",
+  "decals": "M_TC_Blood slope fade: opacity x smoothstep(0.6, 0.85, |n.z|), n from ddx/ddy of the world position: no wear decal smears down a vertical face (complements C8b's placements)",
+  "table": "wood_table_worn MI: handling detail layer (DetailTiling 5, normal 0.5, rough 0.25, darken 0.12)",
+  "evidence": "C8m-wood.jpg. The gouges read as pale-outlined cuts; worth a judge look"
+ },
+ "rooks": "master top mask (TopMaskZ/TopDarken/TopRough: up-facing surfaces above a mesh-local z, LocalPosition + VertexNormalWS); MI_RookWhiteCrown/BlackCrown on the rooks (top 1.4 cm of the 7.79 cm rook; darken 0.45/0.2, roughness +0.35). The crown reads darker and more even in close-ups; not measured against the specks at the seat FOV",
+ "tests": {
+  "cpu": "PASS 168/168 (final build)",
+  "drag": "PASS 8/8 (final build)"
+ },
+ "red_skin_incident": "cause: player_skins() reused an existing MI_PlayerSkin_*; a WIP build set 'Basecolor Global Saturation Post-Bake' 0.88 (and the SRMF) on them, and clean upstream builds kept those overrides (C:/TownChess/assets/skin was never changed). Fix on the PC: the five MI_PlayerSkin_*.uasset moved to C:/TownChess/c8m/stale_mi, L_Table rebuilt from upstream: main r/g 1.4673 (m9u, 81450aa), 1.4676 after this session's restore (m11u). In code: the MIs are recreated every build; my restore deletes them before the upstream build",
+ "files": [
+  "C8m-main-before-after.jpg",
+  "C8m-opponent.jpg",
+  "C8m-hands.jpg",
+  "C8m-wood.jpg"
+ ],
+ "pc": "each session: pull, upstream build + before captures, staged files copied over (guarded by the base commit), C8m build, captures, autotests, git checkout of my files + garment.py removed + MI_PlayerSkin_* removed + upstream rebuild, lock released"
+}

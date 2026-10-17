@@ -1,0 +1,6 @@
+{
+  "type": "CREATE_AI_GAME",
+  "level": "sf1600",
+  "color": "b",
+  "timeControl": "10+5"
+}

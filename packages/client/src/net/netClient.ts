@@ -79,7 +79,7 @@ export class NetClient {
   private pendingPrivate: string | null = null;
   private retry = 0;
   private wantOpen = false;
-  me: { id: string; rating: number } | null = null;
+  me: { id: string; rating: number | null } | null = null;
 
   constructor(private settings: Settings, private cb: NetCallbacks) {}
 

@@ -5,8 +5,10 @@
   "type": "module",
   "workspaces": [
     "packages/shared",
+    "packages/engine",
     "packages/server",
-    "packages/client"
+    "packages/client",
+    "packages/learning"
   ],
   "scripts": {
     "dev": "npm run dev -w @hc/client",
@@ -14,14 +16,19 @@
     "build": "npm run build -w @hc/client",
     "start": "npm run build && npm run start -w @hc/server",
     "start:server": "npm run start -w @hc/server",
-    "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/engine && tsc -p packages/server && tsc -p packages/client && tsc -p packages/learning",
     "test": "vitest run",
     "shots": "node tools/screenshots.mjs",
-    "e2e:online": "node tools/e2e-online.mjs"
+    "e2e:online": "node tools/e2e-online.mjs",
+    "build:openings": "node tools/build-openings.mjs",
+    "build:schema": "tsx tools/build-schema.ts",
+    "e2e:offline": "node tools/e2e-offline.mjs",
+    "bundle:core": "node tools/bundle-core.mjs && node tools/verify-core-bundle.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "tsx": "^4.19.0"
   }
 }

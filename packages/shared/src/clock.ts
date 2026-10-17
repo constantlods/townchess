@@ -10,6 +10,9 @@ export class ChessClock {
   private lastTick = 0;
 
   constructor(public readonly tc: TimeControl) {
+    if (!Number.isFinite(tc?.initialMs) || !Number.isFinite(tc?.incrementMs) || tc.initialMs <= 0 || tc.incrementMs < 0) {
+      throw new Error('invalid time control');
+    }
     this.remaining = { w: tc.initialMs, b: tc.initialMs };
   }
 

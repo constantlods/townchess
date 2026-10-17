@@ -1,0 +1,6 @@
+{
+  "type": "CREATE_AI_GAME",
+  "level": "warden",
+  "color": "w",
+  "timeControl": "5+0"
+}

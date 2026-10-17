@@ -1,0 +1,50 @@
+# Free assets register
+
+Owner rule: the best quality possible with **free** assets only (CC0 preferred, CC-BY with credit), and our own code
+where free assets fall short. No paid assets, nothing ripped from commercial games.
+
+## Third-party (all CC0 unless stated)
+
+| Asset | Source | Licence | Resolution | Used for |
+|---|---|---|---|---|
+| chess_set (pieces + original board) | https://polyhaven.com/a/chess_set | CC0 | 8K | The 32 pieces |
+| white_maple_veneer, dark_wood | https://polyhaven.com/a/white_maple_veneer, https://polyhaven.com/a/dark_wood | CC0 | 4K (baked) / 8K fetched | Board squares (baked by `ue5/tools/textures/board.py`) |
+| smoke_speckled_veneer | https://polyhaven.com/a/smoke_speckled_veneer | CC0 | 8K | Alternative dark squares |
+| wood_cabinet_worn_long | https://polyhaven.com/a/wood_cabinet_worn_long | CC0 | 4K | Board frame |
+| wooden_table_02, wood_table_worn | https://polyhaven.com/a/wooden_table_02, https://polyhaven.com/a/wood_table_worn | CC0 | 4K | Table |
+| lacquered_cherry_wood | https://polyhaven.com/a/lacquered_cherry_wood | CC0 | 4K | Lacquer reference for pieces |
+| rusty_metal_02, rust_coarse_01 | https://polyhaven.com/a/rusty_metal_02, https://polyhaven.com/a/rust_coarse_01 | CC0 | 4K | Cage mask, bars, lamp, cart, mug |
+| brown_leather, rough_linen | https://polyhaven.com/a/brown_leather, https://polyhaven.com/a/rough_linen | CC0 | 4K / 2K | Ledger, cloth |
+| dirty_tiles, damaged_plaster, old_linoleum_flooring_01, concrete_floor_worn_001, painted_plaster_wall, cracked_concrete_wall | polyhaven.com/a/<slug> | CC0 | 2K | Room surfaces |
+| old_bed_frame, wheelchair_01, metal_office_desk, drawer_cabinet, painted_wooden_chair_01, book_encyclopedia_set_01, modular_industrial_pipes_01, mounted_fluorescent_lights, alarm_clock_01, desk_lamp_arm_01, lightbulb_01 | polyhaven.com/a/<slug> | CC0 | 2K | Room props |
+| MetaHuman (Walter preset, wardrobe, grooms) | Unreal Engine MetaHuman Creator 5.8 | Epic MetaHuman licence (free for UE projects; no AI training) | Cinematic pipeline | Opponents and the player's arms |
+| UE template mannequins (fallback) | Unreal Engine templates | UE EULA | — | Fallback when no MetaHuman is built |
+| Patrick Hand, Courier Prime | Google Fonts | SIL OFL 1.1 (licences in `ue5/assets/fonts`) | — | Clipboard game record; Courier Prime Regular also for the HUD's section titles |
+| Lato Light, Lato Regular | https://github.com/google/fonts/tree/main/ofl/lato | SIL OFL 1.1 (`ue5/assets/fonts/OFL-Lato.txt`) | — | HUD text (names, clocks, menus, action list) |
+| Stockfish 19 | https://github.com/official-stockfish/Stockfish/releases/tag/sf_19 | GPL-3.0, separate process only (`tools/engines/SOURCE.txt`) | — | League opponents, simulator referee |
+
+All Poly Haven downloads are scripted (`ue5/tools/fetch_polyhaven.py`, hero resolutions in `HERO`/`HERO_TEXTURES`).
+
+## Our own (generated in this repository)
+
+| Asset | Generator | Output |
+|---|---|---|
+| Cage mask, Annotator plate/coif/sleeves, ledger, pencil, tin mug, dome lamp (+ shade head, C4), med cart, clipboard (+ forms pad, C4), surgical tape roll (C4, replaces Poly Haven `medical_tape` in the level), wooden chessboard, book pile, loose record sheets, pill bottle with tablets | `ue5/tools/blender/props.py` (Blender, scripted) | `ue5/assets/props/*.obj` |
+| Blood decals (spatter, pool, smear, drips: colour/coverage, relief, gloss) and handling-grime masks (since pass C3 the master material's DetailNormal/DetailMask: relief and gloss variation on every untextured instance and the pieces) | `ue5/tools/textures/blood.py` (numpy/scipy/pillow, `tools/.venv`) | `ue5/assets/textures/blood`, `.../grime` |
+| Inlaid board surface (maple/walnut composite, joints, scratches, wear) | `ue5/tools/textures/board.py` | `ue5/assets/textures/board` |
+| Grime mask (blotches, streaks, smudges) | `build_scene.py` `grime_png` | built into the level |
+| Table stains: mug rings (dried rim, faint film, broken where the mug tilted) and handled-grime patches (greasy blotch with wipe streaks), knife scars and scuffs (fine scratches, grime-filled gouges with pale rims) | `ue5/tools/textures/stains.py` | `ue5/assets/textures/stains` |
+| Patient-record sheet (aged A4 form: typed WARD B header and fields, handwritten notes, foxing, crease, tea ring; repo OFL fonts) | `ue5/tools/textures/forms.py` | `ue5/assets/textures/forms` |
+| "WARD B" wall sign (stencilled off-white paint, double arrow, flaking and runs; C8b decal on the back wall; repo OFL Courier Prime) | `ue5/tools/textures/ward_sign.py` | `ue5/assets/textures/signs` |
+| Player skin layers (veins, extensor tendons, knuckle redness, faint freckles, subdermal mottling with a redder wrist and paler underside; dirt driven by cavity since pass C3: fine creases gated to the knuckle skin by the body's corrective joint bones, wrist folds, finger sides and webs, nail folds, under a broad low-contrast film; dirty: heavier dirt and dried blood specks; scarred: healed cuts and a stitched wound; tattooed: faded ink on the forearms; gloves: worn leather painted over the hands; every variant paints the legs as trousers), painted in the MetaHuman body's UV space from each texel's 3D rest position. Derived from Epic's MetaHuman (Walter) body textures, so the outputs are not committed | `ue5/tools/textures/skin.py` (inputs from `ue5/TownChess/Scripts/export_body.py` and `ue5/tools/blender/dump_mesh.py`) | `C:\TownChess\assets\skin` (workspace only) |
+| Player sleeve canvas wear (cuff and fold-crease grime, underside and elbow wear, dried stains; C6) | `ue5/tools/textures/sleeve.py` (our own; weave from CC0 Poly Haven `rough_linen`) | `ue5/assets/textures/sleeve` |
+| Chess piece ambient-occlusion bakes per piece kind (C6), baked in Blender from the CC0 Poly Haven chess set meshes | `ue5/tools/textures/piece_ao.py` | `ue5/assets/textures/pieces` |
+| Patient garment wear (fold dirt, soiled/frayed seams, collar ring, sweat tide lines, dried-blood stains and drips, rust smears; C8m), painted in the garment's own UVs over Epic MetaHuman garment masks, so the outputs are not committed | `ue5/tools/textures/garment.py` | `C:\TownChess\assets\garment` (workspace only) |
+| Wristwatch dial (aged cream dial, minute track, batons, 12/3/9 numerals in Courier Prime, seconds sub-dial, hands at 10:08) | `ue5/tools/textures/watch.py` (our own) | `ue5/assets/textures/watch/T_WatchDial_BaseColor.png` |
+| Ward ambience (ventilation, fluorescent hum, drips, metal creaks; seamless 29 s loop) and the end-of-game sting | `ue5/tools/audio/ambience.py` | `ue5/assets/sounds/S_TC_Ambience.wav`, `S_TC_Sting.wav` |
+| HUD portraits (opponent headshots captured in game, cropped and graded) | `ue5/tools/win/portraits.ps1` + `ue5/tools/portraits.py` | `ue5/assets/ui/T_Portrait_*.png` |
+| Piece sounds: wooden move "clack" and heavier capture (synthesised: modal resonances of a wood block plus a felt thud) | `ue5/tools/audio/clack.py` | `ue5/assets/sounds/S_TC_Move.wav`, `S_TC_Capture.wav` |
+
+## Credits
+
+No CC-BY assets are in use yet. If one is added, credit it here and in the game's credits screen.

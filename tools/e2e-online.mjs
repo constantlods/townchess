@@ -1,7 +1,7 @@
 // End-to-end: two browser clients matched through the real server; one move is played and observed.
 import { chromium } from 'playwright-core';
 const url = process.argv[2] ?? 'http://localhost:5173/?quality=low';
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? `${process.env.HOME}/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome`, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const open = async (name) => {
   const ctx = await browser.newContext({ viewport: { width: 480, height: 270 } });
   const p = await ctx.newPage();
@@ -31,5 +31,8 @@ await w.waitForFunction(() => window.__HC_INFO().moves.length === 2, null, { tim
 console.log('white sees', (await info(w)).moves);
 await w.evaluate(() => window.__HC_DEBUG('resign'));
 await bl.waitForFunction(() => window.__HC_INFO().status === 'resigned', null, { timeout: 30000 });
-console.log('final', (await info(bl)).status);
+const final = (await info(bl)).status;
+console.log('final', final);
 await browser.close();
+if (final !== 'resigned') { console.error('E2E FAILED'); process.exit(1); }
+console.log('E2E OK');

@@ -1,0 +1,111 @@
+{
+ "what": "C2 lighting/post/atmosphere (rendering architect). Metrics: frame resized to 1045 px, Rec.709 luma, PNG captures (capture.ps1 -Preset epic, benchmark cameras); reference panel: mean 26.6, p95 97.1, r/g 1.443, g/b 1.619, below8 33.8%, median 15.0, detail 12.94",
+ "states": {
+  "c1": "87abc46 (before C2)",
+  "c2_2": "d5014f1 (lamp key only + Lamp_Bounce, rejected by the lead: white pieces dark from the seat)",
+  "c2_3": "C2.2 + Table_Bounce 90 lm + EV 8.45"
+ },
+ "c1_main": {
+  "mean": 23.0,
+  "p95": 98.2,
+  "rg": 1.447,
+  "gb": 1.643,
+  "detail": 11.28,
+  "below8": 49.5,
+  "median": 8.3,
+  "board": 56.1,
+  "lhand": 20.3,
+  "rhand": 28.1,
+  "scalp_p95": 95.2,
+  "room": 9.0,
+  "top_row": 13.7,
+  "grain": 0.5,
+  "sharpen": 1.0
+ },
+ "c2_2_main": {
+  "mean": 27.2,
+  "p95": 102.0,
+  "rg": 1.425,
+  "gb": 1.599,
+  "detail": 11.21,
+  "below8": 38.6,
+  "median": 13.7
+ },
+ "c2_3_main": {
+  "mean": 29.1,
+  "p95": 99.7,
+  "rg": 1.473,
+  "gb": 1.661,
+  "detail": 11.15,
+  "below8": 32.3,
+  "median": 15.9,
+  "p999": 217.2,
+  "board": 54.3,
+  "board_p95": 133.3,
+  "lhand": 31.0,
+  "rhand": 43.3,
+  "scalp_p95": 83.8,
+  "face_p95": 110.9,
+  "room": 17.4,
+  "top_row": 22.7,
+  "grain": 0.2,
+  "sharpen": 0.5
+ },
+ "c2_3_black_seat": {
+  "mean": 27.7,
+  "p95": 98.2,
+  "rg": 1.481,
+  "gb": 1.653,
+  "detail": 10.96,
+  "below8": 33.3,
+  "median": 15.1
+ },
+ "piece_separation": {
+  "method": "start position (-TCPlay=0), seat camera, 1920x1080; masks from a -TCSource=basecolor capture of the same view (white: min channel > 115 and chroma < 25% of max; black: max < 55 and chroma < 13; inside the board box; eroded 1 px): 78092 white and 31597 black pixels, overlay C2-piece-masks.jpg. Median Rec.709 luma of the final frame in each mask. Target ratio >= 2.5",
+  "c1": {
+   "white_median": 72.7,
+   "black_median": 2.4,
+   "ratio": 30.9
+  },
+  "c2_2": {
+   "white_median": 11.6,
+   "black_median": 2.1,
+   "ratio": 5.43
+  },
+  "c2_3": {
+   "white_median": 74.8,
+   "black_median": 4.2,
+   "ratio": 17.77
+  },
+  "note": "the black pieces are near-black in every state, so the ratio passes even for C2.2; the white median (11.6 vs 72.7) is the number that shows C2.2's problem and its fix"
+ },
+ "gpu_editor_1440p_ms": {
+  "c1_auto": 11.57,
+  "s1b_auto": 7.75,
+  "c2_2_auto": 8.13,
+  "c2_3_auto": 8.42,
+  "c2_3_sp75": 11.14,
+  "c2_3_sp100": 17.32
+ },
+ "tests": "cpu 142/142 + drag 8/8 (C2.1 build); cpu 120/120 + drag 8/8 (C2.2 build); cpu 108/108 + drag 8/8 (C2.3 build)",
+ "images": [
+  "C2-main.jpg (C2.3 main view, mid-game)",
+  "C2-before-after.jpg (start position: C1 top, C2.2 middle, C2.3 bottom)",
+  "C2-hands-black.jpg (C2.3 hands camera, Black seat)",
+  "C2-piece-masks.jpg (masks over the C1 start frame)"
+ ],
+ "packaged_perf": {
+  "commit": "f140362",
+  "resolution": "2560x1440 auto (offscreen)",
+  "avgFps": 116.1,
+  "low1Fps": 96.3,
+  "baseline": "86.9 / 72.1",
+  "plies": 54,
+  "pass": true
+ },
+ "v2_grain0": {
+  "detail_grain0": 11.06,
+  "detail_grain02": 11.17,
+  "note": "V2 (>= 11.5) not met; grain now contributes about 0.1"
+ }
+}

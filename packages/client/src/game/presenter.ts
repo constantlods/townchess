@@ -32,7 +32,7 @@ export function moveVisual(m: MoveRecord): MoveVisual {
 
 const resultText: Record<string, string> = {
   checkmate: 'CHECKMATE', stalemate: 'STALEMATE', draw_agreed: 'DRAW AGREED', draw_repetition: 'DRAW — REPETITION',
-  draw_insufficient: 'DRAW — NO MATERIAL', draw_fifty: 'DRAW — FIFTY MOVES', resigned: 'RESIGNATION', timeout: 'TIME', abandoned: 'ABANDONED',
+  draw_insufficient: 'DRAW — NO MATERIAL', draw_fifty: 'DRAW — FIFTY MOVES', draw_fivefold: 'DRAW — FIVEFOLD REPETITION', draw_seventyfive: 'DRAW — SEVENTY-FIVE MOVES', resigned: 'RESIGNATION', timeout: 'TIME', abandoned: 'ABANDONED', aborted: 'ABORTED',
 };
 
 /**
